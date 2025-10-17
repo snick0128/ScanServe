@@ -24,15 +24,15 @@ class MenuGrid extends StatelessWidget {
 
     if (screenWidth < 480) {
       // Mobile - very small screens
-      crossAxisCount = 1;
-      childAspectRatio = 1.1;
+      crossAxisCount = 2;
+      childAspectRatio = 0.75; // Reduced to prevent overflow
       crossAxisSpacing = 8;
       mainAxisSpacing = 8;
       gridPadding = const EdgeInsets.all(8);
     } else if (screenWidth < 600) {
       // Mobile
-      crossAxisCount = 1;
-      childAspectRatio = 1.0;
+      crossAxisCount = 2;
+      childAspectRatio = 0.7; // Reduced to prevent overflow
       crossAxisSpacing = 12;
       mainAxisSpacing = 12;
       gridPadding = const EdgeInsets.all(12);

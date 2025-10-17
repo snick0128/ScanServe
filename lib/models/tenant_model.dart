@@ -3,12 +3,14 @@ class Tenant {
   final String name;
   final String description;
   final List<Category> categories;
+  final bool isVegOnly;
 
   Tenant({
     required this.id,
     required this.name,
     required this.description,
     required this.categories,
+    this.isVegOnly = false,
   });
 
   factory Tenant.fromFirestore(Map<String, dynamic> data, String id) {
@@ -21,6 +23,7 @@ class Tenant {
               ?.map((category) => Category.fromMap(category))
               .toList() ??
           [],
+      isVegOnly: data['isVegOnly'] ?? false,
     );
   }
 }
@@ -51,6 +54,9 @@ class MenuItem {
   final String description;
   final double price;
   final String? imageUrl;
+  final String? category; // Breakfast, Lunch, Dinner
+  final String? subcategory; // Veg, Non-Veg, Beverages, etc.
+  final String? itemType; // veg or nonveg
 
   MenuItem({
     required this.id,
@@ -58,15 +64,24 @@ class MenuItem {
     required this.description,
     required this.price,
     this.imageUrl,
+    this.category,
+    this.subcategory,
+    this.itemType,
   });
 
   factory MenuItem.fromMap(Map<String, dynamic> data) {
+    final itemType = data['itemType'];
+    print('🔍 MenuItem.fromMap - itemType: $itemType, data keys: ${data.keys.toList()}');
+
     return MenuItem(
       id: data['id'] ?? '',
       name: data['name'] ?? '',
       description: data['description'] ?? '',
       price: (data['price'] ?? 0.0).toDouble(),
       imageUrl: data['image_url'],
+      category: data['category'] ?? data['Category'], // Try both cases
+      subcategory: data['subcategory'] ?? data['Subcategory'], // Try both cases
+      itemType: itemType, // veg or nonveg
     );
   }
 }

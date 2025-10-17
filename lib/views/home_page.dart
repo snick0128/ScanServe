@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scan_serve/services/tenant_service.dart';
 import '../controllers/menu_controller.dart' as app_controller;
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
-import '../services/offline_service.dart';
+import '../services/session_service.dart';
+import '../models/order_model.dart';
+import 'order_type_modal.dart';
 import 'meal_time_tabs.dart';
 import 'search_bar.dart' as custom_search;
 import 'subcategory_chips.dart';
@@ -32,24 +35,146 @@ class HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<HomeContent> {
+  String? _tenantName;
+  bool _isLoadingTenant = true;
+  bool? _isVegOnly;
+  bool _showNonVeg = false;
+  OrderType _currentOrderType = OrderType.parcel; // Default to parcel
+  String? _currentTableId;
+  String? _guestId;
+  bool _showOrderTypeSnackbar = false;
+
   @override
   void initState() {
     super.initState();
+    _initializeSession();
+    _loadTenantInfo();
     // Load menu items when the home content is initialized
-    final menuController = context.read<app_controller.MenuController>();
-    menuController.loadMenuItems(widget.tenantId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final menuController = context.read<app_controller.MenuController>();
+      menuController.loadMenuItems(widget.tenantId);
+    });
+  }
 
-    // Listen for offline status changes
-    final offlineService = context.read<OfflineService>();
-    offlineService.connectionStatus.listen((isOnline) {
+  Future<void> _initializeSession() async {
+    try {
+      final sessionService = SessionService();
+
+      // Load last used order type
+      final lastOrderType = await sessionService.getLastOrderType();
+      if (lastOrderType != null) {
+        setState(() {
+          _currentOrderType = lastOrderType;
+        });
+      }
+
+      // Load last used table ID
+      final lastTableId = await sessionService.getLastTableId();
+      if (lastTableId != null) {
+        setState(() {
+          _currentTableId = lastTableId;
+        });
+      }
+
+      // Create or get guest session
+      if (_guestId == null) {
+        _guestId = await sessionService.createGuestSession(widget.tenantId);
+        await sessionService.updateGuestSession(_guestId!, _currentOrderType, tableId: _currentTableId);
+      }
+
+      // Show snackbar notification
+      _showOrderTypeNotification();
+
+    } catch (e) {
+      print('Error initializing session: $e');
+    }
+  }
+
+  void _showOrderTypeNotification() {
+    setState(() {
+      _showOrderTypeSnackbar = true;
+    });
+
+    // Auto-hide after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        if (isOnline) {
-          offlineService.showOnlineSnackbar(context);
-        } else {
-          offlineService.showOfflineSnackbar(context);
-        }
+        setState(() {
+          _showOrderTypeSnackbar = false;
+        });
       }
     });
+  }
+
+  Future<void> _showOrderTypeSelectionModal() async {
+    await context.showOrderTypeModal(
+      tenantId: widget.tenantId,
+      guestId: _guestId ?? '',
+      onOrderTypeSelected: (orderType, tableId) async {
+        setState(() {
+          _currentOrderType = orderType;
+          _currentTableId = tableId;
+          _showNonVeg = false; // Reset to veg-only when changing order type
+        });
+
+        // Save to session
+        final sessionService = SessionService();
+        await sessionService.saveOrderType(orderType);
+        if (tableId != null) {
+          await sessionService.saveTableId(tableId);
+        }
+
+        // Update guest session
+        if (_guestId != null) {
+          await sessionService.updateGuestSession(_guestId!, orderType, tableId: tableId);
+        }
+
+        // Update order controller
+        final orderController = context.read<OrderController>();
+        orderController.setSession(widget.tenantId, tableId);
+
+        // Show notification
+        _showOrderTypeNotification();
+      },
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // TODO: Re-enable offline service when properly configured
+    // final offlineService = Provider.of<OfflineService>(context);
+    // offlineService.connectionStatus.listen((isOnline) {
+    //   if (mounted) {
+    //     if (isOnline) {
+    //       offlineService.showOnlineSnackbar(context);
+    //     } else {
+    //       offlineService.showOfflineSnackbar(context);
+    //     }
+    //   }
+    // });
+  }
+
+  Future<void> _loadTenantInfo() async {
+    try {
+      final tenantService = TenantService();
+      final tenant = await tenantService.getTenantInfo(widget.tenantId);
+      if (mounted) {
+        setState(() {
+          _tenantName = tenant?.name ?? 'Restaurant';
+          _isVegOnly = tenant?.isVegOnly ?? false;
+          _isLoadingTenant = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading tenant info: $e');
+      if (mounted) {
+        setState(() {
+          _tenantName = 'Restaurant';
+          _isVegOnly = false;
+          _isLoadingTenant = false;
+        });
+      }
+    }
   }
 
   @override
@@ -97,7 +222,7 @@ class _HomeContentState extends State<HomeContent> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Menu',
+          _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
           style: TextStyle(
             fontSize: screenWidth < 600 ? 20 : 24,
             fontWeight: FontWeight.bold,
@@ -105,42 +230,109 @@ class _HomeContentState extends State<HomeContent> {
         ),
         elevation: appBarElevation,
         actions: [
-          // Offline status indicator
-          Consumer<OfflineService>(
-            builder: (context, offlineService, child) {
-              return Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: offlineService.getOfflineStatusColor().withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: offlineService.getOfflineStatusColor().withAlpha(50),
-                    width: 1,
+          // Current Order Type Indicator
+          if (!_isLoadingTenant)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: _showOrderTypeSelectionModal,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _currentOrderType == OrderType.dineIn
+                        ? Colors.orange.withAlpha(25)
+                        : Colors.green.withAlpha(25),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _currentOrderType == OrderType.dineIn
+                          ? Colors.orange.withAlpha(50)
+                          : Colors.green.withAlpha(50),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _currentOrderType == OrderType.dineIn
+                            ? Icons.restaurant
+                            : Icons.takeout_dining,
+                        size: 16,
+                        color: _currentOrderType == OrderType.dineIn
+                            ? Colors.orange
+                            : Colors.green,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _currentOrderType.displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _currentOrderType == OrderType.dineIn
+                              ? Colors.orange
+                              : Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      offlineService.isOnline ? Icons.wifi : Icons.wifi_off,
-                      size: iconSize - 4,
-                      color: offlineService.getOfflineStatusColor(),
+              ),
+            ),
+
+          // Veg/Non-Veg toggle
+          if (!_isLoadingTenant)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Non-Veg',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      offlineService.getOfflineStatusMessage(),
-                      style: TextStyle(
-                        fontSize: screenWidth < 600 ? 10 : 12,
-                        fontWeight: FontWeight.bold,
-                        color: offlineService.getOfflineStatusColor(),
-                      ),
+                  ),
+                  SizedBox(width: 4),
+                  Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                      value: _showNonVeg && (_isVegOnly != true),
+                      onChanged: (_isVegOnly == true)
+                          ? null
+                          : (value) {
+                              if (_isVegOnly == true) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('This restaurant serves only vegetarian dishes.'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              } else {
+                                setState(() {
+                                  _showNonVeg = value;
+                                });
+                                // Update veg filter in menu controller
+                                final menuController = context.read<app_controller.MenuController>();
+                                menuController.setVegFilter(value);
+                              }
+                            },
+                      activeColor: const Color(0xFFFF914D),
+                      inactiveThumbColor: Colors.grey.shade400,
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  ),
+                ],
+              ),
+            ),
+
           IconButton(
             iconSize: iconSize,
             icon: const Icon(Icons.receipt_long),
@@ -167,9 +359,7 @@ class _HomeContentState extends State<HomeContent> {
               // Search Bar with responsive design
               Padding(
                 padding: searchPadding,
-                child: custom_search.SearchBar(
-                  maxWidth: searchBarMaxWidth,
-                ),
+                child: custom_search.SearchBar(maxWidth: searchBarMaxWidth),
               ),
 
               // Subcategories with responsive padding
@@ -200,6 +390,62 @@ class _HomeContentState extends State<HomeContent> {
             bottom: 0,
             child: ViewOrderBar(tenantId: widget.tenantId),
           ),
+
+          // Order Type Snackbar
+          if (_showOrderTypeSnackbar)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 100,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFFFF8F5),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _currentOrderType == OrderType.dineIn
+                            ? Icons.restaurant
+                            : Icons.takeout_dining,
+                        color: _currentOrderType == OrderType.dineIn
+                            ? Colors.orange
+                            : Colors.green,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'You\'re ordering for ${_currentOrderType.displayName}.',
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _showOrderTypeSelectionModal,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Change',
+                          style: TextStyle(
+                            color: Color(0xFFFF7043),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

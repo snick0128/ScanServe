@@ -16,7 +16,7 @@ class _MealTimeTabsState extends State<MealTimeTabs>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0); // Changed from 3 to 2 tabs
   }
 
   @override
@@ -31,11 +31,12 @@ class _MealTimeTabsState extends State<MealTimeTabs>
     final selectedMealTime = menuController.selectedMealTime;
 
     // Update tab controller when selected meal time changes
-    if (_tabController.index !=
-        ['Breakfast', 'Lunch', 'Dinner'].indexOf(selectedMealTime)) {
-      _tabController.animateTo(
-        ['Breakfast', 'Lunch', 'Dinner'].indexOf(selectedMealTime),
-      );
+    final currentIndex = _tabController.index;
+    final mealTimes = ['Breakfast', 'Meals']; // Changed from 3 to 2 meal times
+    final targetIndex = selectedMealTime.isEmpty ? 0 : mealTimes.indexOf(selectedMealTime);
+
+    if (currentIndex != targetIndex && targetIndex >= 0) {
+      _tabController.animateTo(targetIndex);
     }
 
     return Container(
@@ -48,7 +49,7 @@ class _MealTimeTabsState extends State<MealTimeTabs>
       child: TabBar(
         controller: _tabController,
         onTap: (index) {
-          final mealTime = ['Breakfast', 'Lunch', 'Dinner'][index];
+          final mealTime = ['Breakfast', 'Meals'][index]; // Changed from 3 to 2 meal times
           menuController.setMealTime(mealTime);
         },
         indicator: BoxDecoration(
@@ -76,8 +77,7 @@ class _MealTimeTabsState extends State<MealTimeTabs>
         ),
         tabs: const [
           Tab(text: 'Breakfast'),
-          Tab(text: 'Lunch'),
-          Tab(text: 'Dinner'),
+          Tab(text: 'Meals'), // Changed from 'Lunch' and 'Dinner' to just 'Meals'
         ],
       ),
     );

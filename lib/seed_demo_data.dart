@@ -49,6 +49,7 @@ Future<void> seedDemoData() async {
     'avgPrepTime': 25, // 25 minutes average preparation time
     'createdAt': FieldValue.serverTimestamp(),
     'isActive': true,
+    'isVegOnly': false, // Restaurant serves both veg and non-veg
   });
 
   print('🏪 Created demo tenant: $tenantId');
@@ -129,9 +130,10 @@ Future<void> seedDemoData() async {
       ],
     },
     {
-      'id': 'lunch',
-      'name': 'Lunch',
+      'id': 'meals',
+      'name': 'Meals', // Combined Lunch and Dinner
       'subcategories': [
+        // Lunch items
         {
           'id': 'lunch_veg',
           'name': 'Veg',
@@ -199,12 +201,7 @@ Future<void> seedDemoData() async {
             },
           ],
         },
-      ],
-    },
-    {
-      'id': 'dinner',
-      'name': 'Dinner',
-      'subcategories': [
+        // Dinner items
         {
           'id': 'dinner_veg',
           'name': 'Veg',
@@ -290,6 +287,12 @@ Future<void> seedDemoData() async {
       final items = subcategoryData['items'] as List;
 
       for (final itemData in items) {
+        // Determine itemType based on subcategory
+        String itemType = 'veg'; // default
+        if (subcategoryName.toLowerCase() == 'non-veg') {
+          itemType = 'nonveg';
+        }
+
         menuItems.add({
           'id': itemData['id'],
           'name': itemData['name'],
@@ -297,6 +300,8 @@ Future<void> seedDemoData() async {
           'price': itemData['price'],
           'image_url': itemData['image_url'],
           'subcategory': subcategoryName,
+          'category': categoryName, // Add category field
+          'itemType': itemType, // Add itemType field (veg/nonveg)
           'available': true,
         });
       }

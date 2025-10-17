@@ -1,43 +1,68 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 import '../models/order_details.dart';
-import '../controllers/cart_controller.dart';
 import '../models/order_model.dart';
+import '../controllers/cart_controller.dart';
 
 class OrderService {
-  final _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final Uuid _uuid = Uuid();
 
-  // Save new order to Firestore
-  Future<String> placeOrder({
+  // Order types
+  static const String TYPE_DINE_IN = 'dinein';
+  static const String TYPE_PARCEL = 'parcel';
+
+  /// Create a new order
+  Future<String> createOrder({
     required String tenantId,
     required String guestId,
-    required OrderType type,
+    required OrderType orderType,
     String? tableId,
-    required List<CartItem> items,
-    required int avgPrepTime,
+    required List<CartItem> cartItems,
+    String? notes,
   }) async {
     try {
-      final orderId = _firestore.collection('orders').doc().id;
+      final orderId = _uuid.v4();
       final tenantSettings = await getTenantSettings(tenantId);
       final taxRate = tenantSettings['taxRate'] as double? ?? 0.18;
+
+      print('Creating order: $orderId for guest: $guestId, type: ${orderType.name}, tableId: $tableId');
 
       final orderDetails = OrderDetails.fromCart(
         orderId: orderId,
         guestId: guestId,
         tenantId: tenantId,
-        type: type,
+        type: orderType,
         tableId: tableId,
-        cartItems: items,
-        avgPrepTime: avgPrepTime,
+        cartItems: cartItems,
+        avgPrepTime: 25,
         taxRate: taxRate,
       );
 
-      await _firestore
-          .collection('tenants')
-          .doc(tenantId)
-          .collection('orders')
-          .doc(orderId)
-          .set(orderDetails.toMap());
+      // Store in appropriate location based on order type
+      if (orderType == OrderType.dineIn && tableId != null) {
+        print('🍽️ Saving dine-in order to: tenants/$tenantId/tables/$tableId/orders/$orderId');
+        // Dine-in: Store under table
+        await _firestore
+            .collection('tenants')
+            .doc(tenantId)
+            .collection('tables')
+            .doc(tableId)
+            .collection('orders')
+            .doc(orderId)
+            .set(orderDetails.toMap());
+      } else {
+        print('📦 Saving parcel order to: tenants/$tenantId/orders/$orderId');
+        // Parcel: Store directly under tenant orders
+        await _firestore
+            .collection('tenants')
+            .doc(tenantId)
+            .collection('orders')
+            .doc(orderId)
+            .set(orderDetails.toMap());
+      }
 
+      print('Order saved successfully: $orderId');
       return orderId;
     } catch (e) {
       print('Error placing order: $e');

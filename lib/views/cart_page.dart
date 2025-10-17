@@ -232,17 +232,17 @@ class _OrderSummary extends StatelessWidget {
                         if (!context.mounted) return;
                         try {
                           final guestId = await guestSession.getGuestId();
-                          final avgPrepTime =
-                              await orderService.getTenantPrepTime(tenantId);
+                          print('Placing order for guest: $guestId');
 
-                          await orderService.placeOrder(
+                          final orderId = await orderService.createOrder(
                             tenantId: tenantId,
                             guestId: guestId,
-                            type: orderController.currentOrderType,
+                            orderType: orderController.currentOrderType,
                             tableId: orderController.currentSession?.tableId,
-                            items: cartController.items,
-                            avgPrepTime: avgPrepTime,
+                            cartItems: cartController.items,
                           );
+
+                          print('Order placed successfully: $orderId');
 
                           cartController.clear();
 

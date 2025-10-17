@@ -14,6 +14,16 @@ class OrderListScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('My Orders')),
       body: Consumer<OrderController>(
         builder: (context, orderController, child) {
+          // Debug: Print current state
+          print('OrderListScreen rebuild - Orders count: ${orderController.activeOrders.length}');
+
+          // Check if there are no orders at all
+          final hasNoOrders = orderController.activeOrders.isEmpty;
+
+          if (hasNoOrders) {
+            return _buildEmptyState(context);
+          }
+
           return Column(
             children: [
               _buildTotalWaitTime(orderController),
@@ -40,6 +50,53 @@ class OrderListScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Orders Found',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You haven\'t placed any orders yet.\nBrowse the menu and place your first order!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.restaurant_menu),
+            label: const Text('Browse Menu'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

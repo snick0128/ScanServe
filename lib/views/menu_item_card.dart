@@ -58,8 +58,8 @@ class _MenuItemCardState extends State<MenuItemCard>
           return Transform.scale(
             scale: _scaleAnimation.value,
             child: Card(
-              elevation: _isHovered ? 6 : 3,
-              shadowColor: Colors.black.withAlpha(25),
+              elevation: _isHovered ? 8 : 5,
+              shadowColor: Colors.black.withAlpha(30),
               color: Colors.white,
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
@@ -86,7 +86,7 @@ class _MenuItemCardState extends State<MenuItemCard>
                       ),
                     ),
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 10.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -95,17 +95,19 @@ class _MenuItemCardState extends State<MenuItemCard>
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           widget.item.description,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.grey[600],
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [

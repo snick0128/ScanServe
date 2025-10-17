@@ -6,25 +6,49 @@ class MenuService {
 
   Future<List<MenuItem>> getMenuItems(String tenantId) async {
     try {
-      final tenantDoc = await _firestore
+      print('Fetching menu items for tenant: $tenantId');
+      // Get categories subcollection
+      final categoriesCollection = await _firestore
           .collection('tenants')
           .doc(tenantId)
+          .collection('categories')
           .get();
 
-      if (!tenantDoc.exists) {
-        print('Tenant not found: $tenantId');
-        return [];
-      }
-
-      final tenantData = tenantDoc.data() as Map<String, dynamic>;
-      final categories = tenantData['categories'] as List<dynamic>? ?? [];
-
+      print('Found ${categoriesCollection.docs.length} categories');
+      
       List<MenuItem> allMenuItems = [];
 
-      for (var category in categories) {
-        final menuItems = category['menu_items'] as List<dynamic>? ?? [];
+      for (var categoryDoc in categoriesCollection.docs) {
+        final categoryData = categoryDoc.data();
+        final categoryName = categoryData['name'] as String? ?? categoryDoc.id;
+
+        print('Processing category: ${categoryDoc.id}');
+        print('Category data: ${categoryDoc.data()}');
+        
+        final menuItems = categoryData['menu_items'] as List<dynamic>? ?? [];
+        print('Found ${menuItems.length} items in category ${categoryDoc.id}');
+        
         for (var item in menuItems) {
-          allMenuItems.add(MenuItem.fromMap(item as Map<String, dynamic>));
+          final itemData = item as Map<String, dynamic>;
+
+          // Add category field based on the category document ID
+          if (!itemData.containsKey('category')) {
+            final categoryId = categoryDoc.id.toLowerCase();
+            if (categoryId == 'lunch' || categoryId == 'dinner') {
+              itemData['category'] = 'Meals'; // Combine Lunch and Dinner into Meals
+            } else {
+              itemData['category'] = categoryName; // Use the category name for others
+            }
+          }
+
+          print('🔍 RAW ITEM DATA: ${itemData.toString()}');
+          try {
+            final menuItem = MenuItem.fromMap(itemData);
+            print('📝 CREATED: ${menuItem.name} | Category: "${menuItem.category}" | Subcategory: "${menuItem.subcategory}"');
+            allMenuItems.add(menuItem);
+          } catch (e) {
+            print('❌ Error parsing menu item: $e');
+          }
         }
       }
 

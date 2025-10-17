@@ -52,12 +52,27 @@ class _InitializerState extends State<Initializer> {
   }
 
   Future<void> _initialize() async {
-    final guestSession = GuestSessionService();
-    await guestSession.startSession(tenantId: 'demo_tenant');
+    print('Starting app initialization');
 
-    // This is a placeholder for the actual URL from the browser
-    const url = 'https://example.com/?tenantId=demo_tenant&tableId=table_1';
+    // Get the actual URL from the window location in web
+    String url = Uri.base.toString();
+    print('Current URL: $url');
+
+    // For development/testing, use a default tenant if no URL parameters
+    if (!url.contains('tenantId')) {
+      print('No tenantId in URL, using demo_tenant');
+      url =
+          '$url${url.contains('?') ? '&' : '?'}tenantId=demo_tenant&tableId=table_1';
+    }
+
     final params = QrUrlParser.parseUrl(url);
+    print('Parsed URL parameters: $params');
+
+    final guestSession = GuestSessionService();
+    await guestSession.getOrCreateGuestId();
+    await guestSession.startSession(
+      tenantId: params['tenantId'] ?? 'demo_tenant',
+    );
 
     final tenantId = params['tenantId'];
     final tableId = params['tableId'];

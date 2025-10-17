@@ -21,7 +21,7 @@ class SubcategoryChips extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           // Add dynamic subcategories here based on your data
-          ...['Starters', 'Main Course', 'Desserts'].map((subcategory) {
+          ...['Veg', 'Non-Veg', 'Beverages'].map((subcategory) {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilterChip(
