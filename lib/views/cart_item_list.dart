@@ -60,101 +60,160 @@ class CartItemList extends StatelessWidget {
         final item = items[index];
 
         return Card(
-          elevation: 3,
-          shadowColor: Colors.black.withAlpha(25),
+          elevation: 2,
+          shadowColor: Colors.deepPurple.withOpacity(0.1),
           color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           child: Padding(
-            padding: EdgeInsets.all(isMobile ? 12 : 16),
+            padding: EdgeInsets.all(isMobile ? 16 : 20),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Item details
+                // Item details section
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Item name with better typography
                       Text(
                         item.item.name,
                         style: TextStyle(
                           fontSize: isMobile ? 16 : 18,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                           color: Colors.black87,
+                          height: 1.3,
                         ),
                       ),
-                      SizedBox(height: isMobile ? 2 : 4),
-                      Text(
-                        '₹${item.item.price.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: isMobile ? 14 : 16,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                      SizedBox(height: isMobile ? 6 : 8),
 
-                // Quantity controls
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _AnimatedIconButton(
-                        icon: Icons.remove,
-                        color: const Color(0xFFFF6E40),
-                        onPressed: () {
-                          onUpdateQuantity(item.item.id, item.quantity - 1);
-                        },
-                        isMobile: isMobile,
-                      ),
+                      // Price with improved styling
                       Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 16 : 20,
-                          vertical: isMobile ? 8 : 12,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF6E40).withAlpha(25),
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.deepPurple.withAlpha(10),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          item.quantity.toString(),
+                          '₹${item.item.price.toStringAsFixed(2)} each',
                           style: TextStyle(
-                            fontSize: isMobile ? 16 : 18,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFFFF6E40),
+                            fontSize: isMobile ? 13 : 14,
+                            color: Colors.deepPurple,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
-                      _AnimatedIconButton(
-                        icon: Icons.add,
-                        color: const Color(0xFFFF6E40),
-                        onPressed: () {
-                          onUpdateQuantity(item.item.id, item.quantity + 1);
-                        },
-                        isMobile: isMobile,
+
+                      // Veg/Non-veg indicator
+                      SizedBox(height: isMobile ? 8 : 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: item.item.isVeg ? Colors.green.withAlpha(15) : Colors.red.withAlpha(15),
+                          border: Border.all(
+                            color: item.item.isVeg ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50),
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              item.item.isVeg ? Icons.circle : Icons.circle_outlined,
+                              size: 12,
+                              color: item.item.isVeg ? Colors.green : Colors.red,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              item.item.isVeg ? 'Veg' : 'Non-Veg',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: item.item.isVeg ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                // Item total
-                SizedBox(width: isMobile ? 12 : 16),
-                SizedBox(
-                  width: isMobile ? 70 : 80,
-                  child: Text(
-                    '₹${item.totalPrice.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: isMobile ? 16 : 18,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFFF6E40),
+                SizedBox(width: isMobile ? 16 : 20),
+
+                // Quantity controls and price section
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Quantity controls
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.deepPurple.withAlpha(30)),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.grey[50],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _AnimatedIconButton(
+                            icon: Icons.remove,
+                            color: item.quantity > 1 ? Colors.deepPurple : Colors.grey[400]!,
+                            onPressed: () {
+                              onUpdateQuantity(item.item.id, item.quantity - 1);
+                            },
+                            isMobile: isMobile,
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 14 : 16,
+                              vertical: isMobile ? 8 : 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurple.withAlpha(15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              item.quantity.toString(),
+                              style: TextStyle(
+                                fontSize: isMobile ? 14 : 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepPurple,
+                              ),
+                            ),
+                          ),
+                          _AnimatedIconButton(
+                            icon: Icons.add,
+                            color: Colors.deepPurple,
+                            onPressed: () {
+                              onUpdateQuantity(item.item.id, item.quantity + 1);
+                            },
+                            isMobile: isMobile,
+                          ),
+                        ],
+                      ),
                     ),
-                    textAlign: TextAlign.end,
-                  ),
+
+                    // Total price
+                    SizedBox(height: isMobile ? 12 : 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.withAlpha(10),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '₹${item.totalPrice.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: isMobile ? 15 : 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

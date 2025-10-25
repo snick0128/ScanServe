@@ -53,6 +53,8 @@ class _HomeContentState extends State<HomeContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final menuController = context.read<app_controller.MenuController>();
       menuController.loadMenuItems(widget.tenantId);
+      // Set default filter to Veg
+      menuController.setVegFilter(false);
     });
   }
 
@@ -181,7 +183,7 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // Enhanced responsive breakpoints for better UX
+    // Enhanced responsive breakpoints for better UX with Material 3
     double searchBarMaxWidth;
     EdgeInsets searchPadding;
     double appBarElevation;
@@ -190,43 +192,54 @@ class _HomeContentState extends State<HomeContent> {
     if (screenWidth < 480) {
       // Very small mobile
       searchBarMaxWidth = double.infinity;
-      searchPadding = const EdgeInsets.fromLTRB(8, 8, 8, 16);
-      appBarElevation = 0;
-      iconSize = 20;
+      searchPadding = const EdgeInsets.fromLTRB(12, 12, 12, 20);
+      appBarElevation = 2;
+      iconSize = 22;
     } else if (screenWidth < 600) {
       // Mobile
       searchBarMaxWidth = double.infinity;
-      searchPadding = const EdgeInsets.fromLTRB(12, 8, 12, 16);
-      appBarElevation = 0;
-      iconSize = 22;
+      searchPadding = const EdgeInsets.fromLTRB(16, 12, 16, 20);
+      appBarElevation = 2;
+      iconSize = 24;
     } else if (screenWidth < 900) {
       // Tablet portrait
-      searchBarMaxWidth = 400;
-      searchPadding = const EdgeInsets.fromLTRB(16, 12, 16, 20);
-      appBarElevation = 1;
-      iconSize = 24;
-    } else if (screenWidth < 1200) {
-      // Tablet landscape
       searchBarMaxWidth = 450;
       searchPadding = const EdgeInsets.fromLTRB(20, 16, 20, 24);
-      appBarElevation = 2;
+      appBarElevation = 3;
       iconSize = 26;
-    } else {
-      // Desktop
+    } else if (screenWidth < 1200) {
+      // Tablet landscape
       searchBarMaxWidth = 500;
       searchPadding = const EdgeInsets.fromLTRB(24, 20, 24, 28);
-      appBarElevation = 2;
+      appBarElevation = 4;
       iconSize = 28;
+    } else {
+      // Desktop
+      searchBarMaxWidth = 550;
+      searchPadding = const EdgeInsets.fromLTRB(28, 24, 28, 32);
+      appBarElevation = 4;
+      iconSize = 30;
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
-          style: TextStyle(
-            fontSize: screenWidth < 600 ? 20 : 24,
-            fontWeight: FontWeight.bold,
-          ),
+        title: LayoutBuilder(
+          builder: (context, constraints) {
+            return Container(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.6),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         elevation: appBarElevation,
         actions: [
@@ -286,50 +299,70 @@ class _HomeContentState extends State<HomeContent> {
               ),
             ),
 
-          // Veg/Non-Veg toggle
+          // Veg/Non-Veg circular indicators
           if (!_isLoadingTenant)
             Container(
               margin: const EdgeInsets.only(right: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Non-Veg',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w500,
+              child: InkWell(
+                onTap: (_isVegOnly == true)
+                    ? null
+                    : () {
+                        setState(() {
+                          _showNonVeg = !_showNonVeg;
+                        });
+                        // Update veg filter in menu controller
+                        final menuController = context.read<app_controller.MenuController>();
+                        menuController.setVegFilter(_showNonVeg);
+                      },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _showNonVeg
+                        ? Colors.orange.withAlpha(15)
+                        : Colors.green.withAlpha(25),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _showNonVeg
+                          ? Colors.orange.withAlpha(50)
+                          : Colors.green.withAlpha(50),
+                      width: 1,
                     ),
                   ),
-                  SizedBox(width: 4),
-                  Transform.scale(
-                    scale: 0.8,
-                    child: Switch(
-                      value: _showNonVeg && (_isVegOnly != true),
-                      onChanged: (_isVegOnly == true)
-                          ? null
-                          : (value) {
-                              if (_isVegOnly == true) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('This restaurant serves only vegetarian dishes.'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              } else {
-                                setState(() {
-                                  _showNonVeg = value;
-                                });
-                                // Update veg filter in menu controller
-                                final menuController = context.read<app_controller.MenuController>();
-                                menuController.setVegFilter(value);
-                              }
-                            },
-                      activeColor: const Color(0xFFFF914D),
-                      inactiveThumbColor: Colors.grey.shade400,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Green dot for Veg
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Red dot for Non-Veg (shows when non-veg items are included)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _showNonVeg ? Colors.red : Colors.grey.shade300,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _showNonVeg ? 'Non-Veg' : 'Veg',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _showNonVeg ? Colors.orange : Colors.green,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
@@ -365,7 +398,7 @@ class _HomeContentState extends State<HomeContent> {
               // Subcategories with responsive padding
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth < 600 ? 8 : 16,
+                  horizontal: screenWidth < 600 ? 12 : 20,
                 ),
                 child: const SubcategoryChips(),
               ),
@@ -374,21 +407,72 @@ class _HomeContentState extends State<HomeContent> {
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(
-                    left: screenWidth < 600 ? 8 : 16,
-                    right: screenWidth < 600 ? 8 : 16,
-                    bottom: screenWidth < 600 ? 8 : 16,
+                    left: screenWidth < 600 ? 12 : 20,
+                    right: screenWidth < 600 ? 12 : 20,
+                    bottom: screenWidth < 600 ? 12 : 20,
                   ),
                   child: const MenuGrid(),
                 ),
               ),
             ],
           ),
-          // Floating cart button with responsive positioning
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
+            left: 15,
+            right: 15,
+            bottom: 15,
             child: ViewOrderBar(tenantId: widget.tenantId),
+          ),
+
+          // Floating Call Waiter Button
+          Positioned(
+            right: 16,
+            bottom: 90, // Position above the ViewOrderBar
+            child: FloatingActionButton(
+              onPressed: () {
+                // Show call waiter dialog or snackbar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Waiter has been notified!'),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 6,
+                    backgroundColor: Colors.deepPurple.withAlpha(25),
+                  ),
+                );
+              },
+              backgroundColor: Colors.transparent,
+              elevation: 8,
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.deepPurple,
+                      Colors.deepPurpleAccent,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.deepPurple.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.notifications_active_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
           ),
 
           // Order Type Snackbar
@@ -396,11 +480,12 @@ class _HomeContentState extends State<HomeContent> {
             Positioned(
               left: 16,
               right: 16,
-              bottom: 100,
+              bottom: 160, // Position above Call Waiter button and ViewOrderBar
               child: Material(
                 elevation: 6,
-                borderRadius: BorderRadius.circular(12),
-                color: const Color(0xFFFFF8F5),
+                shadowColor: Colors.deepPurple.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+                surfaceTintColor: const Color(0xFFFFF8F5),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(

@@ -23,8 +23,17 @@ class CartPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your Order'),
-        elevation: 0,
+        title: const Text(
+          'Your Order',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        elevation: 2,
+        shadowColor: Colors.deepPurple.withOpacity(0.1),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -144,18 +153,19 @@ class _OrderSummary extends StatelessWidget {
         final total = subtotal + tax;
 
         return Container(
-          padding: EdgeInsets.all(isMobile ? 12 : 16),
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
+            color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(25),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
+                color: Colors.deepPurple.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -8),
+                spreadRadius: 2,
               ),
             ],
             borderRadius: isMobile
-                ? const BorderRadius.vertical(top: Radius.circular(16))
+                ? const BorderRadius.vertical(top: Radius.circular(20))
                 : BorderRadius.zero,
           ),
           child: Column(
@@ -220,7 +230,7 @@ class _OrderSummary extends StatelessWidget {
                     style: TextStyle(
                       fontSize: isMobile ? 18 : 20,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
+                      color: Colors.deepPurple,
                     ),
                   ),
                 ],
@@ -278,19 +288,26 @@ class _OrderSummary extends StatelessWidget {
                   backgroundColor: MaterialStateProperty.all(Colors.transparent),
                 ),
                 child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
                       colors: [
-                        Color(0xFFFF914D),
-                        Color(0xFFFF6E40),
+                        Colors.deepPurple,
+                        Colors.deepPurpleAccent,
                       ],
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ),
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.deepPurple.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   padding: EdgeInsets.symmetric(
-                    vertical: isMobile ? 14 : 16,
+                    vertical: isMobile ? 16 : 18,
                     horizontal: 32,
                   ),
                   child: const Text(
@@ -298,7 +315,9 @@ class _OrderSummary extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),

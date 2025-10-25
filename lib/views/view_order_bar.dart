@@ -59,93 +59,109 @@ class ViewOrderBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isTablet ? (screenWidth - 600) / 2 : 16,
-        vertical: 16,
+        vertical: 8, // Reduced from 16 to 8
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor,
+        gradient: LinearGradient(
+          colors: [
+            Colors.deepPurple,
+            Colors.deepPurpleAccent,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.deepPurple.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.deepPurpleAccent.withOpacity(0.2),
             blurRadius: 10,
-            offset: const Offset(0, -2),
+            offset: const Offset(0, 4),
           ),
         ],
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.circular(50), // Pill-shaped
       ),
-      child: SafeArea(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () async {
-              final orderController = context.read<OrderController>();
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            final orderController = context.read<OrderController>();
 
-              // Show order type selection if not already selected
-              if (orderController.currentOrderType == null) {
-                final selectedType = await showDialog<OrderType>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => OrderTypeDialog(
-                    initialType: orderController.currentOrderType,
-                  ),
-                );
-
-                if (selectedType != null) {
-                  await orderController.createOrderSession(
-                    selectedType,
-                    tenantId: tenantId,
-                  );
-                  _showOrderTypeSnackBar(context, selectedType);
-                }
-              }
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CartPage(
-                    tenantId: orderController.currentSession!.tenantId,
-                  ),
+            // Show order type selection if not already selected
+            if (orderController.currentOrderType == null) {
+              final selectedType = await showDialog<OrderType>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => OrderTypeDialog(
+                  initialType: orderController.currentOrderType,
                 ),
               );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.shopping_cart,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'View Order (₹${cart.totalAmount.toStringAsFixed(2)})',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      cart.itemCount.toString(),
-                      style: TextStyle(
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+
+              if (selectedType != null) {
+                await orderController.createOrderSession(
+                  selectedType,
+                  tenantId: tenantId,
+                );
+                _showOrderTypeSnackBar(context, selectedType);
+              }
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CartPage(
+                  tenantId: orderController.currentSession!.tenantId,
+                ),
               ),
+            );
+          },
+          borderRadius: BorderRadius.circular(50),
+          splashColor: Theme.of(context).colorScheme.onPrimary.withAlpha(30),
+          highlightColor: Theme.of(context).colorScheme.onPrimary.withAlpha(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 16 to 8
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.shopping_cart,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  size: 18, // Slightly smaller
+                ),
+                const SizedBox(width: 6), // Reduced from 8 to 6
+                Text(
+                  'View Order (₹${cart.totalAmount.toStringAsFixed(2)})',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontSize: 14, // Reduced from 16 to 14
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6), // Reduced from 8 to 6
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    cart.itemCount.toString(),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11, // Reduced from 12 to 11
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

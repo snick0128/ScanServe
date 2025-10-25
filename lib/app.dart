@@ -28,8 +28,54 @@ class App extends StatelessWidget {
       child: MaterialApp(
         title: 'ScanServe',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          colorScheme: const ColorScheme.light(
+            primary: Colors.deepPurple,
+            primaryContainer: Colors.deepPurple,
+            secondary: Colors.deepPurpleAccent,
+            secondaryContainer: Colors.deepPurpleAccent,
+            tertiary: Colors.indigoAccent,
+            surface: Colors.white,
+            background: Colors.white,
+            onPrimary: Colors.white,
+            onSecondary: Colors.white,
+            onSurface: Colors.black87,
+            onBackground: Colors.black87,
+          ),
           useMaterial3: true,
+          // Enhanced Material 3 styling
+          appBarTheme: AppBarTheme(
+            elevation: 2,
+            shadowColor: Colors.deepPurple.withOpacity(0.1),
+            surfaceTintColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
+            ),
+          ),
+          cardTheme: CardThemeData(
+            elevation: 1,
+            shadowColor: Colors.black.withOpacity(0.1),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            surfaceTintColor: Colors.white,
+          ),
+          floatingActionButtonTheme: FloatingActionButtonThemeData(
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              elevation: 2,
+              shadowColor: Colors.deepPurple.withOpacity(0.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
         ),
         home: const Initializer(),
       ),

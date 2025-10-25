@@ -56,7 +56,9 @@ class MenuItem {
   final String? imageUrl;
   final String? category; // Breakfast, Lunch, Dinner
   final String? subcategory; // Veg, Non-Veg, Beverages, etc.
-  final String? itemType; // veg or nonveg
+  late final String? itemType; // veg or nonveg
+
+  bool get isVeg => itemType?.toLowerCase() == 'veg';
 
   MenuItem({
     required this.id,
@@ -66,8 +68,10 @@ class MenuItem {
     this.imageUrl,
     this.category,
     this.subcategory,
-    this.itemType,
-  });
+    String? itemType,
+  }) {
+    this.itemType = itemType;
+  }
 
   factory MenuItem.fromMap(Map<String, dynamic> data) {
     final itemType = data['itemType'];

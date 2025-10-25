@@ -46,6 +46,10 @@ class CartController extends ChangeNotifier {
     }
   }
 
+  bool isItemInCart(String itemId) => _items.containsKey(itemId);
+
+  int getItemQuantity(String itemId) => _items[itemId]?.quantity ?? 0;
+
   void clear() {
     _items.clear();
     notifyListeners();
