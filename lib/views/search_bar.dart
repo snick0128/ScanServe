@@ -49,7 +49,7 @@ class _SearchBarState extends State<SearchBar>
         return Container(
           constraints: BoxConstraints(maxWidth: widget.maxWidth),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withAlpha(10),
@@ -81,45 +81,79 @@ class _SearchBarState extends State<SearchBar>
                     color: Colors.grey[500],
                     fontSize: isMobile ? 14 : 16,
                   ),
-                  prefixIcon: Container(
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      Icons.search,
-                      color: Colors.grey[600],
-                      size: isMobile ? 20 : 22,
-                    ),
-                  ),
-                  suffixIcon: Consumer<app_controller.MenuController>(
-                    builder: (context, controller, child) {
-                      if (controller.searchQuery.isNotEmpty) {
-                        return IconButton(
-                          icon: Icon(
-                            Icons.clear,
-                            color: Colors.grey[600],
-                            size: isMobile ? 20 : 22,
-                          ),
-                          onPressed: () {
-                            controller.setSearchQuery('');
-                          },
-                          padding: const EdgeInsets.all(12),
-                        );
-                      }
-                      return const SizedBox.shrink();
+                  prefixIcon: AnimatedBuilder(
+                    animation: _focusController,
+                    builder: (context, child) {
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.search,
+                          color: _focusController.value > 0.5
+                              ? const Color(0xFFFF6E40)
+                              : Colors.grey[600],
+                          size: isMobile ? 20 : 22,
+                        ),
+                      );
                     },
                   ),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Consumer<app_controller.MenuController>(
+                        builder: (context, controller, child) {
+                          if (controller.isSearching) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                '${controller.searchResultsCount} found',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: isMobile ? 12 : 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                      Consumer<app_controller.MenuController>(
+                        builder: (context, controller, child) {
+                          if (controller.searchQuery.isNotEmpty) {
+                            return IconButton(
+                              icon: AnimatedOpacity(
+                                opacity: 1.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey[600],
+                                  size: isMobile ? 20 : 22,
+                                ),
+                              ),
+                              onPressed: () {
+                                controller.setSearchQuery('');
+                              },
+                              padding: const EdgeInsets.all(12),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
                       color: Colors.grey[300]!,
                       width: 1,
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     borderSide: const BorderSide(
                       color: Color(0xFFFF6E40),
                       width: 2,
@@ -129,7 +163,7 @@ class _SearchBarState extends State<SearchBar>
                   fillColor: Colors.white,
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: isMobile ? 16 : 20,
-                    vertical: isMobile ? 12 : 16,
+                    vertical: isMobile ? 14 : 18,
                   ),
                 ),
               ),

@@ -138,7 +138,17 @@ class _InitializerState extends State<Initializer> {
       // Handle invalid QR code
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Invalid QR Code')));
+      ).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid QR Code'),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            top: 20,
+            left: 16,
+            right: 16,
+          ),
+        ),
+      );
     }
   }
 

@@ -71,6 +71,11 @@ class OfflineService {
         backgroundColor: Colors.orange,
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(
+          top: 20,
+          left: 16,
+          right: 16,
+        ),
       ),
     );
   }
@@ -89,6 +94,11 @@ class OfflineService {
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(
+          top: 20,
+          left: 16,
+          right: 16,
+        ),
       ),
     );
   }

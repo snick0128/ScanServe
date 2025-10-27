@@ -19,7 +19,24 @@ class ViewOrderBar extends StatelessWidget {
       SnackBar(
         content: Row(
           children: [
-            Expanded(child: Text('Order type set to ${type.displayName}')),
+            Icon(
+              type == OrderType.dineIn
+                  ? Icons.restaurant
+                  : Icons.takeout_dining,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Order type set to ${type.displayName}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
             TextButton(
               onPressed: () async {
                 final newType = await showDialog<OrderType>(
@@ -34,13 +51,31 @@ class ViewOrderBar extends StatelessWidget {
                   _showOrderTypeSnackBar(context, newType);
                 }
               },
-              child: const Text('CHANGE'),
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'CHANGE',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(top: 20, left: 16, right: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 6,
+        backgroundColor: type == OrderType.dineIn
+            ? Colors.orange.shade700
+            : Colors.green.shade700,
       ),
     );
   }
@@ -63,10 +98,7 @@ class ViewOrderBar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.deepPurple,
-            Colors.deepPurpleAccent,
-          ],
+          colors: [Colors.deepPurple, Colors.deepPurpleAccent],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -123,7 +155,9 @@ class ViewOrderBar extends StatelessWidget {
           splashColor: Theme.of(context).colorScheme.onPrimary.withAlpha(30),
           highlightColor: Theme.of(context).colorScheme.onPrimary.withAlpha(20),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 16 to 8
+            padding: const EdgeInsets.symmetric(
+              vertical: 8,
+            ), // Reduced from 16 to 8
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,

@@ -15,23 +15,38 @@ class MenuController extends ChangeNotifier {
   String get selectedMealTime => _selectedMealTime;
   String? get selectedSubcategory => _selectedSubcategory;
   String get searchQuery => _searchQuery;
-  bool get showNonVeg => _showNonVeg;
+  int get searchResultsCount => filteredItems.length;
+  bool get isSearching => _searchQuery.isNotEmpty;
   List<MenuItem> get filteredItems {
-    print('🔍 FILTERING: Total items: ${_items.length}, Selected meal time: "$_selectedMealTime", Search query: "$_searchQuery"');
+    print(
+      '🔍 FILTERING: Total items: ${_items.length}, Selected meal time: "$_selectedMealTime", Search query: "$_searchQuery"',
+    );
 
     var filtered = _items
         .where(
           (item) =>
+              item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
               item.description.toLowerCase().contains(_searchQuery.toLowerCase()),
         );
 
     print('🔍 AFTER SEARCH: ${filtered.length} items');
 
+    // Debug: Print all available categories
+    if (_selectedMealTime.isEmpty) {
+      final categories = <String>{};
+      for (var item in _items) {
+        categories.add(item.category ?? 'NULL');
+      }
+      print('🔍 AVAILABLE CATEGORIES: $categories');
+    }
+
     filtered = filtered.where((item) {
       // Filter by meal time (category) if selected
       if (_selectedMealTime.isNotEmpty && item.category != null) {
         if (item.category != _selectedMealTime) {
-          print('FILTERING OUT: "${item.name}" (category: "${item.category}") - looking for "$_selectedMealTime"');
+          print(
+            'FILTERING OUT: "${item.name}" (category: "${item.category}") - looking for "$_selectedMealTime"',
+          );
           return false;
         }
       }
@@ -48,10 +63,13 @@ class MenuController extends ChangeNotifier {
       } else {
         // Show only veg items when toggle is false
         final subcategory = item.subcategory;
-        final isVeg = subcategory != null &&
-                     (subcategory.toLowerCase() == 'veg' ||
-                      subcategory.toLowerCase().contains('veg'));
-        print('🔍 Item: "${item.name}" | subcategory: "$subcategory" | isVeg: $isVeg');
+        final isVeg =
+            subcategory != null &&
+            (subcategory.toLowerCase() == 'veg' ||
+                subcategory.toLowerCase().contains('veg'));
+        print(
+          '🔍 Item: "${item.name}" | subcategory: "$subcategory" | isVeg: $isVeg',
+        );
         return isVeg;
       }
     });
@@ -62,6 +80,7 @@ class MenuController extends ChangeNotifier {
     print('🔍 FINAL RESULT: ${result.length} items');
     return result;
   }
+
   bool get isLoading => _isLoading;
 
   void setMealTime(String mealTime) {
@@ -70,10 +89,15 @@ class MenuController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void testFiltering() {
-    print('🧪 TESTING FILTER: Setting filter to "Meals"');
-    _selectedMealTime = 'Meals';
-    notifyListeners();
+  void testFirebaseConnection() async {
+    print('🧪 TESTING FIREBASE CONNECTION...');
+    try {
+      final menuItems = await _menuService.getMenuItems('demo_tenant');
+      print('🧪 TEST RESULT: Loaded ${menuItems.length} items from Firebase');
+      setMenuItems(menuItems);
+    } catch (e) {
+      print('🧪 TEST ERROR: $e');
+    }
   }
 
   void setSubcategory(String? subcategory) {

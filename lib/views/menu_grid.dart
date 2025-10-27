@@ -20,50 +20,43 @@ class MenuGrid extends StatelessWidget {
     double childAspectRatio;
     double crossAxisSpacing;
     double mainAxisSpacing;
-    EdgeInsets gridPadding;
 
     if (screenWidth < 480) {
       // Mobile - very small screens
       crossAxisCount = 2;
-      childAspectRatio = 0.75; // Reduced to prevent overflow
-      crossAxisSpacing = 8;
+      childAspectRatio = 0.68; // Decreased from 0.75 to increase height by ~15px
+      crossAxisSpacing = 12;
       mainAxisSpacing = 8;
-      gridPadding = const EdgeInsets.all(8);
     } else if (screenWidth < 600) {
       // Mobile
       crossAxisCount = 2;
-      childAspectRatio = 0.7; // Reduced to prevent overflow
-      crossAxisSpacing = 12;
+      childAspectRatio = 0.63; // Decreased from 0.7 to increase height by ~15px
+      crossAxisSpacing = 16;
       mainAxisSpacing = 12;
-      gridPadding = const EdgeInsets.all(12);
     } else if (screenWidth < 900) {
       // Tablet - portrait
       crossAxisCount = 2;
-      childAspectRatio = 0.9;
-      crossAxisSpacing = 16;
+      childAspectRatio = 0.81; // Decreased from 0.9 to increase height by ~15px
+      crossAxisSpacing = 20;
       mainAxisSpacing = 16;
-      gridPadding = const EdgeInsets.all(16);
     } else if (screenWidth < 1200) {
       // Tablet - landscape
       crossAxisCount = 2;
-      childAspectRatio = 0.85;
-      crossAxisSpacing = 20;
+      childAspectRatio = 0.76; // Decreased from 0.85 to increase height by ~15px
+      crossAxisSpacing = 24;
       mainAxisSpacing = 20;
-      gridPadding = const EdgeInsets.all(20);
     } else if (screenWidth < 1600) {
       // Desktop - medium
       crossAxisCount = 3;
-      childAspectRatio = 0.8;
-      crossAxisSpacing = 24;
+      childAspectRatio = 0.71; // Decreased from 0.8 to increase height by ~15px
+      crossAxisSpacing = 28;
       mainAxisSpacing = 24;
-      gridPadding = const EdgeInsets.all(24);
     } else {
       // Desktop - large
       crossAxisCount = 4;
-      childAspectRatio = 0.75;
-      crossAxisSpacing = 28;
+      childAspectRatio = 0.67; // Decreased from 0.75 to increase height by ~15px
+      crossAxisSpacing = 32;
       mainAxisSpacing = 28;
-      gridPadding = const EdgeInsets.all(28);
     }
 
     if (isLoading) {
@@ -79,8 +72,51 @@ class MenuGrid extends StatelessWidget {
       );
     }
 
+    if (items.isEmpty) {
+      return Container(
+        width: double.infinity,
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                menuController.isSearching ? Icons.search_off : Icons.restaurant_menu,
+                size: 48,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                menuController.isSearching ? 'No search results found' : 'No items found',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (menuController.isSearching)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Try searching with different keywords',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return GridView.builder(
-      padding: gridPadding,
+      padding: const EdgeInsets.all(0), // Remove grid padding since parent handles spacing
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         childAspectRatio: childAspectRatio,
@@ -88,6 +124,8 @@ class MenuGrid extends StatelessWidget {
         mainAxisSpacing: mainAxisSpacing,
       ),
       itemCount: items.length,
+      shrinkWrap: true, // Add this to prevent layout issues
+      physics: const NeverScrollableScrollPhysics(), // Add this to prevent nested scrolling issues
       itemBuilder: (context, index) {
         final item = items[index];
         return MenuItemCard(
@@ -99,10 +137,10 @@ class MenuGrid extends StatelessWidget {
                 content: Text('${item.name} added to cart'),
                 duration: const Duration(seconds: 1),
                 behavior: SnackBarBehavior.floating,
-                margin: EdgeInsets.only(
-                  bottom: 80,
-                  left: screenWidth < 600 ? 16 : 24,
-                  right: screenWidth < 600 ? 16 : 24,
+                margin: const EdgeInsets.only(
+                  top: 20,
+                  left: 8,
+                  right: 8,
                 ),
               ),
             );

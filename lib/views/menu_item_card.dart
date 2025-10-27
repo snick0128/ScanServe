@@ -27,13 +27,9 @@ class _MenuItemCardState extends State<MenuItemCard>
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeInOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -74,112 +70,138 @@ class _MenuItemCardState extends State<MenuItemCard>
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min, // Prevent column from expanding unnecessarily
                     children: [
                       if (widget.item.imageUrl != null)
                         AspectRatio(
                           aspectRatio: 16 / 9,
-                          child: Image.network(
-                            widget.item.imageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[100],
-                                child: const Icon(
-                                  Icons.broken_image,
-                                  color: Colors.grey,
-                                ),
-                              );
-                            },
+                          child: ClipRRect( // Ensure image doesn't overflow
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                            child: Image.network(
+                              widget.item.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[100],
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 10.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.item.name,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
+                      Flexible( // Allow content to flex within constraints
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            12.0,
+                            12.0,
+                            12.0,
+                            10.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.item.name,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.item.description,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.item.description,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.grey[600]),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '₹${widget.item.price.toStringAsFixed(2)}',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFFFF6E40),
-                                  ),
-                                ),
-                                if (isInCart)
-                                  _QuantityControls(
-                                    itemId: widget.item.id,
-                                    quantity: quantity,
-                                    onUpdateQuantity: cartController.updateQuantity,
-                                    isHovered: _isHovered,
-                                  )
-                                else
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFFFF914D),
-                                          Color(0xFFFF6E40),
-                                        ],
-                                        begin: Alignment.centerLeft,
-                                        end: Alignment.centerRight,
-                                      ),
-                                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                                      boxShadow: _isHovered
-                                        ? [
-                                            BoxShadow(
-                                              color: const Color(0xFFFF6E40).withAlpha(50),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                    ),
-                                    child: ElevatedButton(
-                                      onPressed: _onAddPressed,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.transparent,
-                                        shadowColor: Colors.transparent,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'Add',
-                                        style: TextStyle(
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '₹${widget.item.price.toStringAsFixed(2)}',
+                                    style: Theme.of(context).textTheme.titleMedium
+                                        ?.copyWith(
                                           fontWeight: FontWeight.bold,
+                                          color: const Color(0xFFFF6E40),
+                                        ),
+                                  ),
+                                  if (isInCart)
+                                    SizedBox(
+                                      width: 65,
+                                      child: _QuantityControls(
+                                        itemId: widget.item.id,
+                                        quantity: quantity,
+                                        onUpdateQuantity:
+                                            cartController.updateQuantity,
+                                        isHovered: _isHovered,
+                                      ),
+                                    )
+                                  else
+                                    SizedBox(
+                                      width: 65,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              Color(0xFFFF914D),
+                                              Color(0xFFFF6E40),
+                                            ],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                          ),
+                                          borderRadius: const BorderRadius.all(
+                                            Radius.circular(20),
+                                          ),
+                                          boxShadow: _isHovered
+                                              ? [
+                                                  BoxShadow(
+                                                    color: const Color(
+                                                      0xFFFF6E40,
+                                                    ).withAlpha(50),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: _onAddPressed,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.transparent,
+                                            shadowColor: Colors.transparent,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(
+                                                20,
+                                              ),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Add',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -210,17 +232,23 @@ class _QuantityControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 32, // Fixed height for consistent centering
       decoration: BoxDecoration(
-        color: isHovered ? const Color(0xFFFF6E40).withAlpha(15) : Colors.grey[50],
+        color: isHovered
+            ? const Color(0xFFFF6E40).withAlpha(15)
+            : Colors.grey[50],
         border: Border.all(color: const Color(0xFFFF6E40).withAlpha(50)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           IconButton(
-            iconSize: 18,
-            padding: const EdgeInsets.all(6),
+            iconSize: 12,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
             icon: Icon(
               Icons.remove,
               color: quantity > 1 ? const Color(0xFFFF6E40) : Colors.grey[400],
@@ -230,27 +258,22 @@ class _QuantityControls extends StatelessWidget {
                 : null,
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF6E40).withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            alignment: Alignment.center,
             child: Text(
               quantity.toString(),
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFFFF6E40),
               ),
             ),
           ),
           IconButton(
-            iconSize: 18,
-            padding: const EdgeInsets.all(6),
-            icon: const Icon(
-              Icons.add,
-              color: Color(0xFFFF6E40),
-            ),
+            iconSize: 12,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            icon: const Icon(Icons.add, color: Color(0xFFFF6E40)),
             onPressed: () => onUpdateQuantity(itemId, quantity + 1),
           ),
         ],

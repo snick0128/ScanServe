@@ -17,22 +17,33 @@ class FirebaseService {
   static FirebaseFirestore get firestore => FirebaseFirestore.instance;
 
   static Future<void> initialize() async {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    try {
+      print('🔥 INITIALIZING FIREBASE...');
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('✅ FIREBASE INITIALIZED SUCCESSFULLY');
 
-    // Enable offline persistence for Firestore
-    if (kIsWeb) {
-      // For web, enable persistence with settings
-      FirebaseFirestore.instance.settings = const Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-      );
-    } else {
-      // For mobile, enable persistence (default behavior)
-      FirebaseFirestore.instance.settings = const Settings(
-        persistenceEnabled: true,
-      );
+      // Enable offline persistence for Firestore
+      if (kIsWeb) {
+        // For web, enable persistence with settings
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: true,
+          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+        );
+        print('🔥 FIRESTORE WEB SETTINGS CONFIGURED');
+      } else {
+        // For mobile, enable persistence (default behavior)
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: true,
+        );
+        print('🔥 FIRESTORE MOBILE SETTINGS CONFIGURED');
+      }
+      print('✅ FIREBASE INITIALIZATION COMPLETE');
+    } catch (e) {
+      print('❌ FIREBASE INITIALIZATION ERROR: $e');
+      print('Stack trace: ${StackTrace.current}');
+      rethrow;
     }
   }
 

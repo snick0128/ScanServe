@@ -25,10 +25,7 @@ class CartPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Your Order',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         elevation: 2,
         shadowColor: Colors.deepPurple.withOpacity(0.1),
@@ -57,7 +54,8 @@ class CartPage extends StatelessWidget {
                         orderController.currentSession?.tableId ?? '',
                       ),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return Container(
                             height: 100,
                             alignment: Alignment.center,
@@ -76,11 +74,7 @@ class CartPage extends StatelessWidget {
                         );
                       },
                     ),
-                    Divider(
-                      thickness: 1,
-                      height: 1,
-                      color: Colors.grey[300],
-                    ),
+                    Divider(thickness: 1, height: 1, color: Colors.grey[300]),
                   ],
 
                   // Current cart items
@@ -210,11 +204,7 @@ class _OrderSummary extends StatelessWidget {
                   ),
                 ],
               ),
-              Divider(
-                height: 24,
-                thickness: 1,
-                color: Colors.grey[300],
-              ),
+              Divider(height: 24, thickness: 1, color: Colors.grey[300]),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -258,9 +248,15 @@ class _OrderSummary extends StatelessWidget {
 
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Order placed successfully!'),
+                            SnackBar(
+                              content: const Text('Order placed successfully!'),
                               backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.only(
+                                top: 20,
+                                left: 16,
+                                right: 16,
+                              ),
                             ),
                           );
                         } catch (e) {
@@ -269,31 +265,37 @@ class _OrderSummary extends StatelessWidget {
                             SnackBar(
                               content: Text('Error placing order: $e'),
                               backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.only(
+                                top: 20,
+                                left: 16,
+                                right: 16,
+                              ),
                             ),
                           );
                         }
                       }
                     : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(
-                    vertical: isMobile ? 14 : 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ).copyWith(
-                  backgroundColor: MaterialStateProperty.all(Colors.transparent),
-                ),
+                style:
+                    ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        vertical: isMobile ? 14 : 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ).copyWith(
+                      backgroundColor: MaterialStateProperty.all(
+                        Colors.transparent,
+                      ),
+                    ),
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [
-                        Colors.deepPurple,
-                        Colors.deepPurpleAccent,
-                      ],
+                      colors: [Colors.deepPurple, Colors.deepPurpleAccent],
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ),

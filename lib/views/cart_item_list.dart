@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../controllers/cart_controller.dart';
 import 'shimmer_loading.dart';
 
+import 'package:flutter/material.dart';
+
 class CartItemList extends StatelessWidget {
   final List<CartItem> items;
   final Function(String, int) onUpdateQuantity;
@@ -60,162 +62,189 @@ class CartItemList extends StatelessWidget {
         final item = items[index];
 
         return Card(
-          elevation: 2,
-          shadowColor: Colors.deepPurple.withOpacity(0.1),
+          elevation: 4,
+          shadowColor: Colors.deepPurple.withOpacity(0.15),
           color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Padding(
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Item details section
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Item name with better typography
-                      Text(
-                        item.item.name,
-                        style: TextStyle(
-                          fontSize: isMobile ? 16 : 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                          height: 1.3,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.deepPurple.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(isMobile ? 16 : 20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product Image
+                  if (item.item.imageUrl != null)
+                    Container(
+                      width: isMobile ? 60 : 70,
+                      height: isMobile ? 60 : 70,
+                      margin: EdgeInsets.only(right: isMobile ? 12 : 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(
+                          image: NetworkImage(item.item.imageUrl!),
+                          fit: BoxFit.cover,
                         ),
                       ),
-                      SizedBox(height: isMobile ? 6 : 8),
+                    )
+                  else
+                    Container(
+                      width: isMobile ? 60 : 70,
+                      height: isMobile ? 60 : 70,
+                      margin: EdgeInsets.only(right: isMobile ? 12 : 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey[400],
+                        size: isMobile ? 24 : 28,
+                      ),
+                    ),
 
-                      // Price with improved styling
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.deepPurple.withAlpha(10),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '₹${item.item.price.toStringAsFixed(2)} each',
+                  // Item details section
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Item name
+                        Text(
+                          item.item.name,
                           style: TextStyle(
-                            fontSize: isMobile ? 13 : 14,
-                            color: Colors.deepPurple,
-                            fontWeight: FontWeight.w500,
+                            fontSize: isMobile ? 16 : 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            height: 1.3,
                           ),
                         ),
-                      ),
+                        SizedBox(height: isMobile ? 6 : 8),
 
-                      // Veg/Non-veg indicator
-                      SizedBox(height: isMobile ? 8 : 10),
+                        // Price
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.deepPurple.withAlpha(10),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '₹${item.item.price.toStringAsFixed(2)} each',
+                            style: TextStyle(
+                              fontSize: isMobile ? 13 : 14,
+                              color: Colors.deepPurple,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(width: isMobile ? 16 : 20),
+
+                  // Quantity + Total price
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Quantity controls
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: item.item.isVeg ? Colors.green.withAlpha(15) : Colors.red.withAlpha(15),
                           border: Border.all(
-                            color: item.item.isVeg ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50),
-                            width: 1,
+                            color: Colors.deepPurple.withAlpha(30),
                           ),
                           borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey[50],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              item.item.isVeg ? Icons.circle : Icons.circle_outlined,
-                              size: 12,
-                              color: item.item.isVeg ? Colors.green : Colors.red,
+                            _AnimatedIconButton(
+                              icon: Icons.remove,
+                              color: item.quantity > 1
+                                  ? Colors.deepPurple
+                                  : Colors.grey[400]!,
+                              onPressed: () {
+                                onUpdateQuantity(
+                                  item.item.id,
+                                  item.quantity - 1,
+                                );
+                              },
+                              isMobile: isMobile,
                             ),
-                            SizedBox(width: 4),
-                            Text(
-                              item.item.isVeg ? 'Veg' : 'Non-Veg',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: item.item.isVeg ? Colors.green : Colors.red,
-                                fontWeight: FontWeight.w500,
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 14 : 16,
+                                vertical: isMobile ? 8 : 10,
                               ),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.withAlpha(15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                item.quantity.toString(),
+                                style: TextStyle(
+                                  fontSize: isMobile ? 14 : 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
+                              ),
+                            ),
+                            _AnimatedIconButton(
+                              icon: Icons.add,
+                              color: Colors.deepPurple,
+                              onPressed: () {
+                                onUpdateQuantity(
+                                  item.item.id,
+                                  item.quantity + 1,
+                                );
+                              },
+                              isMobile: isMobile,
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
 
-                SizedBox(width: isMobile ? 16 : 20),
+                      SizedBox(height: isMobile ? 12 : 16),
 
-                // Quantity controls and price section
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Quantity controls
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.deepPurple.withAlpha(30)),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey[50],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _AnimatedIconButton(
-                            icon: Icons.remove,
-                            color: item.quantity > 1 ? Colors.deepPurple : Colors.grey[400]!,
-                            onPressed: () {
-                              onUpdateQuantity(item.item.id, item.quantity - 1);
-                            },
-                            isMobile: isMobile,
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isMobile ? 14 : 16,
-                              vertical: isMobile ? 8 : 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.deepPurple.withAlpha(15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              item.quantity.toString(),
-                              style: TextStyle(
-                                fontSize: isMobile ? 14 : 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.deepPurple,
-                              ),
-                            ),
-                          ),
-                          _AnimatedIconButton(
-                            icon: Icons.add,
+                      // Total price
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple.withAlpha(10),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '₹${item.totalPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: isMobile ? 15 : 17,
+                            fontWeight: FontWeight.bold,
                             color: Colors.deepPurple,
-                            onPressed: () {
-                              onUpdateQuantity(item.item.id, item.quantity + 1);
-                            },
-                            isMobile: isMobile,
                           ),
-                        ],
-                      ),
-                    ),
-
-                    // Total price
-                    SizedBox(height: isMobile ? 12 : 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.deepPurple.withAlpha(10),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '₹${item.totalPrice.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: isMobile ? 15 : 17,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -256,10 +285,7 @@ class _AnimatedIconButtonState extends State<_AnimatedIconButton>
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 0.9,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
