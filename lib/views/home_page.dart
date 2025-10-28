@@ -6,7 +6,6 @@ import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../services/session_service.dart';
 import '../models/order_model.dart';
-import 'order_type_modal.dart';
 import 'meal_time_tabs.dart';
 import 'search_bar.dart' as custom_search;
 import 'menu_grid.dart';
@@ -39,8 +38,6 @@ class _HomeContentState extends State<HomeContent> {
   bool _isLoadingTenant = true;
   bool? _isVegOnly;
   bool _showNonVeg = false;
-  OrderType _currentOrderType = OrderType.parcel; // Default to parcel
-  String? _currentTableId;
   String? _guestId;
 
   @override
@@ -66,30 +63,18 @@ class _HomeContentState extends State<HomeContent> {
   Future<void> _initializeSession() async {
     try {
       final sessionService = SessionService();
-
-      // Load last used order type
-      final lastOrderType = await sessionService.getLastOrderType();
-      if (lastOrderType != null) {
-        setState(() {
-          _currentOrderType = lastOrderType;
-        });
-      }
-
-      // Load last used table ID
-      final lastTableId = await sessionService.getLastTableId();
-      if (lastTableId != null) {
-        setState(() {
-          _currentTableId = lastTableId;
-        });
-      }
+      final orderController = context.read<OrderController>();
 
       // Create or get guest session
       if (_guestId == null) {
         _guestId = await sessionService.createGuestSession(widget.tenantId);
+        // Order type is already set by app.dart based on URL parameters
+        final currentOrderType = orderController.currentOrderType;
+        final currentTableId = orderController.currentSession?.tableId;
         await sessionService.updateGuestSession(
           _guestId!,
-          _currentOrderType,
-          tableId: _currentTableId,
+          currentOrderType,
+          tableId: currentTableId,
         );
       }
 
@@ -101,12 +86,16 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   void _showOrderTypeNotification() {
+    final orderController = context.read<OrderController>();
+    final currentOrderType = orderController.currentOrderType;
+    final tableId = orderController.currentSession?.tableId;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(
-              _currentOrderType == OrderType.dineIn
+              currentOrderType == OrderType.dineIn
                   ? Icons.restaurant
                   : Icons.takeout_dining,
               color: Colors.white,
@@ -115,28 +104,13 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'You\'re ordering for ${_currentOrderType.displayName}.',
+                currentOrderType == OrderType.dineIn
+                    ? 'Dine-in order${tableId != null ? " - Table $tableId" : ""}'
+                    : 'Parcel order',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: _showOrderTypeSelectionModal,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'Change',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -147,48 +121,20 @@ class _HomeContentState extends State<HomeContent> {
         margin: const EdgeInsets.only(top: 20, left: 16, right: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 6,
-        backgroundColor: _currentOrderType == OrderType.dineIn
+        backgroundColor: currentOrderType == OrderType.dineIn
             ? Colors.orange.shade700
             : Colors.green.shade700,
       ),
     );
   }
 
-  Future<void> _showOrderTypeSelectionModal() async {
-    await context.showOrderTypeModal(
-      tenantId: widget.tenantId,
-      guestId: _guestId ?? '',
-      onOrderTypeSelected: (orderType, tableId) async {
-        setState(() {
-          _currentOrderType = orderType;
-          _currentTableId = tableId;
-          _showNonVeg = false; // Reset to veg-only when changing order type
-        });
+  // Order type selection removed - now determined by URL parameters
 
-        // Save to session
-        final sessionService = SessionService();
-        await sessionService.saveOrderType(orderType);
-        if (tableId != null) {
-          await sessionService.saveTableId(tableId);
-        }
-
-        // Update guest session
-        if (_guestId != null) {
-          await sessionService.updateGuestSession(
-            _guestId!,
-            orderType,
-            tableId: tableId,
-          );
-        }
-
-        // Update order controller
-        final orderController = context.read<OrderController>();
-        orderController.setSession(widget.tenantId, tableId);
-
-        // Show notification
-        _showOrderTypeNotification();
-      },
-    );
+  /// Format table ID from 'Table_1' or 'table_1' to 'T1'
+  String _formatTableId(String tableId) {
+    // Remove 'table_' or 'Table_' prefix and convert to T{number}
+    final cleaned = tableId.replaceAll(RegExp(r'[Tt]able[_-]?', caseSensitive: false), '');
+    return 'T$cleaned';
   }
 
   @override
@@ -276,19 +222,71 @@ class _HomeContentState extends State<HomeContent> {
       appBar: AppBar(
         title: LayoutBuilder(
           builder: (context, constraints) {
+            final orderController = context.watch<OrderController>();
+            final tableId = orderController.currentSession?.tableId;
+            
             return Container(
-              constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.6),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _isLoadingTenant
-                      ? 'Loading...'
-                      : (_tenantName ?? 'Restaurant'),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.7),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tenant name
+                    Flexible(
+                      child: Text(
+                        _isLoadingTenant
+                            ? 'Loading...'
+                            : (_tenantName ?? 'Restaurant'),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Table badge (only show if tableId exists)
+                    if (tableId != null && tableId.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.deepPurple.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _formatTableId(tableId),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );
@@ -296,65 +294,6 @@ class _HomeContentState extends State<HomeContent> {
         ),
         elevation: appBarElevation,
         actions: [
-          // Current Order Type Indicator
-          if (!_isLoadingTenant)
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: InkWell(
-                onTap: _showOrderTypeSelectionModal,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _currentOrderType == OrderType.dineIn
-                        ? Colors.orange.withAlpha(25)
-                        : Colors.green.withAlpha(25),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _currentOrderType == OrderType.dineIn
-                          ? Colors.orange.withAlpha(50)
-                          : Colors.green.withAlpha(50),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _currentOrderType == OrderType.dineIn
-                            ? Icons.restaurant
-                            : Icons.takeout_dining,
-                        size: 16,
-                        color: _currentOrderType == OrderType.dineIn
-                            ? Colors.orange
-                            : Colors.green,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _currentOrderType.displayName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _currentOrderType == OrderType.dineIn
-                              ? Colors.orange
-                              : Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
           // Veg/Non-Veg single dot indicator
           if (!_isLoadingTenant)
             Container(
@@ -445,24 +384,24 @@ class _HomeContentState extends State<HomeContent> {
           ),
 
           // Subtle separator
-          Container(
-            height: 1,
-            color: Colors.grey[200],
-          ),
+          Container(height: 1, color: Colors.grey[200]),
 
           // Scrollable Content
           Expanded(
             child: Container(
               color: Colors.grey[50],
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 0), // Fixed 4px leading and trailing
+              padding: const EdgeInsets.fromLTRB(
+                4,
+                0,
+                4,
+                0,
+              ), // Fixed 4px leading and trailing
               child: SingleChildScrollView(
                 child: Column(
                   children: [
                     // Most Ordered Items Section
                     Container(
-                      margin: const EdgeInsets.only(
-                        top: 8,
-                      ),
+                      margin: const EdgeInsets.only(top: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -493,7 +432,10 @@ class _HomeContentState extends State<HomeContent> {
                                   ),
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFFFF914D), Color(0xFFFF6E40)],
+                                      colors: [
+                                        Color(0xFFFF914D),
+                                        Color(0xFFFF6E40),
+                                      ],
                                       begin: Alignment.centerLeft,
                                       end: Alignment.centerRight,
                                     ),
@@ -515,7 +457,10 @@ class _HomeContentState extends State<HomeContent> {
                               builder: (context, menuController, child) {
                                 // For now, show first 5 items as "most ordered"
                                 // In a real app, this would come from analytics data
-                                final mostOrderedItems = menuController.filteredItems.take(5).toList();
+                                final mostOrderedItems = menuController
+                                    .filteredItems
+                                    .take(5)
+                                    .toList();
 
                                 if (mostOrderedItems.isEmpty) {
                                   return Container(
@@ -533,7 +478,8 @@ class _HomeContentState extends State<HomeContent> {
                                     ),
                                     child: Center(
                                       child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(
                                             Icons.star_outline,
@@ -575,13 +521,28 @@ class _HomeContentState extends State<HomeContent> {
                                         child: MenuItemCard(
                                           item: item,
                                           onAddPressed: () {
-                                            context.read<CartController>().addItem(item);
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            context
+                                                .read<CartController>()
+                                                .addItem(item);
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               SnackBar(
-                                                content: Text('${item.name} added to cart'),
-                                                duration: const Duration(seconds: 1),
-                                                behavior: SnackBarBehavior.floating,
-                                                margin: const EdgeInsets.fromLTRB(8, 20, 8, 0),
+                                                content: Text(
+                                                  '${item.name} added to cart',
+                                                ),
+                                                duration: const Duration(
+                                                  seconds: 1,
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                                margin:
+                                                    const EdgeInsets.fromLTRB(
+                                                      8,
+                                                      20,
+                                                      8,
+                                                      0,
+                                                    ),
                                               ),
                                             );
                                           },
@@ -599,9 +560,7 @@ class _HomeContentState extends State<HomeContent> {
 
                     // Menu Grid with responsive spacing
                     Container(
-                      margin: const EdgeInsets.only(
-                        bottom: 8,
-                      ),
+                      margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),

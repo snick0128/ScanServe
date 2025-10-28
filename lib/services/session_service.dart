@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order_model.dart';
+import 'guest_session_service.dart';
 
 class SessionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -69,16 +70,38 @@ class SessionService {
     }
   }
 
-  /// Create a guest session in Firestore
+  /// Create or get existing guest session in Firestore
+  /// Uses persistent UUID from GuestSessionService to ensure one device = one guestId
   Future<String> createGuestSession(String tenantId) async {
     try {
-      final guestId = DateTime.now().millisecondsSinceEpoch.toString();
-      await _firestore.collection('guest_sessions').doc(guestId).set({
-        'guestId': guestId,
-        'tenantId': tenantId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isActive': true,
-      });
+      // Get or create persistent guestId (same across all tabs)
+      final guestSessionService = GuestSessionService();
+      final guestId = await guestSessionService.getOrCreateGuestId();
+      
+      // Check if session already exists in Firestore
+      final existingSession = await _firestore.collection('guest_sessions').doc(guestId).get();
+      
+      if (!existingSession.exists) {
+        // Create new session only if it doesn't exist
+        await _firestore.collection('guest_sessions').doc(guestId).set({
+          'guestId': guestId,
+          'tenantId': tenantId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isActive': true,
+        });
+        print('✅ Created new guest session: $guestId');
+      } else {
+        // Update existing session with new tenant if different
+        final sessionData = existingSession.data();
+        if (sessionData?['tenantId'] != tenantId) {
+          await _firestore.collection('guest_sessions').doc(guestId).update({
+            'tenantId': tenantId,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+        print('♻️ Reusing existing guest session: $guestId');
+      }
+      
       return guestId;
     } catch (e) {
       print('Error creating guest session: $e');

@@ -4,13 +4,64 @@ import 'order_model.dart';
 
 enum OrderStatus {
   pending,
+  confirmed,
   preparing,
   ready,
   served,
   completed;
 
   String get displayName {
-    return name[0].toUpperCase() + name.substring(1);
+    switch (this) {
+      case OrderStatus.pending:
+        return 'Pending';
+      case OrderStatus.confirmed:
+        return 'Confirmed';
+      case OrderStatus.preparing:
+        return 'Preparing';
+      case OrderStatus.ready:
+        return 'Ready';
+      case OrderStatus.served:
+        return 'Served';
+      case OrderStatus.completed:
+        return 'Completed';
+    }
+  }
+}
+
+enum PaymentStatus {
+  pending,
+  paid,
+  failed,
+  cancelled,
+  refunded;
+
+  String get displayName {
+    switch (this) {
+      case PaymentStatus.pending:
+        return 'Pending';
+      case PaymentStatus.paid:
+        return 'Paid';
+      case PaymentStatus.failed:
+        return 'Payment Failed';
+      case PaymentStatus.cancelled:
+        return 'Payment Cancelled';
+      case PaymentStatus.refunded:
+        return 'Refunded';
+    }
+  }
+}
+
+enum PaymentMethod {
+  upi,
+  cash;
+
+  String get displayName {
+    switch (this) {
+      case PaymentMethod.upi:
+        return 'UPI';
+      case PaymentMethod.cash:
+        return 'Cash';
+    }
   }
 }
 
@@ -27,6 +78,12 @@ class OrderDetails {
   final double subtotal;
   final double tax;
   final double total;
+  final PaymentStatus paymentStatus;
+  final PaymentMethod paymentMethod;
+  final String customerName;
+  final String? customerPhone;
+  final String? paymentId;
+  final DateTime? paymentTimestamp;
 
   OrderDetails({
     required this.orderId,
@@ -41,6 +98,12 @@ class OrderDetails {
     required this.subtotal,
     required this.tax,
     required this.total,
+    this.paymentStatus = PaymentStatus.pending,
+    this.paymentMethod = PaymentMethod.upi,
+    this.customerName = '',
+    this.customerPhone,
+    this.paymentId,
+    this.paymentTimestamp,
   });
 
   factory OrderDetails.fromCart({
@@ -52,6 +115,10 @@ class OrderDetails {
     required List<CartItem> cartItems,
     required int avgPrepTime,
     required double taxRate,
+    PaymentStatus paymentStatus = PaymentStatus.pending,
+    PaymentMethod paymentMethod = PaymentMethod.cash,
+    String customerName = '',
+    String? customerPhone,
   }) {
     final subtotal = cartItems.fold<double>(
       0,
@@ -72,6 +139,10 @@ class OrderDetails {
       subtotal: subtotal,
       tax: tax,
       total: total,
+      paymentStatus: paymentStatus,
+      paymentMethod: paymentMethod,
+      customerName: customerName,
+      customerPhone: customerPhone,
     );
   }
 
@@ -89,6 +160,12 @@ class OrderDetails {
       'subtotal': subtotal,
       'tax': tax,
       'total': total,
+      'paymentStatus': paymentStatus.name,
+      'paymentMethod': paymentMethod.name,
+      'customerName': customerName,
+      'customerPhone': customerPhone,
+      'paymentId': paymentId,
+      'paymentTimestamp': paymentTimestamp != null ? Timestamp.fromDate(paymentTimestamp!) : null,
     };
   }
 
@@ -108,6 +185,18 @@ class OrderDetails {
       subtotal: map['subtotal'],
       tax: map['tax'],
       total: map['total'],
+      paymentStatus: PaymentStatus.values.firstWhere(
+        (e) => e.name == (map['paymentStatus'] ?? PaymentStatus.pending.name),
+      ),
+      paymentMethod: PaymentMethod.values.firstWhere(
+        (e) => e.name == (map['paymentMethod'] ?? PaymentMethod.upi.name),
+      ),
+      customerName: map['customerName'] ?? '',
+      customerPhone: map['customerPhone'],
+      paymentId: map['paymentId'],
+      paymentTimestamp: map['paymentTimestamp'] != null
+          ? (map['paymentTimestamp'] as Timestamp).toDate()
+          : null,
     );
   }
 

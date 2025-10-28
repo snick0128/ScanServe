@@ -5,6 +5,7 @@ import 'dart:async';
 import '../models/order_model.dart';
 import '../models/order_details.dart';
 import '../services/guest_session_service.dart';
+import '../services/payment_service.dart';
 
 class OrderController extends ChangeNotifier {
   static const String _orderTypeKey = 'last_order_type';
@@ -17,6 +18,7 @@ class OrderController extends ChangeNotifier {
   final List<OrderDetails> _activeOrders = [];
   StreamSubscription<QuerySnapshot>? _ordersSubscription;
   StreamSubscription<QuerySnapshot>? _tableOrdersSubscription;
+  final PaymentService _paymentService = PaymentService();
 
   OrderController() {
     // Don't initialize tracking in constructor, do it after session is set
@@ -119,7 +121,9 @@ class OrderController extends ChangeNotifier {
     final guestId = _currentSession!.guestId;
     final tenantId = _currentSession!.tenantId;
 
-    print('🚀 Initializing order tracking for guest: $guestId, tenant: $tenantId');
+    print(
+      '🚀 Initializing order tracking for guest: $guestId, tenant: $tenantId',
+    );
 
     // Cancel existing subscriptions if any
     await _ordersSubscription?.cancel();
@@ -133,10 +137,15 @@ class OrderController extends ChangeNotifier {
         .doc(tenantId)
         .collection('orders')
         .where('guestId', isEqualTo: guestId)
-        .where('status', whereNotIn: [OrderStatus.completed.name])
+        .where(
+          'status',
+          whereNotIn: [OrderStatus.completed.name, OrderStatus.confirmed.name],
+        )
         .snapshots()
         .listen((snapshot) {
-          print('📦 Received ${snapshot.docs.length} parcel orders from tenant collection');
+          print(
+            '📦 Received ${snapshot.docs.length} parcel orders from tenant collection',
+          );
 
           // Remove existing parcel orders to avoid duplicates
           _activeOrders.removeWhere((order) => order.type == OrderType.parcel);
@@ -154,7 +163,9 @@ class OrderController extends ChangeNotifier {
             }
           }
 
-          print('📊 Total active orders after parcel update: ${_activeOrders.length}');
+          print(
+            '📊 Total active orders after parcel update: ${_activeOrders.length}',
+          );
           // Sort by timestamp, newest first
           _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           notifyListeners();
@@ -163,7 +174,9 @@ class OrderController extends ChangeNotifier {
     // Listen to dine-in orders if we have a table
     if (_currentSession?.tableId != null) {
       final tableId = _currentSession!.tableId!;
-      print('🍽️ Setting up dine-in orders listener: tenants/$tenantId/tables/$tableId/orders');
+      print(
+        '🍽️ Setting up dine-in orders listener: tenants/$tenantId/tables/$tableId/orders',
+      );
 
       _tableOrdersSubscription = _firestore
           .collection('tenants')
@@ -172,13 +185,23 @@ class OrderController extends ChangeNotifier {
           .doc(tableId)
           .collection('orders')
           .where('guestId', isEqualTo: guestId)
-          .where('status', whereNotIn: [OrderStatus.completed.name])
+          .where(
+            'status',
+            whereNotIn: [
+              OrderStatus.completed.name,
+              OrderStatus.confirmed.name,
+            ],
+          )
           .snapshots()
           .listen((snapshot) {
-            print('🍽️ Received ${snapshot.docs.length} dine-in orders from table collection');
+            print(
+              '🍽️ Received ${snapshot.docs.length} dine-in orders from table collection',
+            );
 
             // Remove existing dine-in orders to avoid duplicates
-            _activeOrders.removeWhere((order) => order.type == OrderType.dineIn);
+            _activeOrders.removeWhere(
+              (order) => order.type == OrderType.dineIn,
+            );
 
             for (final doc in snapshot.docs) {
               final orderData = doc.data();
@@ -196,7 +219,9 @@ class OrderController extends ChangeNotifier {
               }
             }
 
-            print('📊 Total active orders after dine-in update: ${_activeOrders.length}');
+            print(
+              '📊 Total active orders after dine-in update: ${_activeOrders.length}',
+            );
             // Sort by timestamp, newest first
             _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
             notifyListeners();
@@ -212,7 +237,8 @@ class OrderController extends ChangeNotifier {
       (order) =>
           order.tableId == tableId &&
           order.type == OrderType.dineIn &&
-          order.status != OrderStatus.completed,
+          (order.status == OrderStatus.pending ||
+              order.status == OrderStatus.confirmed),
     );
   }
 
@@ -225,13 +251,63 @@ class OrderController extends ChangeNotifier {
   // Debug method to print current state
   void debugPrintState() {
     print('=== ORDER CONTROLLER DEBUG STATE ===');
-    print('Current session: ${_currentSession?.tenantId}/${_currentSession?.tableId}');
+    print(
+      'Current session: ${_currentSession?.tenantId}/${_currentSession?.tableId}',
+    );
     print('Current order type: $_currentOrderType');
     print('Active orders count: ${_activeOrders.length}');
     print('Active orders:');
     for (var order in _activeOrders) {
-      print('  - ${order.orderId}: ${order.type.name} (${order.status.name})');
+      print(
+        '  - ${order.orderId}: ${order.type.name} (${order.status.name}) - Payment: ${order.paymentStatus.name}',
+      );
     }
     print('=====================================');
+  }
+
+  // Get payment status for a specific order
+  Future<PaymentStatus> getOrderPaymentStatus(String orderId) async {
+    if (_currentSession == null) return PaymentStatus.pending;
+
+    return await _paymentService.getPaymentStatus(
+      orderId,
+      _currentSession!.tenantId,
+    );
+  }
+
+  // Update payment status for an order (called by payment service)
+  Future<void> updateOrderPaymentStatus(
+    String orderId,
+    PaymentStatus status,
+  ) async {
+    final orderIndex = _activeOrders.indexWhere(
+      (order) => order.orderId == orderId,
+    );
+    if (orderIndex != -1) {
+      // Update the order in the local list
+      final updatedOrder = OrderDetails(
+        orderId: _activeOrders[orderIndex].orderId,
+        guestId: _activeOrders[orderIndex].guestId,
+        tableId: _activeOrders[orderIndex].tableId,
+        tenantId: _activeOrders[orderIndex].tenantId,
+        type: _activeOrders[orderIndex].type,
+        items: _activeOrders[orderIndex].items,
+        timestamp: _activeOrders[orderIndex].timestamp,
+        status: _activeOrders[orderIndex].status,
+        estimatedWaitTime: _activeOrders[orderIndex].estimatedWaitTime,
+        subtotal: _activeOrders[orderIndex].subtotal,
+        tax: _activeOrders[orderIndex].tax,
+        total: _activeOrders[orderIndex].total,
+        paymentStatus: status,
+        paymentMethod: _activeOrders[orderIndex].paymentMethod,
+        customerName: _activeOrders[orderIndex].customerName,
+        customerPhone: _activeOrders[orderIndex].customerPhone,
+        paymentId: _activeOrders[orderIndex].paymentId,
+        paymentTimestamp: _activeOrders[orderIndex].paymentTimestamp,
+      );
+
+      _activeOrders[orderIndex] = updatedOrder;
+      notifyListeners();
+    }
   }
 }

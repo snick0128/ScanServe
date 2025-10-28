@@ -5,6 +5,7 @@ import 'package:scan_serve/controllers/menu_controller.dart' as app_controller;
 import 'package:scan_serve/controllers/order_controller.dart';
 import 'package:scan_serve/utils/qr_url_parser.dart';
 import 'package:scan_serve/views/home_page.dart';
+import 'package:scan_serve/models/order_model.dart';
 import 'controllers/auth_controller.dart';
 import 'services/guest_session_service.dart';
 import 'services/offline_service.dart';
@@ -124,7 +125,15 @@ class _InitializerState extends State<Initializer> {
     final tableId = params['tableId'];
 
     if (tenantId != null) {
+      // Automatically determine order type based on tableId presence
+      final orderType = tableId != null && tableId.isNotEmpty 
+          ? OrderType.dineIn 
+          : OrderType.parcel;
+      
       final orderController = context.read<OrderController>();
+      // Set order type first
+      await orderController.setOrderType(orderType);
+      // Then set session with the tableId
       orderController.setSession(tenantId, tableId);
 
       // Load menu items for the tenant

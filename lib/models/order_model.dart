@@ -21,6 +21,8 @@ class OrderSession {
   final String guestId;
   final int estimatedWaitTime; // in minutes
   final String status;
+  final String paymentStatus; // 'paid' or 'pending'
+  final String paymentMethod; // 'UPI' or 'Cash'
 
   OrderSession({
     required this.orderId,
@@ -31,6 +33,8 @@ class OrderSession {
     required this.guestId,
     this.estimatedWaitTime = 30,
     this.status = 'Pending',
+    this.paymentStatus = 'pending',
+    this.paymentMethod = 'Cash',
   });
 
   factory OrderSession.create({
@@ -38,6 +42,8 @@ class OrderSession {
     required String tenantId,
     required OrderType type,
     String? tableId,
+    String paymentStatus = 'pending',
+    String paymentMethod = 'Cash',
   }) {
     return OrderSession(
       orderId: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -46,6 +52,8 @@ class OrderSession {
       type: type,
       timestamp: DateTime.now(),
       guestId: guestId,
+      paymentStatus: paymentStatus,
+      paymentMethod: paymentMethod,
     );
   }
 
@@ -58,6 +66,8 @@ class OrderSession {
       'guestId': guestId,
       'estimatedWaitTime': estimatedWaitTime,
       'status': status,
+      'paymentStatus': paymentStatus,
+      'paymentMethod': paymentMethod,
     };
   }
 }

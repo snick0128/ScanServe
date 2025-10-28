@@ -85,13 +85,24 @@ class ViewOrderBar extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
     final cart = context.watch<CartController>();
+    final orderController = context.watch<OrderController>();
 
-    // Don't show the bar if cart is empty
-    if (cart.itemCount == 0) {
+    // Check if there are pending orders
+    final hasPendingOrders = orderController.activeOrders.isNotEmpty;
+    final cartIsEmpty = cart.itemCount == 0;
+
+    // Don't show the bar if cart is empty AND no pending orders
+    if (cartIsEmpty && !hasPendingOrders) {
       return const SizedBox.shrink();
     }
 
+    // Determine button text and action
+    final bool showPayNow = cartIsEmpty && hasPendingOrders;
+    final String buttonText = showPayNow ? 'Pay Now' : 'View Order (₹${cart.totalAmount.toStringAsFixed(2)})';
+    final IconData buttonIcon = showPayNow ? Icons.payment : Icons.shopping_cart;
+
     return Container(
+      margin: const EdgeInsets.only(bottom: 15, left: 15, right: 15),
       padding: EdgeInsets.symmetric(
         horizontal: isTablet ? (screenWidth - 600) / 2 : 16,
         vertical: 8, // Reduced from 16 to 8
@@ -142,14 +153,29 @@ class ViewOrderBar extends StatelessWidget {
               }
             }
 
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CartPage(
-                  tenantId: orderController.currentSession!.tenantId,
+            // If showing Pay Now (cart empty but has pending orders), go to checkout
+            if (showPayNow) {
+              Navigator.pushNamed(
+                context,
+                '/checkout',
+                arguments: {
+                  'tenantId': tenantId,
+                  'orderType': orderController.currentOrderType,
+                  'tableId': orderController.currentSession?.tableId,
+                  'requirePayment': true,
+                },
+              );
+            } else {
+              // Otherwise go to cart page
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CartPage(
+                    tenantId: orderController.currentSession!.tenantId,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           borderRadius: BorderRadius.circular(50),
           splashColor: Theme.of(context).colorScheme.onPrimary.withAlpha(30),
@@ -163,38 +189,40 @@ class ViewOrderBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.shopping_cart,
+                  buttonIcon,
                   color: Theme.of(context).colorScheme.onPrimary,
                   size: 18, // Slightly smaller
                 ),
                 const SizedBox(width: 6), // Reduced from 8 to 6
                 Text(
-                  'View Order (₹${cart.totalAmount.toStringAsFixed(2)})',
+                  buttonText,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onPrimary,
                     fontSize: 14, // Reduced from 16 to 14
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 6), // Reduced from 8 to 6
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    cart.itemCount.toString(),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11, // Reduced from 12 to 11
+                if (!showPayNow) ...[
+                  const SizedBox(width: 6), // Reduced from 8 to 6
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      cart.itemCount.toString(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11, // Reduced from 12 to 11
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

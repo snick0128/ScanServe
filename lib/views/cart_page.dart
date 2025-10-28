@@ -226,107 +226,178 @@ class _OrderSummary extends StatelessWidget {
                 ],
               ),
               SizedBox(height: isMobile ? 12 : 16),
-              ElevatedButton(
-                onPressed: subtotal > 0
-                    ? () async {
-                        if (!context.mounted) return;
-                        try {
-                          final guestId = await guestSession.getGuestId();
-                          print('Placing order for guest: $guestId');
-
-                          final orderId = await orderService.createOrder(
-                            tenantId: tenantId,
-                            guestId: guestId,
-                            orderType: orderController.currentOrderType,
-                            tableId: orderController.currentSession?.tableId,
-                            cartItems: cartController.items,
-                          );
-
-                          print('Order placed successfully: $orderId');
-
-                          cartController.clear();
-
+              // Show different buttons based on order type
+              if (orderController.currentOrderType == OrderType.dineIn)
+                // Dine-in: Two buttons side by side
+                Row(
+                  children: [
+                    // Send to Kitchen button (only enabled if cart has items)
+                    Expanded(
+                      child: _buildButton(
+                        context: context,
+                        text: 'Send to Kitchen',
+                        gradient: const LinearGradient(
+                          colors: [Colors.orange, Colors.orangeAccent],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        shadowColor: Colors.orange,
+                        isEnabled: cartController.itemCount > 0,
+                        isMobile: isMobile,
+                        fontSize: 13,
+                        onPressed: () async {
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Order placed successfully!'),
-                              backgroundColor: Colors.green,
-                              behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.only(
-                                top: 20,
-                                left: 16,
-                                right: 16,
+                          try {
+                            final guestId = await guestSession.getGuestId();
+                            await orderService.createOrder(
+                              tenantId: tenantId,
+                              guestId: guestId,
+                              orderType: orderController.currentOrderType,
+                              tableId: orderController.currentSession?.tableId,
+                              cartItems: cartController.items,
+                              notes: 'Sent to kitchen - payment pending',
+                            );
+                            cartController.clear();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Order sent to kitchen!'),
+                                backgroundColor: Colors.orange,
+                                behavior: SnackBarBehavior.floating,
                               ),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error placing order: $e'),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.only(
-                                top: 20,
-                                left: 16,
-                                right: 16,
+                            );
+                            Navigator.of(context).pop();
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
                               ),
-                            ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Pay Now button (mandatory payment)
+                    Expanded(
+                      child: _buildButton(
+                        context: context,
+                        text: 'Pay Now',
+                        gradient: const LinearGradient(
+                          colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        shadowColor: Colors.deepPurple,
+                        isEnabled: subtotal > 0,
+                        isMobile: isMobile,
+                        fontSize: 13,
+                        onPressed: () {
+                          // Navigate to checkout page - payment required
+                          Navigator.pushNamed(
+                            context,
+                            '/checkout',
+                            arguments: {
+                              'tenantId': tenantId,
+                              'orderType': orderController.currentOrderType,
+                              'tableId': orderController.currentSession?.tableId,
+                              'requirePayment': true,
+                            },
                           );
-                        }
-                      }
-                    : null,
-                style:
-                    ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        vertical: isMobile ? 14 : 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ).copyWith(
-                      backgroundColor: MaterialStateProperty.all(
-                        Colors.transparent,
+                        },
                       ),
                     ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.deepPurple.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+                  ],
+                )
+              else
+                // Parcel: Single button (full width)
+                _buildButton(
+                  context: context,
+                  text: 'Pay & Place Order',
+                  gradient: const LinearGradient(
+                    colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
-                  padding: EdgeInsets.symmetric(
-                    vertical: isMobile ? 16 : 18,
-                    horizontal: 32,
-                  ),
-                  child: const Text(
-                    'Place Order',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  shadowColor: Colors.deepPurple,
+                  isEnabled: subtotal > 0,
+                  isMobile: isMobile,
+                  fontSize: 14,
+                  onPressed: () {
+                    // Navigate to checkout page - payment required
+                    Navigator.pushNamed(
+                      context,
+                      '/checkout',
+                      arguments: {
+                        'tenantId': tenantId,
+                        'orderType': orderController.currentOrderType,
+                        'tableId': null,
+                        'requirePayment': true,
+                      },
+                    );
+                  },
                 ),
-              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildButton({
+    required BuildContext context,
+    required String text,
+    required LinearGradient gradient,
+    required Color shadowColor,
+    required bool isEnabled,
+    required bool isMobile,
+    required VoidCallback onPressed,
+    double fontSize = 16,
+  }) {
+    return ElevatedButton(
+      onPressed: isEnabled ? onPressed : null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(
+          vertical: isMobile ? 14 : 16,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ).copyWith(
+        backgroundColor: MaterialStateProperty.all(Colors.transparent),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.symmetric(
+          vertical: isMobile ? 16 : 18,
+          horizontal: 32,
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
     );
   }
 }

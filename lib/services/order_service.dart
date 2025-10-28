@@ -20,6 +20,10 @@ class OrderService {
     String? tableId,
     required List<CartItem> cartItems,
     String? notes,
+    String customerName = '',
+    String? customerPhone,
+    PaymentStatus paymentStatus = PaymentStatus.pending,
+    PaymentMethod paymentMethod = PaymentMethod.upi,
   }) async {
     try {
       final orderId = _uuid.v4();
@@ -37,6 +41,10 @@ class OrderService {
         cartItems: cartItems,
         avgPrepTime: 25,
         taxRate: taxRate,
+        paymentStatus: paymentStatus,
+        paymentMethod: paymentMethod,
+        customerName: customerName,
+        customerPhone: customerPhone,
       );
 
       // Store in appropriate location based on order type
@@ -81,6 +89,7 @@ class OrderService {
           'status',
           whereIn: [
             OrderStatus.pending.name,
+            OrderStatus.confirmed.name,
             OrderStatus.preparing.name,
             OrderStatus.ready.name,
           ],
