@@ -4,6 +4,7 @@ import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../models/order_model.dart';
 import '../services/tenant_service.dart';
+import '../utils/snackbar_helper.dart';
 import 'order_type_dialog.dart';
 import 'cart_page.dart';
 
@@ -15,68 +16,10 @@ class ViewOrderBar extends StatelessWidget {
   void _showOrderTypeSnackBar(BuildContext context, OrderType type) {
     final orderController = context.read<OrderController>();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              type == OrderType.dineIn
-                  ? Icons.restaurant
-                  : Icons.takeout_dining,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Order type set to ${type.displayName}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                final newType = await showDialog<OrderType>(
-                  context: context,
-                  builder: (_) => OrderTypeDialog(initialType: type),
-                );
-                if (newType != null && newType != type) {
-                  await orderController.createOrderSession(
-                    newType,
-                    tenantId: tenantId,
-                  );
-                  _showOrderTypeSnackBar(context, newType);
-                }
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'CHANGE',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 20, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 6,
-        backgroundColor: type == OrderType.dineIn
-            ? Colors.orange.shade700
-            : Colors.green.shade700,
-      ),
+    SnackbarHelper.showTopSnackBar(
+      context,
+      'Order type set to ${type.toString().split('.').last}',
+      duration: const Duration(seconds: 4),
     );
   }
 

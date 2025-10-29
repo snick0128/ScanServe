@@ -8,6 +8,7 @@ import '../services/order_service.dart';
 import '../services/guest_session_service.dart';
 import 'previous_orders_list.dart';
 import 'cart_item_list.dart';
+import '../utils/snackbar_helper.dart';
 
 class CartPage extends StatelessWidget {
   final String tenantId;
@@ -259,22 +260,16 @@ class _OrderSummary extends StatelessWidget {
                             );
                             cartController.clear();
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Order sent to kitchen!'),
-                                backgroundColor: Colors.orange,
-                                behavior: SnackBarBehavior.floating,
-                              ),
+                            SnackbarHelper.showTopSnackBar(
+                              context,
+                              'Order sent to kitchen!',
                             );
                             Navigator.of(context).pop();
                           } catch (e) {
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                                behavior: SnackBarBehavior.floating,
-                              ),
+SnackbarHelper.showTopSnackBar(
+                              context,
+                              'Error: $e',
                             );
                           }
                         },

@@ -52,6 +52,8 @@ class _MealTimeTabsState extends State<MealTimeTabs>
       ),
       child: TabBar(
         controller: _tabController,
+        dividerHeight: 0, // Remove the divider height
+        dividerColor: Colors.transparent, // Make the divider transparent
         onTap: (index) {
           final mealTime = [
             'Breakfast',

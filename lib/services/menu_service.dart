@@ -39,10 +39,11 @@ class MenuService {
           // Add category field based on the category document ID
           if (!itemData.containsKey('category')) {
             final categoryId = categoryDoc.id.toLowerCase();
-            if (categoryId == 'meals') {
-              itemData['category'] = 'Meals'; // Use 'Meals' for the meals category
+            // Include both 'lunch' and 'dinner' in the 'Meals' category
+            if (categoryId == 'meals' || categoryId == 'lunch' || categoryId == 'dinner') {
+              itemData['category'] = 'Meals';
             } else {
-              itemData['category'] = categoryName; // Use the category name for others (like 'Breakfast')
+              itemData['category'] = categoryName;
             }
           }
 

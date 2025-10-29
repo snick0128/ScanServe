@@ -75,7 +75,9 @@ class MenuItem {
 
   factory MenuItem.fromMap(Map<String, dynamic> data) {
     final itemType = data['itemType'];
-    print('🔍 MenuItem.fromMap - itemType: $itemType, data keys: ${data.keys.toList()}');
+    print(
+      '🔍 MenuItem.fromMap - itemType: $itemType, data keys: ${data.keys.toList()}',
+    );
 
     return MenuItem(
       id: data['id'] ?? '',

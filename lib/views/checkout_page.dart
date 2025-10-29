@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scan_serve/utils/snackbar_helper.dart';
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../models/order_model.dart';
@@ -497,11 +498,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
     OrderController orderController,
   ) async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields'),
-          backgroundColor: Colors.red,
-        ),
+      SnackbarHelper.showTopSnackBar(
+        context,
+        'Please fill in all required fields',
       );
       return;
     }
@@ -547,18 +546,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Text('Order placed successfully! Payment ID: $paymentId'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 5),
-          ),
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Order #${_orderId} placed successfully!',
         );
 
         // Navigate back to home or order list
@@ -566,12 +556,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing order: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackbarHelper.showTopSnackBar(context, 'Error processing order: $e');
       }
     } finally {
       if (mounted) {
@@ -721,11 +706,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
     OrderController orderController,
   ) async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields'),
-          backgroundColor: Colors.red,
-        ),
+      SnackbarHelper.showTopSnackBar(
+        context,
+        'Please fill in all required fields',
       );
       return;
     }
@@ -764,18 +747,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.restaurant, color: Colors.white),
-                const SizedBox(width: 12),
-                Text('Order sent to kitchen! Table: ${widget.tableId}'),
-              ],
-            ),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 4),
-          ),
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Order sent to kitchen! Table: ${widget.tableId}',
+          duration: const Duration(seconds: 4),
         );
 
         // Navigate back to home
@@ -783,11 +758,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending order to kitchen: $e'),
-            backgroundColor: Colors.red,
-          ),
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Error sending order to kitchen: $e',
         );
       }
     } finally {

@@ -5,13 +5,13 @@ import '../controllers/menu_controller.dart' as app_controller;
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../services/session_service.dart';
-import '../models/order_model.dart';
 import 'meal_time_tabs.dart';
 import 'search_bar.dart' as custom_search;
 import 'menu_grid.dart';
 import 'menu_item_card.dart';
 import 'view_order_bar.dart';
 import 'order_list_screen.dart';
+import '../utils/snackbar_helper.dart';
 
 class HomePage extends StatelessWidget {
   final String tenantId;
@@ -39,25 +39,41 @@ class _HomeContentState extends State<HomeContent> {
   bool? _isVegOnly;
   bool _showNonVeg = false;
   String? _guestId;
+  bool _showSwipeHint = true;
+  final ScrollController _mostOrderedScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _initializeSession();
     _loadTenantInfo();
+
+    // Initialize scroll controller
+    _mostOrderedScrollController.addListener(_onMostOrderedScroll);
+
     // Load menu items when the home content is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final menuController = context.read<app_controller.MenuController>();
       menuController.loadMenuItems(widget.tenantId);
       // Set default filter to Veg
       menuController.setVegFilter(false);
-
-      // Test Firebase connection and category filtering
-      Future.delayed(const Duration(seconds: 2), () {
-        print('🧪 TESTING CATEGORY FILTERING...');
-        menuController.testFirebaseConnection();
-      });
     });
+  }
+
+  void _onMostOrderedScroll() {
+    // Hide the hint when user starts scrolling
+    if (_showSwipeHint && _mostOrderedScrollController.offset > 0) {
+      setState(() {
+        _showSwipeHint = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _mostOrderedScrollController.removeListener(_onMostOrderedScroll);
+    _mostOrderedScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeSession() async {
@@ -89,51 +105,21 @@ class _HomeContentState extends State<HomeContent> {
     final orderController = context.read<OrderController>();
     final currentOrderType = orderController.currentOrderType;
     final tableId = orderController.currentSession?.tableId;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              currentOrderType == OrderType.dineIn
-                  ? Icons.restaurant
-                  : Icons.takeout_dining,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                currentOrderType == OrderType.dineIn
-                    ? 'Dine-in order${tableId != null ? " - Table $tableId" : ""}'
-                    : 'Parcel order',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 20, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 6,
-        backgroundColor: currentOrderType == OrderType.dineIn
-            ? Colors.orange.shade700
-            : Colors.green.shade700,
-      ),
+
+    SnackbarHelper.showTopSnackBar(
+      context,
+      'Order type: ${currentOrderType.toString().split('.').last}${tableId != null ? ' - Table $tableId' : ''}',
+      duration: const Duration(seconds: 2),
     );
   }
-
-  // Order type selection removed - now determined by URL parameters
 
   /// Format table ID from 'Table_1' or 'table_1' to 'T1'
   String _formatTableId(String tableId) {
     // Remove 'table_' or 'Table_' prefix and convert to T{number}
-    final cleaned = tableId.replaceAll(RegExp(r'[Tt]able[_-]?', caseSensitive: false), '');
+    final cleaned = tableId.replaceAll(
+      RegExp(r'[Tt]able[_-]?', caseSensitive: false),
+      '',
+    );
     return 'T$cleaned';
   }
 
@@ -219,28 +205,31 @@ class _HomeContentState extends State<HomeContent> {
     }
 
     return Scaffold(
+      extendBody: true, // This helps with bottom navigation bar spacing
       appBar: AppBar(
         title: LayoutBuilder(
           builder: (context, constraints) {
             final orderController = context.watch<OrderController>();
             final tableId = orderController.currentSession?.tableId;
-            
+
             return Container(
-              constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.7),
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.8),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Tenant name
-                    Flexible(
+                    // Tenant name with proper alignment
+                    Padding(
+                      padding: EdgeInsets.only(
+                        left:
+                            searchPadding.left, // Match search bar left padding
+                      ),
                       child: Text(
                         _isLoadingTenant
                             ? 'Loading...'
@@ -249,21 +238,25 @@ class _HomeContentState extends State<HomeContent> {
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                     // Table badge (only show if tableId exists)
                     if (tableId != null && tableId.isNotEmpty) ...[
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10), // 10px spacing from name
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
+                          horizontal: 10, // Reduced from 14 to 10
+                          vertical: 5, // Reduced from 7 to 5
                         ),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                            colors: [
+                              Colors.deepPurple,
+                              Colors.deepPurpleAccent,
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -297,7 +290,7 @@ class _HomeContentState extends State<HomeContent> {
           // Veg/Non-Veg single dot indicator
           if (!_isLoadingTenant)
             Container(
-              margin: const EdgeInsets.only(right: 8),
+              margin: const EdgeInsets.only(right: 4), // Reduced right margin
               child: InkWell(
                 onTap: (_isVegOnly == true)
                     ? null
@@ -313,7 +306,7 @@ class _HomeContentState extends State<HomeContent> {
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: 10, // Reduced horizontal padding
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
@@ -414,12 +407,7 @@ class _HomeContentState extends State<HomeContent> {
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          16, // Align with 4px parent padding
-                          20,
-                          20,
-                          20,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -457,21 +445,18 @@ class _HomeContentState extends State<HomeContent> {
                               builder: (context, menuController, child) {
                                 // For now, show first 5 items as "most ordered"
                                 // In a real app, this would come from analytics data
-                                final mostOrderedItems = menuController
-                                    .filteredItems
-                                    .take(5)
-                                    .toList();
+                                final items = menuController.filteredItems;
+                                final mostOrderedItems = items.isEmpty
+                                    ? []
+                                    : items.take(5).toList();
 
                                 if (mostOrderedItems.isEmpty) {
                                   return Container(
                                     width: double.infinity,
                                     height: 120,
-                                    margin: const EdgeInsets.fromLTRB(
-                                      16, // Match card padding alignment
-                                      0,
-                                      20,
-                                      0,
-                                    ),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ), // Consistent horizontal padding
                                     decoration: BoxDecoration(
                                       color: Colors.grey[50],
                                       borderRadius: BorderRadius.circular(12),
@@ -486,7 +471,33 @@ class _HomeContentState extends State<HomeContent> {
                                             size: 32,
                                             color: Colors.grey[400],
                                           ),
-                                          const SizedBox(height: 8),
+                                          const SizedBox(height: 12),
+                                          Center(
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: List<Widget>.generate(
+                                                mostOrderedItems.length,
+                                                (index) => Container(
+                                                  width: 6,
+                                                  height: 6,
+                                                  margin:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 2,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: index == 0
+                                                        ? Theme.of(
+                                                            context,
+                                                          ).colorScheme.primary
+                                                        : Colors.grey[300],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
                                           Text(
                                             'No popular items yet',
                                             style: TextStyle(
@@ -500,56 +511,82 @@ class _HomeContentState extends State<HomeContent> {
                                   );
                                 }
 
-                                return Container(
-                                  height: 220,
-                                  margin: const EdgeInsets.fromLTRB(
-                                    16, // Match card padding alignment
-                                    0,
-                                    20,
-                                    0,
-                                  ),
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: mostOrderedItems.length,
-                                    shrinkWrap: true,
-                                    physics: const ClampingScrollPhysics(),
-                                    itemBuilder: (context, index) {
-                                      final item = mostOrderedItems[index];
-                                      return Container(
-                                        width: 160,
-                                        margin: EdgeInsets.only(right: 12),
-                                        child: MenuItemCard(
-                                          item: item,
-                                          onAddPressed: () {
-                                            context
-                                                .read<CartController>()
-                                                .addItem(item);
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  '${item.name} added to cart',
-                                                ),
-                                                duration: const Duration(
-                                                  seconds: 1,
-                                                ),
-                                                behavior:
-                                                    SnackBarBehavior.floating,
-                                                margin:
-                                                    const EdgeInsets.fromLTRB(
-                                                      8,
-                                                      20,
-                                                      8,
-                                                      0,
-                                                    ),
-                                              ),
-                                            );
-                                          },
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Scroll hint indicator (only show on first load)
+                                    if (_showSwipeHint)
+                                      Container(
+                                        padding: const EdgeInsets.only(
+                                          left: 4,
+                                          bottom: 8,
                                         ),
-                                      );
-                                    },
-                                  ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.arrow_forward_ios,
+                                              size: 14,
+                                              color: Colors.grey[500],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Swipe to see more',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 12,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    // Scrollable list
+                                    SizedBox(
+                                      height:
+                                          240, // Increased height to accommodate the card
+                                      child: ListView.builder(
+                                        controller:
+                                            _mostOrderedScrollController,
+                                        scrollDirection: Axis.horizontal,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                        itemCount: mostOrderedItems.length,
+                                        shrinkWrap: true,
+                                        physics: const BouncingScrollPhysics(),
+                                        clipBehavior: Clip.hardEdge,
+                                        itemBuilder: (context, index) {
+                                          final item = mostOrderedItems[index];
+                                          return Container(
+                                            width: 160,
+                                            margin: EdgeInsets.only(
+                                              right:
+                                                  index ==
+                                                      mostOrderedItems.length -
+                                                          1
+                                                  ? 0
+                                                  : 16,
+                                            ),
+                                            child: MenuItemCard(
+                                              item: item,
+                                              onAddPressed: () {
+                                                context
+                                                    .read<CartController>()
+                                                    .addItem(item);
+                                                SnackbarHelper.showTopSnackBar(
+                                                  context,
+                                                  '${item.name} added to cart',
+                                                  duration: const Duration(
+                                                    seconds: 1,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 );
                               },
                             ),
@@ -625,68 +662,47 @@ class _HomeContentState extends State<HomeContent> {
         ],
       ),
       bottomNavigationBar: ViewOrderBar(tenantId: widget.tenantId),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Show call waiter dialog or snackbar
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(
-                    Icons.notifications_active_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    'Waiter has been notified!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(
+          bottom: 65.0,
+        ), // Add margin above FAB for bottom navigation
+        child: FloatingActionButton(
+          onPressed: () {
+            // Show call waiter dialog or snackbar
+            SnackbarHelper.showTopSnackBar(
+              context,
+              'Waiter has been notified!',
               duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.fromLTRB(8, 20, 8, 0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            );
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 8,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              elevation: 8,
-              backgroundColor: Colors.deepPurple.shade700,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.deepPurple.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          );
-        },
-        backgroundColor: Colors.transparent,
-        elevation: 8,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            child: const Icon(
+              Icons.notifications_active_rounded,
+              color: Colors.white,
+              size: 24,
             ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.deepPurple.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.notifications_active_rounded,
-            color: Colors.white,
-            size: 24,
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

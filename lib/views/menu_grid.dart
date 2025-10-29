@@ -4,6 +4,7 @@ import '../controllers/menu_controller.dart' as app_controller;
 import '../controllers/cart_controller.dart';
 import 'menu_item_card.dart';
 import 'shimmer_loading.dart';
+import 'package:scan_serve/utils/snackbar_helper.dart';
 
 class MenuGrid extends StatelessWidget {
   const MenuGrid({Key? key}) : super(key: key);
@@ -24,7 +25,8 @@ class MenuGrid extends StatelessWidget {
     if (screenWidth < 480) {
       // Mobile - very small screens
       crossAxisCount = 2;
-      childAspectRatio = 0.68; // Decreased from 0.75 to increase height by ~15px
+      childAspectRatio =
+          0.68; // Decreased from 0.75 to increase height by ~15px
       crossAxisSpacing = 12;
       mainAxisSpacing = 8;
     } else if (screenWidth < 600) {
@@ -42,7 +44,8 @@ class MenuGrid extends StatelessWidget {
     } else if (screenWidth < 1200) {
       // Tablet - landscape
       crossAxisCount = 2;
-      childAspectRatio = 0.76; // Decreased from 0.85 to increase height by ~15px
+      childAspectRatio =
+          0.76; // Decreased from 0.85 to increase height by ~15px
       crossAxisSpacing = 24;
       mainAxisSpacing = 20;
     } else if (screenWidth < 1600) {
@@ -54,7 +57,8 @@ class MenuGrid extends StatelessWidget {
     } else {
       // Desktop - large
       crossAxisCount = 4;
-      childAspectRatio = 0.67; // Decreased from 0.75 to increase height by ~15px
+      childAspectRatio =
+          0.67; // Decreased from 0.75 to increase height by ~15px
       crossAxisSpacing = 32;
       mainAxisSpacing = 28;
     }
@@ -85,13 +89,17 @@ class MenuGrid extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                menuController.isSearching ? Icons.search_off : Icons.restaurant_menu,
+                menuController.isSearching
+                    ? Icons.search_off
+                    : Icons.restaurant_menu,
                 size: 48,
                 color: Colors.grey[400],
               ),
               const SizedBox(height: 12),
               Text(
-                menuController.isSearching ? 'No search results found' : 'No items found',
+                menuController.isSearching
+                    ? 'No search results found'
+                    : 'No items found',
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontSize: 16,
@@ -103,10 +111,7 @@ class MenuGrid extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Try searching with different keywords',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
                   ),
                 ),
             ],
@@ -116,7 +121,9 @@ class MenuGrid extends StatelessWidget {
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(0), // Remove grid padding since parent handles spacing
+      padding: const EdgeInsets.all(
+        0,
+      ), // Remove grid padding since parent handles spacing
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         childAspectRatio: childAspectRatio,
@@ -125,24 +132,18 @@ class MenuGrid extends StatelessWidget {
       ),
       itemCount: items.length,
       shrinkWrap: true, // Add this to prevent layout issues
-      physics: const NeverScrollableScrollPhysics(), // Add this to prevent nested scrolling issues
+      physics:
+          const NeverScrollableScrollPhysics(), // Add this to prevent nested scrolling issues
       itemBuilder: (context, index) {
         final item = items[index];
         return MenuItemCard(
           item: item,
           onAddPressed: () {
             context.read<CartController>().addItem(item);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${item.name} added to cart'),
-                duration: const Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.only(
-                  top: 20,
-                  left: 8,
-                  right: 8,
-                ),
-              ),
+            SnackbarHelper.showTopSnackBar(
+              context,
+              '${item.name} added to cart',
+              duration: const Duration(seconds: 1),
             );
           },
         );

@@ -22,12 +22,11 @@ class MenuController extends ChangeNotifier {
       '🔍 FILTERING: Total items: ${_items.length}, Selected meal time: "$_selectedMealTime", Search query: "$_searchQuery"',
     );
 
-    var filtered = _items
-        .where(
-          (item) =>
-              item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              item.description.toLowerCase().contains(_searchQuery.toLowerCase()),
-        );
+    var filtered = _items.where(
+      (item) =>
+          item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.description.toLowerCase().contains(_searchQuery.toLowerCase()),
+    );
 
     print('🔍 AFTER SEARCH: ${filtered.length} items');
 
@@ -139,8 +138,11 @@ class MenuController extends ChangeNotifier {
       final categories = <String>{};
       for (var item in items) {
         categories.add(item.category ?? 'NULL');
-        if (categories.length <= 5) { // Only print first few unique categories
-          print('Item: "${item.name}" | Category: "${item.category}" | Subcategory: "${item.subcategory}"');
+        if (categories.length <= 5) {
+          // Only print first few unique categories
+          print(
+            'Item: "${item.name}" | Category: "${item.category}" | Subcategory: "${item.subcategory}"',
+          );
         }
       }
       print('Unique categories found: $categories');
