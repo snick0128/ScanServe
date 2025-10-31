@@ -47,9 +47,55 @@ class _MenuItemCardState extends State<MenuItemCard>
   }
 
   void _showItemPreview() {
-    MenuItemPreview.show(
-      context: context,
-      item: widget.item,
+    MenuItemPreview.show(context: context, item: widget.item);
+  }
+
+  Widget _buildAddButton() {
+    return Container(
+      height: 30,
+      width: 80,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF914D), Color(0xFFFF6E40)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: _isHovered
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFF6E40).withAlpha(80),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _onAddPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: const Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_shopping_cart, size: 14, color: Colors.white),
+                SizedBox(width: 4),
+                Text(
+                  'Add',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -77,23 +123,24 @@ class _MenuItemCardState extends State<MenuItemCard>
                     surfaceTintColor: Colors.transparent,
                     clipBehavior: Clip.antiAlias,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        24,
-                      ), // Increased from 16 to 24 for better separation
+                      borderRadius: BorderRadius.circular(24),
                       side: BorderSide(color: Colors.grey.shade200, width: 1.0),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      // Use spaceBetween to pin bottom row, and Expanded for middle text block.
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Optional image
                         if (widget.item.imageUrl != null)
                           AspectRatio(
-                            aspectRatio: 16 / 9,
+                            aspectRatio: MediaQuery.of(context).size.width < 600
+                                ? 4 / 3
+                                : 16 / 9,
                             child: ClipRRect(
                               borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(
-                                  24,
-                                ), // Match the card's border radius
+                                top: Radius.circular(24),
                               ),
                               child: Image.network(
                                 widget.item.imageUrl!,
@@ -110,117 +157,66 @@ class _MenuItemCardState extends State<MenuItemCard>
                               ),
                             ),
                           ),
+
+                        // Middle content (title + description). Expanded ensures the bottom row stays pinned.
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.item.name,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.item.description,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: Colors.grey[600]),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Price + Add/Quantity row — pinned to bottom with explicit bottom padding
                         Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
-                                widget.item.name,
+                                '₹${widget.item.price.toStringAsFixed(2)}',
                                 style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.item.description,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: Colors.grey[600]),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '₹${widget.item.price.toStringAsFixed(2)}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFFFF6E40),
-                                          fontSize: 12,
-                                        ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (isInCart)
-                                    ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 100,
-                                      ),
-                                      child: _QuantityControls(
-                                        itemId: widget.item.id,
-                                        quantity: quantity,
-                                        onUpdateQuantity:
-                                            cartController.updateQuantity,
-                                        isHovered: _isHovered,
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      height: 30,
-                                      width: 80,
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFFFF914D),
-                                            Color(0xFFFF6E40),
-                                          ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: _isHovered
-                                            ? [
-                                                BoxShadow(
-                                                  color: const Color(
-                                                    0xFFFF6E40,
-                                                  ).withAlpha(80),
-                                                  blurRadius: 6,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ]
-                                            : null,
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: _onAddPressed,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          child: Center(
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons.add_shopping_cart,
-                                                  size: 14,
-                                                  color: Colors.white,
-                                                ),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  'Add',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.white,
-                                                    height: 1.2,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFFF6E40),
+                                      fontSize: 12,
                                     ),
-                                ],
+                                overflow: TextOverflow.ellipsis,
                               ),
+                              if (isInCart)
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 100,
+                                  ),
+                                  child: _QuantityControls(
+                                    itemId: widget.item.id,
+                                    quantity: quantity,
+                                    onUpdateQuantity:
+                                        cartController.updateQuantity,
+                                    isHovered: _isHovered,
+                                  ),
+                                )
+                              else
+                                _buildAddButton(),
                             ],
                           ),
                         ),
@@ -253,11 +249,11 @@ class _QuantityControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // If quantity is 0, return null to show the Add button
+    // If quantity is 0, return nothing (Add button will be shown by parent)
     if (quantity <= 0) {
-      // Use a post-frame callback to ensure we're not updating state during build
+      // Post-frame callback to ensure safe update; the parent CartController should handle removal.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        onUpdateQuantity(itemId, 0); // Notify parent to remove the item
+        onUpdateQuantity(itemId, 0);
       });
       return const SizedBox.shrink();
     }
@@ -282,7 +278,6 @@ class _QuantityControls extends StatelessWidget {
               if (quantity > 1) {
                 onUpdateQuantity(itemId, quantity - 1);
               } else {
-                // If quantity is 1, set to 0 to trigger removal
                 onUpdateQuantity(itemId, 0);
               }
             },

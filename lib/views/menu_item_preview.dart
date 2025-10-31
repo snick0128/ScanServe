@@ -29,11 +29,12 @@ class MenuItemPreview extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      useSafeArea: true,
       builder: (context) => Consumer<CartController>(
         builder: (context, cartController, _) {
           final isInCart = cartController.isItemInCart(item.id);
           final quantity = cartController.getItemQuantity(item.id);
-          
+
           return MenuItemPreview(
             item: item,
             onClose: () => Navigator.of(context).pop(),
@@ -57,37 +58,29 @@ class MenuItemPreview extends StatelessWidget {
     final theme = Theme.of(context);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          Container(
-            margin: const EdgeInsets.only(top: 8, bottom: 4),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
+
+    return IntrinsicHeight(
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
             ),
-          ),
-          
-          // Item image
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+          // IMAGE FIRST (touches top)
           if (item.imageUrl != null)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
                 child: Stack(
@@ -98,7 +91,11 @@ class MenuItemPreview extends StatelessWidget {
                       width: double.infinity,
                       errorBuilder: (context, error, stackTrace) => Container(
                         color: Colors.grey[100],
-                        child: const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                        child: const Icon(
+                          Icons.broken_image,
+                          size: 48,
+                          color: Colors.grey,
+                        ),
                       ),
                     ),
                     Positioned(
@@ -109,10 +106,21 @@ class MenuItemPreview extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: const BoxDecoration(
-                            color: Colors.black54,
+                            color: Colors.white,
                             shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          child: const Icon(Icons.close, color: Colors.white, size: 20),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.black87,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ),
@@ -120,178 +128,177 @@ class MenuItemPreview extends StatelessWidget {
                 ),
               ),
             ),
-          
-          // Content
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16).copyWith(
-              bottom: 16 + bottomPadding,
+
+          // Move drag handle BELOW image
+          Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(2),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ),
+
+          // CONTENT
+          Flexible(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 16)
+                    .copyWith(bottom: 16 + bottomPadding),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                    // ITEM HEADER WITH PRICE AND ADD BUTTON
+                    Padding(
+                      padding: const EdgeInsets.only(left: 1, right: 1, top: 8, bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Item name and price
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: theme.textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '₹${item.price.toStringAsFixed(2)}',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: const Color(0xFFFF6E40),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Add to cart button or quantity controls
+                          if (!isInCart)
+                            Container(
+                              margin: const EdgeInsets.only(left: 16),
+                              child: ElevatedButton.icon(
+                                onPressed: onAddToCart,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF6E40),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.add_shopping_cart,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                label: const Text(
+                                  'Add',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              margin: const EdgeInsets.only(left: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.grey[300]!,
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.remove, size: 20),
+                                    onPressed: () => onUpdateQuantity(item.id, quantity - 1),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    constraints: const BoxConstraints(),
+                                    style: IconButton.styleFrom(
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    child: Text(
+                                      '$quantity',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.add, size: 20),
+                                    onPressed: () => onUpdateQuantity(item.id, quantity + 1),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    constraints: const BoxConstraints(),
+                                    style: IconButton.styleFrom(
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    Text(
-                      '₹${item.price.toStringAsFixed(2)}',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFFFF6E40),
-                        fontWeight: FontWeight.bold,
+                    
+                    // Description section
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 0, right: 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Description',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            item.description,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: Colors.grey[800],
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    // Removed bottom add to cart button as per request
                   ],
                 ),
-                
-                const SizedBox(height: 16),
-                Text(
-                  'Description',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  item.description,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey[800],
-                    height: 1.5,
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                if (isInCart)
-                  _buildQuantityControls(context)
-                else
-                  _buildAddButton(context),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddButton(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: onAddToCart,
-        child: Container(
-          height: 36,
-          width: MediaQuery.of(context).size.width - 100, // Leave 50px on each side
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF6E40),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF6E40).withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Text(
-              'Add to Cart',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuantityControls(BuildContext context) {
-    return Center(
-      child: Container(
-        height: 36,
-        width: MediaQuery.of(context).size.width - 100, // Leave 50px on each side
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFFF6E40).withOpacity(0.5)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            GestureDetector(
-              onTap: () => onUpdateQuantity(item.id, quantity - 1),
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6E40).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '-',
-                    style: TextStyle(
-                      color: Color(0xFFFF6E40),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      height: 1.0,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Text(
-              '$quantity',
-              style: const TextStyle(
-                color: Color(0xFFFF6E40),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            GestureDetector(
-              onTap: () => onUpdateQuantity(item.id, quantity + 1),
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6E40).withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '+',
-                    style: TextStyle(
-                      color: Color(0xFFFF6E40),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      height: 1.0,
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
+
+  // Removed _buildAddButton method as it's no longer needed
+
+  // Removed _buildQuantityControls method as it's no longer needed
 }

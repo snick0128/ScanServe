@@ -84,6 +84,7 @@ class OrderDetails {
   final String? customerPhone;
   final String? paymentId;
   final DateTime? paymentTimestamp;
+  final String? chefNote;
 
   OrderDetails({
     required this.orderId,
@@ -104,6 +105,7 @@ class OrderDetails {
     this.customerPhone,
     this.paymentId,
     this.paymentTimestamp,
+    this.chefNote,
   });
 
   factory OrderDetails.fromCart({
@@ -119,6 +121,7 @@ class OrderDetails {
     PaymentMethod paymentMethod = PaymentMethod.cash,
     String customerName = '',
     String? customerPhone,
+    String? chefNote,
   }) {
     final subtotal = cartItems.fold<double>(
       0,
@@ -143,6 +146,7 @@ class OrderDetails {
       paymentMethod: paymentMethod,
       customerName: customerName,
       customerPhone: customerPhone,
+      chefNote: chefNote,
     );
   }
 
@@ -166,38 +170,68 @@ class OrderDetails {
       'customerPhone': customerPhone,
       'paymentId': paymentId,
       'paymentTimestamp': paymentTimestamp != null ? Timestamp.fromDate(paymentTimestamp!) : null,
+      'chefNote': chefNote,
     };
   }
 
   factory OrderDetails.fromMap(Map<String, dynamic> map) {
-    return OrderDetails(
-      orderId: map['orderId'],
-      guestId: map['guestId'],
-      tableId: map['tableId'],
-      tenantId: map['tenantId'],
-      type: OrderType.values.firstWhere((e) => e.name == map['type']),
-      items: (map['items'] as List)
-          .map((item) => OrderItem.fromMap(item))
-          .toList(),
-      timestamp: (map['timestamp'] as Timestamp).toDate(),
-      status: OrderStatus.values.firstWhere((e) => e.name == map['status']),
-      estimatedWaitTime: map['estimatedWaitTime'],
-      subtotal: map['subtotal'],
-      tax: map['tax'],
-      total: map['total'],
-      paymentStatus: PaymentStatus.values.firstWhere(
-        (e) => e.name == (map['paymentStatus'] ?? PaymentStatus.pending.name),
-      ),
-      paymentMethod: PaymentMethod.values.firstWhere(
-        (e) => e.name == (map['paymentMethod'] ?? PaymentMethod.upi.name),
-      ),
-      customerName: map['customerName'] ?? '',
-      customerPhone: map['customerPhone'],
-      paymentId: map['paymentId'],
-      paymentTimestamp: map['paymentTimestamp'] != null
-          ? (map['paymentTimestamp'] as Timestamp).toDate()
-          : null,
-    );
+    try {
+      return OrderDetails(
+        orderId: map['orderId']?.toString() ?? '',
+        guestId: map['guestId']?.toString() ?? '',
+        tableId: map['tableId']?.toString(),
+        tenantId: map['tenantId']?.toString() ?? '',
+        type: map['type'] != null 
+            ? OrderType.values.firstWhere(
+                (e) => e.name == map['type'],
+                orElse: () => OrderType.dineIn,
+              )
+            : OrderType.dineIn,
+        items: map['items'] != null
+            ? (map['items'] as List).map((item) => OrderItem.fromMap(item)).toList()
+            : [],
+        timestamp: map['timestamp'] != null
+            ? (map['timestamp'] is Timestamp 
+                ? (map['timestamp'] as Timestamp).toDate() 
+                : DateTime.parse(map['timestamp'].toString()))
+            : DateTime.now(),
+        status: map['status'] != null
+            ? OrderStatus.values.firstWhere(
+                (e) => e.name == map['status'],
+                orElse: () => OrderStatus.pending,
+              )
+            : OrderStatus.pending,
+        estimatedWaitTime: (map['estimatedWaitTime'] as num?)?.toInt() ?? 30,
+        subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
+        tax: (map['tax'] as num?)?.toDouble() ?? 0.0,
+        total: (map['total'] as num?)?.toDouble() ?? 0.0,
+        paymentStatus: map['paymentStatus'] != null
+            ? PaymentStatus.values.firstWhere(
+                (e) => e.name == map['paymentStatus'],
+                orElse: () => PaymentStatus.pending,
+              )
+            : PaymentStatus.pending,
+        paymentMethod: map['paymentMethod'] != null
+            ? PaymentMethod.values.firstWhere(
+                (e) => e.name == map['paymentMethod'],
+                orElse: () => PaymentMethod.upi,
+              )
+            : PaymentMethod.upi,
+        customerName: map['customerName']?.toString() ?? '',
+        customerPhone: map['customerPhone']?.toString(),
+        paymentId: map['paymentId']?.toString(),
+        paymentTimestamp: map['paymentTimestamp'] != null
+            ? (map['paymentTimestamp'] is Timestamp
+                ? (map['paymentTimestamp'] as Timestamp).toDate()
+                : DateTime.parse(map['paymentTimestamp'].toString()))
+            : null,
+        chefNote: map['chefNote']?.toString(),
+      );
+    } catch (e) {
+      print('Error parsing OrderDetails: $e');
+      print('Map data: $map');
+      rethrow;
+    }
   }
 
   DateTime get estimatedReadyTime {

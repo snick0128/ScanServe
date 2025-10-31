@@ -204,505 +204,540 @@ class _HomeContentState extends State<HomeContent> {
       iconSize = 30;
     }
 
-    return Scaffold(
-      extendBody: true, // This helps with bottom navigation bar spacing
-      appBar: AppBar(
-        title: LayoutBuilder(
-          builder: (context, constraints) {
-            final orderController = context.watch<OrderController>();
-            final tableId = orderController.currentSession?.tableId;
+    return Stack(
+      children: [
+        Scaffold(
+          extendBody: true, // This helps with bottom navigation bar spacing
+          appBar: AppBar(
+            title: LayoutBuilder(
+              builder: (context, constraints) {
+                final orderController = context.watch<OrderController>();
+                final tableId = orderController.currentSession?.tableId;
 
-            return Container(
-              constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Tenant name with proper alignment
-                    Padding(
-                      padding: EdgeInsets.only(
-                        left:
-                            searchPadding.left, // Match search bar left padding
-                      ),
-                      child: Text(
-                        _isLoadingTenant
-                            ? 'Loading...'
-                            : (_tenantName ?? 'Restaurant'),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        maxLines: 1,
-                      ),
+                return Container(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.8,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(50),
                     ),
-                    // Table badge (only show if tableId exists)
-                    if (tableId != null && tableId.isNotEmpty) ...[
-                      const SizedBox(width: 10), // 10px spacing from name
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10, // Reduced from 14 to 10
-                          vertical: 5, // Reduced from 7 to 5
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              Colors.deepPurple,
-                              Colors.deepPurpleAccent,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Tenant name with proper alignment
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: searchPadding
+                                .left, // Match search bar left padding
                           ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.deepPurple.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                          child: Text(
+                            _isLoadingTenant
+                                ? 'Loading...'
+                                : (_tenantName ?? 'Restaurant'),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                        child: Text(
-                          _formatTableId(tableId),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            maxLines: 1,
                           ),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        elevation: appBarElevation,
-        actions: [
-          // Veg/Non-Veg single dot indicator
-          if (!_isLoadingTenant)
-            Container(
-              margin: const EdgeInsets.only(right: 4), // Reduced right margin
-              child: InkWell(
-                onTap: (_isVegOnly == true)
-                    ? null
-                    : () {
-                        setState(() {
-                          _showNonVeg = !_showNonVeg;
-                        });
-                        // Update veg filter in menu controller
-                        final menuController = context
-                            .read<app_controller.MenuController>();
-                        menuController.setVegFilter(_showNonVeg);
-                      },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10, // Reduced horizontal padding
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _showNonVeg
-                        ? Colors.red.withAlpha(15)
-                        : Colors.green.withAlpha(25),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _showNonVeg
-                          ? Colors.red.withAlpha(50)
-                          : Colors.green.withAlpha(50),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Single dot indicator
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _showNonVeg ? Colors.red : Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _showNonVeg ? 'Non-Veg' : 'Veg',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _showNonVeg ? Colors.red : Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          IconButton(
-            iconSize: iconSize,
-            icon: const Icon(Icons.receipt_long),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const OrderListScreen(),
-                ),
-              );
-            },
-            tooltip: 'View Orders',
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(screenWidth < 600 ? 48 : 52),
-          child: const MealTimeTabs(),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Fixed Search Bar Section
-          Container(
-            color: Colors.white,
-            padding: searchPadding,
-            child: custom_search.SearchBar(maxWidth: searchBarMaxWidth),
-          ),
-
-          // Subtle separator
-          Container(height: 1, color: Colors.grey[200]),
-
-          // Scrollable Content
-          Expanded(
-            child: Container(
-              color: Colors.grey[50],
-              padding: const EdgeInsets.fromLTRB(
-                4,
-                0,
-                4,
-                0,
-              ), // Fixed 4px leading and trailing
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Most Ordered Items Section
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFFFF914D),
-                                        Color(0xFFFF6E40),
-                                      ],
-                                      begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    'Most Ordered',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                        // Table badge (only show if tableId exists)
+                        if (tableId != null && tableId.isNotEmpty) ...[
+                          const SizedBox(width: 10), // 10px spacing from name
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10, // Reduced from 14 to 10
+                              vertical: 5, // Reduced from 7 to 5
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Colors.deepPurple,
+                                  Colors.deepPurpleAccent,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.deepPurple.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Consumer<app_controller.MenuController>(
-                              builder: (context, menuController, child) {
-                                // For now, show first 5 items as "most ordered"
-                                // In a real app, this would come from analytics data
-                                final items = menuController.filteredItems;
-                                final mostOrderedItems = items.isEmpty
-                                    ? []
-                                    : items.take(5).toList();
+                            child: Text(
+                              _formatTableId(tableId),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            elevation: appBarElevation,
+            actions: [
+              // Veg/Non-Veg single dot indicator
+              if (!_isLoadingTenant)
+                Container(
+                  margin: const EdgeInsets.only(
+                    right: 4,
+                  ), // Reduced right margin
+                  child: InkWell(
+                    onTap: (_isVegOnly == true)
+                        ? null
+                        : () {
+                            setState(() {
+                              _showNonVeg = !_showNonVeg;
+                            });
+                            // Update veg filter in menu controller
+                            final menuController = context
+                                .read<app_controller.MenuController>();
+                            menuController.setVegFilter(_showNonVeg);
+                          },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10, // Reduced horizontal padding
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _showNonVeg
+                            ? Colors.red.withAlpha(15)
+                            : Colors.green.withAlpha(25),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _showNonVeg
+                              ? Colors.red.withAlpha(50)
+                              : Colors.green.withAlpha(50),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Single dot indicator
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _showNonVeg ? Colors.red : Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _showNonVeg ? 'Non-Veg' : 'Veg',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _showNonVeg ? Colors.red : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
-                                if (mostOrderedItems.isEmpty) {
-                                  return Container(
-                                    width: double.infinity,
-                                    height: 120,
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                    ), // Consistent horizontal padding
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[50],
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.star_outline,
-                                            size: 32,
-                                            color: Colors.grey[400],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Center(
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: List<Widget>.generate(
-                                                mostOrderedItems.length,
-                                                (index) => Container(
-                                                  width: 6,
-                                                  height: 6,
-                                                  margin:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 2,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    color: index == 0
-                                                        ? Theme.of(
-                                                            context,
-                                                          ).colorScheme.primary
-                                                        : Colors.grey[300],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            'No popular items yet',
-                                            style: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }
+              IconButton(
+                iconSize: iconSize,
+                icon: const Icon(Icons.receipt_long),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const OrderListScreen(),
+                    ),
+                  );
+                },
+                tooltip: 'View Orders',
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(screenWidth < 600 ? 48 : 52),
+              child: const MealTimeTabs(),
+            ),
+          ),
+          body: Column(
+            children: [
+              // Fixed Search Bar Section
+              Container(
+                color: Colors.white,
+                padding: searchPadding,
+                child: custom_search.SearchBar(maxWidth: searchBarMaxWidth),
+              ),
 
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Subtle separator
+              Container(height: 1, color: Colors.grey[200]),
+
+              // Scrollable Content
+              Expanded(
+                child: Container(
+                  color: Colors.grey[50],
+                  padding: const EdgeInsets.fromLTRB(
+                    4,
+                    0,
+                    4,
+                    0,
+                  ), // Fixed 4px leading and trailing
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // Most Ordered Items Section
+                        Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(5),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    // Scroll hint indicator (only show on first load)
-                                    if (_showSwipeHint)
-                                      Container(
-                                        padding: const EdgeInsets.only(
-                                          left: 4,
-                                          bottom: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.arrow_forward_ios,
-                                              size: 14,
-                                              color: Colors.grey[500],
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Swipe to see more',
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 12,
-                                                fontStyle: FontStyle.italic,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
                                       ),
-                                    // Scrollable list
-                                    SizedBox(
-                                      height:
-                                          240, // Increased height to accommodate the card
-                                      child: ListView.builder(
-                                        controller:
-                                            _mostOrderedScrollController,
-                                        scrollDirection: Axis.horizontal,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFFF914D),
+                                            Color(0xFFFF6E40),
+                                          ],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight,
                                         ),
-                                        itemCount: mostOrderedItems.length,
-                                        shrinkWrap: true,
-                                        physics: const BouncingScrollPhysics(),
-                                        clipBehavior: Clip.hardEdge,
-                                        itemBuilder: (context, index) {
-                                          final item = mostOrderedItems[index];
-                                          return Container(
-                                            width: 160,
-                                            margin: EdgeInsets.only(
-                                              right:
-                                                  index ==
-                                                      mostOrderedItems.length -
-                                                          1
-                                                  ? 0
-                                                  : 16,
-                                            ),
-                                            child: MenuItemCard(
-                                              item: item,
-                                              onAddPressed: () {
-                                                context
-                                                    .read<CartController>()
-                                                    .addItem(item);
-                                                SnackbarHelper.showTopSnackBar(
-                                                  context,
-                                                  '${item.name} added to cart',
-                                                  duration: const Duration(
-                                                    seconds: 1,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Most Ordered',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
                                       ),
                                     ),
                                   ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                                ),
+                                const SizedBox(height: 8),
+                                Consumer<app_controller.MenuController>(
+                                  builder: (context, menuController, child) {
+                                    // For now, show first 5 items as "most ordered"
+                                    // In a real app, this would come from analytics data
+                                    final items = menuController.filteredItems;
+                                    final mostOrderedItems = items.isEmpty
+                                        ? []
+                                        : items.take(5).toList();
 
-                    // Menu Grid with responsive spacing
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          16, // Align with 4px parent padding
-                          20,
-                          20,
-                          20,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.grey[300]!,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'Browse Menu',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
+                                    if (mostOrderedItems.isEmpty) {
+                                      return Container(
+                                        width: double.infinity,
+                                        height: 120,
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                        ), // Consistent horizontal padding
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[50],
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.star_outline,
+                                                size: 32,
+                                                color: Colors.grey[400],
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Center(
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: List<Widget>.generate(
+                                                    mostOrderedItems.length,
+                                                    (index) => Container(
+                                                      width: 6,
+                                                      height: 6,
+                                                      margin:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 2,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: index == 0
+                                                            ? Theme.of(context)
+                                                                  .colorScheme
+                                                                  .primary
+                                                            : Colors.grey[300],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'No popular items yet',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }
+
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Scroll hint indicator (only show on first load)
+                                        if (_showSwipeHint)
+                                          Container(
+                                            padding: const EdgeInsets.only(
+                                              left: 4,
+                                              bottom: 8,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.arrow_forward_ios,
+                                                  size: 14,
+                                                  color: Colors.grey[500],
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Swipe to see more',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 12,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        // Scrollable list
+                                        SizedBox(
+                                          height:
+                                              240, // Increased height to accommodate the card
+                                          child: ListView.builder(
+                                            controller:
+                                                _mostOrderedScrollController,
+                                            scrollDirection: Axis.horizontal,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                            ),
+                                            itemCount: mostOrderedItems.length,
+                                            shrinkWrap: true,
+                                            physics:
+                                                const BouncingScrollPhysics(),
+                                            clipBehavior: Clip.hardEdge,
+                                            itemBuilder: (context, index) {
+                                              final item =
+                                                  mostOrderedItems[index];
+                                              return Container(
+                                                width: 160,
+                                                margin: EdgeInsets.only(
+                                                  right:
+                                                      index ==
+                                                          mostOrderedItems
+                                                                  .length -
+                                                              1
+                                                      ? 0
+                                                      : 16,
+                                                ),
+                                                child: MenuItemCard(
+                                                  item: item,
+                                                  onAddPressed: () {
+                                                    context
+                                                        .read<CartController>()
+                                                        .addItem(item);
+                                                    SnackbarHelper.showTopSnackBar(
+                                                      context,
+                                                      '${item.name} added to cart',
+                                                      duration: const Duration(
+                                                        seconds: 1,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            const MenuGrid(),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
 
-                    // Bottom spacing
-                    const SizedBox(height: 8),
-                  ],
+                        // Menu Grid with responsive spacing
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(5),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              16, // Align with 4px parent padding
+                              20,
+                              20,
+                              20,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.grey[300]!,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Browse Menu',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const MenuGrid(),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Bottom spacing
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-      bottomNavigationBar: ViewOrderBar(tenantId: widget.tenantId),
-      floatingActionButton: Container(
-        margin: const EdgeInsets.only(
-          bottom: 65.0,
-        ), // Add margin above FAB for bottom navigation
-        child: FloatingActionButton(
-          onPressed: () {
-            // Show call waiter dialog or snackbar
-            SnackbarHelper.showTopSnackBar(
-              context,
-              'Waiter has been notified!',
-              duration: const Duration(seconds: 3),
-            );
-          },
-          backgroundColor: Colors.transparent,
-          elevation: 8,
-          child: Container(
-            width: 56,
-            height: 56,
+          bottomNavigationBar: ViewOrderBar(tenantId: widget.tenantId),
+        ),
+        // Custom positioned FAB with tooltip
+        Positioned(
+          right: 20,
+          bottom: 80, // Position above the bottom navigation bar
+          child: Tooltip(
+            message: 'Call Waiter',
+            preferBelow: false,
+            verticalOffset: 10,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
+              color: Colors.deepPurple[800],
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.deepPurple.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.notifications_active_rounded,
+            textStyle: const TextStyle(
               color: Colors.white,
-              size: 24,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            child: GestureDetector(
+              onTap: () {
+                // Show call waiter dialog or snackbar
+                SnackbarHelper.showTopSnackBar(
+                  context,
+                  'Waiter has been notified!',
+                  duration: const Duration(seconds: 3),
+                );
+              },
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.deepPurple.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.notifications_active_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

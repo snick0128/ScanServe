@@ -19,6 +19,16 @@ class OrderController extends ChangeNotifier {
   StreamSubscription<QuerySnapshot>? _ordersSubscription;
   StreamSubscription<QuerySnapshot>? _tableOrdersSubscription;
   final PaymentService _paymentService = PaymentService();
+  String? _chefNote;
+
+  String get chefNote => _chefNote ?? '';
+
+  void updateChefNote(String? note) {
+    if (_chefNote != note) {
+      _chefNote = note?.trim();
+      notifyListeners();
+    }
+  }
 
   OrderController() {
     // Don't initialize tracking in constructor, do it after session is set

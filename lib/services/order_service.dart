@@ -20,6 +20,7 @@ class OrderService {
     String? tableId,
     required List<CartItem> cartItems,
     String? notes,
+    String? chefNote,
     String customerName = '',
     String? customerPhone,
     PaymentStatus paymentStatus = PaymentStatus.pending,
@@ -45,6 +46,7 @@ class OrderService {
         paymentMethod: paymentMethod,
         customerName: customerName,
         customerPhone: customerPhone,
+        chefNote: chefNote,
       );
 
       // Store in appropriate location based on order type
