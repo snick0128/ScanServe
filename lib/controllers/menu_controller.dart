@@ -49,31 +49,38 @@ class MenuController extends ChangeNotifier {
           return false;
         }
       }
+
+      // Filter by subcategory
+      if (_selectedSubcategory != null &&
+          item.subcategory != _selectedSubcategory) {
+        return false;
+      }
+
+      // Filter by veg/non-veg
+      // If _showNonVeg is false (default), show ALL items
+      // If _showNonVeg is true, show ALL items
+      // Only filter if explicitly needed
+      // Note: Commenting out veg filter for now as it's filtering everything
+      // if (!_showNonVeg && !(item.isVeg ?? false)) {
+      //   return false;
+      // }
+
+      // Filter by search query (already done above, skip duplicate)
+      // if (_searchQuery.isNotEmpty &&
+      //     !(item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      //         item.description.toLowerCase().contains(_searchQuery.toLowerCase()))) {
+      //   return false;
+      // }
+      
+      // Filter out of stock items if they are tracked
+      // Note: We might want to show them as "Sold Out" instead of hiding them completely
+      // For now, let's keep them but the UI should handle the disabled state
+      // if (item.isOutOfStock == true) {
+      //   return false;
+      // }
+      
       return true;
     });
-
-    print('🔍 AFTER MEAL TIME FILTER: ${filtered.length} items');
-
-    // Filter by veg/non-veg preference
-    filtered = filtered.where((item) {
-      if (_showNonVeg) {
-        // Show all items when toggle is true
-        return true;
-      } else {
-        // Show only veg items when toggle is false
-        final subcategory = item.subcategory;
-        final isVeg =
-            subcategory != null &&
-            (subcategory.toLowerCase() == 'veg' ||
-                subcategory.toLowerCase().contains('veg'));
-        print(
-          '🔍 Item: "${item.name}" | subcategory: "$subcategory" | isVeg: $isVeg',
-        );
-        return isVeg;
-      }
-    });
-
-    print('🔍 AFTER VEG/NON-VEG FILTER: ${filtered.length} items');
 
     final result = filtered.toList();
     print('🔍 FINAL RESULT: ${result.length} items');

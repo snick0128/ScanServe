@@ -7,7 +7,6 @@ import '../models/order_details.dart';
 import '../services/order_service.dart';
 import '../services/guest_session_service.dart';
 import 'previous_orders_list.dart';
-import 'cart_item_list.dart';
 import '../utils/snackbar_helper.dart';
 
 class CartPage extends StatefulWidget {
@@ -20,7 +19,6 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  // Local state for item notes
   final Map<String, String> _itemNotes = {};
 
   @override
@@ -30,15 +28,46 @@ class _CartPageState extends State<CartPage> {
     final orderService = OrderService();
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
           'Your Order',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
         ),
-        elevation: 2,
-        shadowColor: Colors.deepPurple.withOpacity(0.1),
+        elevation: 0,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        foregroundColor: const Color(0xFF1A1A1A),
+        centerTitle: false,
+        actions: [
+          if (cartController.itemCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${cartController.itemCount} items',
+                    style: const TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -54,7 +83,6 @@ class _CartPageState extends State<CartPage> {
               ),
               child: Column(
                 children: [
-                  // Previous orders for dine-in
                   if (orderController.currentOrderType == OrderType.dineIn) ...[
                     StreamBuilder<List<OrderDetails>>(
                       stream: orderService.getTableOrders(
@@ -82,10 +110,8 @@ class _CartPageState extends State<CartPage> {
                         );
                       },
                     ),
-                    Divider(thickness: 1, height: 1, color: Colors.grey[300]),
+                    Container(height: 8, color: const Color(0xFFF5F7FA)),
                   ],
-
-                  // Current cart items with notes
                   Expanded(
                     child: _CartItemsWithNotes(
                       key: ValueKey(cartController.items.length),
@@ -114,8 +140,6 @@ class _CartPageState extends State<CartPage> {
                       isTablet: isTablet,
                     ),
                   ),
-
-                  // Order summary
                   _OrderSummary(
                     subtotal: cartController.totalAmount,
                     tenantId: widget.tenantId,
@@ -136,8 +160,8 @@ class _CartPageState extends State<CartPage> {
 }
 
 class _CartItemsWithNotes extends StatelessWidget {
-  final List items;
-  final Function(dynamic, int) onUpdateQuantity;
+  final List<CartItem> items;
+  final Function(CartItem, int) onUpdateQuantity;
   final Map<String, String> itemNotes;
   final Function(String, String) onNoteUpdate;
   final bool isMobile;
@@ -153,11 +177,10 @@ class _CartItemsWithNotes extends StatelessWidget {
     required this.isTablet,
   }) : super(key: key);
 
-  void _showNoteBottomSheet(BuildContext context, dynamic item) {
-    final itemId = item.id ?? item.hashCode.toString();
+  void _showNoteBottomSheet(BuildContext context, CartItem item) {
+    final itemId = item.item.id;
     final currentNote = itemNotes[itemId] ?? '';
     final noteController = TextEditingController(text: currentNote);
-    final theme = Theme.of(context);
 
     showModalBottomSheet(
       context: context,
@@ -168,92 +191,92 @@ class _CartItemsWithNotes extends StatelessWidget {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Container(
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Handle bar
                   Center(
                     child: Container(
                       width: 40,
                       height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
+                      margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                  // Title
                   Row(
                     children: [
-                      Icon(
-                        Icons.note_add_outlined,
-                        color: Colors.deepPurple,
-                        size: isMobile ? 24 : 28,
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.restaurant_menu,
+                          color: Colors.deepPurple,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'Add Chef Note',
-                          style: TextStyle(
-                            fontSize: isMobile ? 18 : 20,
-                            fontWeight: FontWeight.bold,
-                            color: theme.textTheme.titleLarge?.color,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Add Chef Note',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.item.name,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Special instructions for ${item.name ?? "this item"}',
-                    style: TextStyle(
-                      fontSize: isMobile ? 13 : 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Text field
+                  const SizedBox(height: 24),
                   TextField(
                     controller: noteController,
                     autofocus: true,
                     maxLines: 4,
                     maxLength: 200,
                     decoration: InputDecoration(
-                      hintText: 'e.g., Extra spicy, no onions...',
+                      hintText: 'e.g., Extra spicy, no onions, well done...',
                       hintStyle: TextStyle(
                         color: Colors.grey[400],
-                        fontSize: isMobile ? 14 : 15,
+                        fontSize: 15,
                       ),
                       filled: true,
-                      fillColor: theme.brightness == Brightness.light
-                          ? Colors.grey[50]
-                          : Colors.grey[850],
+                      fillColor: const Color(0xFFF5F7FA),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(
                           color: Colors.deepPurple,
                           width: 2,
@@ -261,30 +284,26 @@ class _CartItemsWithNotes extends StatelessWidget {
                       ),
                       contentPadding: const EdgeInsets.all(16),
                     ),
-                    style: TextStyle(fontSize: isMobile ? 14 : 15),
                   ),
                   const SizedBox(height: 20),
-                  // Action buttons
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                              vertical: isMobile ? 14 : 16,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             side: BorderSide(color: Colors.grey[300]!),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: Text(
+                          child: const Text(
                             'Cancel',
                             style: TextStyle(
-                              fontSize: isMobile ? 14 : 16,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
+                              color: Color(0xFF1A1A1A),
                             ),
                           ),
                         ),
@@ -298,9 +317,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                             Navigator.pop(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                              vertical: isMobile ? 14 : 16,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: Colors.deepPurple,
                             foregroundColor: Colors.white,
                             elevation: 0,
@@ -308,10 +325,10 @@ class _CartItemsWithNotes extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: Text(
+                          child: const Text(
                             'Save Note',
                             style: TextStyle(
-                              fontSize: isMobile ? 14 : 16,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -335,175 +352,360 @@ class _CartItemsWithNotes extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 80,
-              color: Colors.grey[300],
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.shopping_cart_outlined,
+                size: 80,
+                color: Colors.grey[400],
+              ),
             ),
-            const SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 24),
+            const Text(
               'Your cart is empty',
               style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+                fontSize: 20,
+                color: Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w600,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add items from the menu to get started',
+              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
             ),
           ],
         ),
       );
     }
 
-    return ListView.separated(
-      padding: EdgeInsets.all(isMobile ? 12 : 16),
+    return ListView.builder(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       itemCount: items.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final item = items[index];
-        final itemId = item.id ?? item.hashCode.toString();
+        final itemId = item.item.id;
         final hasNote = itemNotes.containsKey(itemId);
+        final imageSize = isMobile ? 70.0 : 80.0;
 
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        return Container(
+          margin: EdgeInsets.only(bottom: isMobile ? 12 : 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          child: Padding(
-            padding: EdgeInsets.all(isMobile ? 12 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.all(isMobile ? 12 : 14),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Item details
+                    // Image
+                    Hero(
+                      tag: 'cart_item_${item.item.id}',
+                      child: Container(
+                        width: imageSize,
+                        height: imageSize,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child:
+                              item.item.imageUrl != null &&
+                                  item.item.imageUrl!.isNotEmpty
+                              ? Image.network(
+                                  item.item.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return _buildPlaceholder();
+                                  },
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                        if (loadingProgress == null)
+                                          return child;
+                                        return Container(
+                                          color: const Color(0xFFF5F7FA),
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              value:
+                                                  loadingProgress
+                                                          .expectedTotalBytes !=
+                                                      null
+                                                  ? loadingProgress
+                                                            .cumulativeBytesLoaded /
+                                                        loadingProgress
+                                                            .expectedTotalBytes!
+                                                  : null,
+                                              strokeWidth: 2,
+                                              color: Colors.deepPurple,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                )
+                              : _buildPlaceholder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Details
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.name ?? 'Item',
-                            style: TextStyle(
-                              fontSize: isMobile ? 15 : 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '₹${(item.price ?? 0).toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: isMobile ? 13 : 14,
-                              color: Colors.deepPurple,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Quantity controls
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove),
-                            iconSize: isMobile ? 18 : 20,
-                            onPressed: () {
-                              final currentQty = item.quantity ?? 1;
-                              onUpdateQuantity(item, currentQty - 1);
-                            },
-                            padding: EdgeInsets.all(isMobile ? 4 : 8),
-                            constraints: const BoxConstraints(),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              '${item.quantity ?? 1}',
-                              style: TextStyle(
-                                fontSize: isMobile ? 14 : 16,
-                                fontWeight: FontWeight.bold,
+                          // Item name and quantity controls row
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.item.name,
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 15 : 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1A1A1A),
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              // Horizontal Quantity controls
+                              Container(
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5F7FA),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFFE5E7EB),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          onUpdateQuantity(
+                                            item,
+                                            item.quantity - 1,
+                                          );
+                                        },
+                                        borderRadius:
+                                            const BorderRadius.horizontal(
+                                              left: Radius.circular(7),
+                                            ),
+                                        child: Container(
+                                          width: 28,
+                                          height: 28,
+                                          alignment: Alignment.center,
+                                          child: Icon(
+                                            item.quantity > 1
+                                                ? Icons.remove
+                                                : Icons.delete_outline,
+                                            size: 16,
+                                            color: item.quantity > 1
+                                                ? Colors.deepPurple
+                                                : Colors.red[400],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 1,
+                                      height: 28,
+                                      color: const Color(0xFFE5E7EB),
+                                    ),
+                                    Container(
+                                      constraints: const BoxConstraints(
+                                        minWidth: 28,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                      height: 28,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '${item.quantity}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF1A1A1A),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 1,
+                                      height: 28,
+                                      color: const Color(0xFFE5E7EB),
+                                    ),
+                                    Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          onUpdateQuantity(
+                                            item,
+                                            item.quantity + 1,
+                                          );
+                                        },
+                                        borderRadius:
+                                            const BorderRadius.horizontal(
+                                              right: Radius.circular(7),
+                                            ),
+                                        child: Container(
+                                          width: 28,
+                                          height: 28,
+                                          alignment: Alignment.center,
+                                          child: const Icon(
+                                            Icons.add,
+                                            size: 16,
+                                            color: Colors.deepPurple,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.add),
-                            iconSize: isMobile ? 18 : 20,
-                            onPressed: () {
-                              final currentQty = item.quantity ?? 1;
-                              onUpdateQuantity(item, currentQty + 1);
-                            },
-                            padding: EdgeInsets.all(isMobile ? 4 : 8),
-                            constraints: const BoxConstraints(),
+                          if (item.item.description != null &&
+                              item.item.description!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              item.item.description!,
+                              style: TextStyle(
+                                fontSize: isMobile ? 12 : 13,
+                                color: Colors.grey[600],
+                                height: 1.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Text(
+                            '₹${(item.item.price * item.quantity).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.deepPurple,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                // Note button and display
-                const SizedBox(height: 8),
-                if (hasNote)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.amber[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber[200]!, width: 1),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.note_outlined,
-                          size: 16,
-                          color: Colors.amber[800],
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            itemNotes[itemId]!,
-                            style: TextStyle(
-                              fontSize: isMobile ? 12 : 13,
-                              color: Colors.amber[900],
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+              ),
+              // Note section
+              if (hasNote)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber[50],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber[200]!, width: 1),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.sticky_note_2,
+                        size: 16,
+                        color: Colors.amber[800],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          itemNotes[itemId]!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.amber[900],
+                            height: 1.3,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => _showNoteBottomSheet(context, item),
-                    icon: Icon(
-                      hasNote ? Icons.edit_note : Icons.note_add_outlined,
-                      size: isMobile ? 16 : 18,
+                ),
+              // Note button
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _showNoteBottomSheet(context, item),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(15),
                     ),
-                    label: Text(
-                      hasNote ? 'Edit Note' : 'Add Note',
-                      style: TextStyle(fontSize: isMobile ? 12 : 13),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.deepPurple,
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            hasNote ? Icons.edit_note : Icons.note_add_outlined,
+                            size: 16,
+                            color: Colors.deepPurple,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            hasNote ? 'Edit Note' : 'Add Note for Chef',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.deepPurple,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      color: const Color(0xFFF5F7FA),
+      child: Center(
+        child: Icon(Icons.restaurant, size: 40, color: Colors.grey[400]),
+      ),
     );
   }
 }
@@ -539,8 +741,9 @@ class _OrderSummary extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
-            height: isMobile ? 120 : 140,
+            height: 140,
             alignment: Alignment.center,
+            color: Colors.white,
             child: const CircularProgressIndicator(),
           );
         }
@@ -551,23 +754,22 @@ class _OrderSummary extends StatelessWidget {
         final total = subtotal + tax;
 
         return Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 16 : 20,
-            vertical: isMobile ? 16 : 20,
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 20 : 24,
+            isMobile ? 20 : 24,
+            isMobile ? 20 : 24,
+            isMobile ? 20 : 24,
           ),
           decoration: BoxDecoration(
             color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
-                color: Colors.deepPurple.withOpacity(0.1),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 20,
-                offset: const Offset(0, -8),
-                spreadRadius: 2,
+                offset: const Offset(0, -4),
               ),
             ],
-            borderRadius: isMobile
-                ? const BorderRadius.vertical(top: Radius.circular(20))
-                : BorderRadius.zero,
           ),
           child: SafeArea(
             top: false,
@@ -575,31 +777,34 @@ class _OrderSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Subtotal
                 _buildSummaryRow(
                   'Subtotal',
                   '₹${subtotal.toStringAsFixed(2)}',
                   false,
                 ),
-                SizedBox(height: isMobile ? 6 : 8),
-                // Tax
+                const SizedBox(height: 8),
                 _buildSummaryRow(
                   'Tax (${(taxRate * 100).toStringAsFixed(0)}%)',
                   '₹${tax.toStringAsFixed(2)}',
                   false,
                 ),
                 Padding(
-                  padding: EdgeInsets.symmetric(vertical: isMobile ? 10 : 12),
-                  child: Divider(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Container(
                     height: 1,
-                    thickness: 1,
-                    color: Colors.grey[300],
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.grey[200]!,
+                          Colors.grey[300]!,
+                          Colors.grey[200]!,
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                // Total
                 _buildSummaryRow('Total', '₹${total.toStringAsFixed(2)}', true),
-                SizedBox(height: isMobile ? 16 : 20),
-                // Action buttons
+                const SizedBox(height: 20),
                 if (orderController.currentOrderType == OrderType.dineIn)
                   Row(
                     children: [
@@ -607,13 +812,9 @@ class _OrderSummary extends StatelessWidget {
                         child: _buildButton(
                           context: context,
                           text: 'Send to Kitchen',
-                          gradient: const LinearGradient(
-                            colors: [Colors.orange, Colors.orangeAccent],
-                          ),
-                          shadowColor: Colors.orange,
+                          colors: [Colors.orange[600]!, Colors.orange[400]!],
                           isEnabled: cartController.itemCount > 0,
                           isMobile: isMobile,
-                          fontSize: isMobile ? 13 : 14,
                           onPressed: () async {
                             if (!context.mounted) return;
                             try {
@@ -644,21 +845,17 @@ class _OrderSummary extends StatelessWidget {
                           },
                         ),
                       ),
-                      SizedBox(width: isMobile ? 10 : 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _buildButton(
                           context: context,
                           text: 'Pay Now',
-                          gradient: const LinearGradient(
-                            colors: [
-                              Colors.deepPurple,
-                              Colors.deepPurpleAccent,
-                            ],
-                          ),
-                          shadowColor: Colors.deepPurple,
+                          colors: [
+                            Colors.deepPurple[700]!,
+                            Colors.deepPurple[500]!,
+                          ],
                           isEnabled: subtotal > 0,
                           isMobile: isMobile,
-                          fontSize: isMobile ? 13 : 14,
                           onPressed: () {
                             Navigator.pushNamed(
                               context,
@@ -681,13 +878,9 @@ class _OrderSummary extends StatelessWidget {
                   _buildButton(
                     context: context,
                     text: 'Pay & Place Order',
-                    gradient: const LinearGradient(
-                      colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-                    ),
-                    shadowColor: Colors.deepPurple,
+                    colors: [Colors.deepPurple[700]!, Colors.deepPurple[500]!],
                     isEnabled: subtotal > 0,
                     isMobile: isMobile,
-                    fontSize: isMobile ? 15 : 16,
                     onPressed: () {
                       Navigator.pushNamed(
                         context,
@@ -717,17 +910,17 @@ class _OrderSummary extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: isBold ? (isMobile ? 17 : 19) : (isMobile ? 14 : 15),
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: isBold ? Colors.black87 : Colors.grey[600],
+            fontSize: isBold ? 18 : 15,
+            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+            color: isBold ? const Color(0xFF1A1A1A) : Colors.grey[600],
           ),
         ),
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? (isMobile ? 18 : 20) : (isMobile ? 14 : 15),
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: isBold ? Colors.deepPurple : Colors.black87,
+            fontSize: isBold ? 20 : 16,
+            fontWeight: FontWeight.w700,
+            color: isBold ? Colors.deepPurple : const Color(0xFF1A1A1A),
           ),
         ),
       ],
@@ -745,24 +938,28 @@ class _OrderSummary extends StatelessWidget {
   Widget _buildButton({
     required BuildContext context,
     required String text,
-    required LinearGradient gradient,
-    required Color shadowColor,
+    required List<Color> colors,
     required bool isEnabled,
     required bool isMobile,
     required VoidCallback onPressed,
-    double fontSize = 16,
   }) {
     return Container(
       decoration: BoxDecoration(
-        gradient: isEnabled ? gradient : null,
+        gradient: isEnabled
+            ? LinearGradient(
+                colors: colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
         color: isEnabled ? null : Colors.grey[300],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: isEnabled
             ? [
                 BoxShadow(
-                  color: shadowColor.withOpacity(0.3),
+                  color: colors[0].withOpacity(0.4),
                   blurRadius: 12,
-                  offset: const Offset(0, 6),
+                  offset: const Offset(0, 4),
                 ),
               ]
             : null,
@@ -771,19 +968,17 @@ class _OrderSummary extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: isEnabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: EdgeInsets.symmetric(
-              vertical: isMobile ? 14 : 16,
-              horizontal: isMobile ? 16 : 24,
-            ),
+            padding: EdgeInsets.symmetric(vertical: isMobile ? 16 : 18),
             child: Center(
               child: Text(
                 text,
                 style: TextStyle(
-                  fontSize: fontSize,
+                  fontSize: isMobile ? 15 : 16,
                   fontWeight: FontWeight.bold,
                   color: isEnabled ? Colors.white : Colors.grey[500],
+                  letterSpacing: 0.5,
                 ),
                 textAlign: TextAlign.center,
               ),

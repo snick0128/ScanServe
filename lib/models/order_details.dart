@@ -8,7 +8,8 @@ enum OrderStatus {
   preparing,
   ready,
   served,
-  completed;
+  completed,
+  cancelled;
 
   String get displayName {
     switch (this) {
@@ -24,6 +25,8 @@ enum OrderStatus {
         return 'Served';
       case OrderStatus.completed:
         return 'Completed';
+      case OrderStatus.cancelled:
+        return 'Cancelled';
     }
   }
 }
@@ -69,6 +72,7 @@ class OrderDetails {
   final String orderId;
   final String guestId;
   final String? tableId;
+  final String? tableName;
   final String tenantId;
   final OrderType type;
   final List<OrderItem> items;
@@ -85,11 +89,13 @@ class OrderDetails {
   final String? paymentId;
   final DateTime? paymentTimestamp;
   final String? chefNote;
+  final String? cancellationReason;
 
   OrderDetails({
     required this.orderId,
     required this.guestId,
     this.tableId,
+    this.tableName,
     required this.tenantId,
     required this.type,
     required this.items,
@@ -106,6 +112,7 @@ class OrderDetails {
     this.paymentId,
     this.paymentTimestamp,
     this.chefNote,
+    this.cancellationReason,
   });
 
   factory OrderDetails.fromCart({
@@ -114,6 +121,7 @@ class OrderDetails {
     required String tenantId,
     required OrderType type,
     String? tableId,
+    String? tableName,
     required List<CartItem> cartItems,
     required int avgPrepTime,
     required double taxRate,
@@ -134,6 +142,7 @@ class OrderDetails {
       orderId: orderId,
       guestId: guestId,
       tableId: tableId,
+      tableName: tableName,
       tenantId: tenantId,
       type: type,
       items: cartItems.map((item) => OrderItem.fromCartItem(item)).toList(),
@@ -155,10 +164,11 @@ class OrderDetails {
       'orderId': orderId,
       'guestId': guestId,
       'tableId': tableId,
+      'tableName': tableName,
       'tenantId': tenantId,
       'type': type.name,
       'items': items.map((item) => item.toMap()).toList(),
-      'timestamp': Timestamp.fromDate(timestamp),
+      'createdAt': Timestamp.fromDate(timestamp),
       'status': status.name,
       'estimatedWaitTime': estimatedWaitTime,
       'subtotal': subtotal,
@@ -169,8 +179,11 @@ class OrderDetails {
       'customerName': customerName,
       'customerPhone': customerPhone,
       'paymentId': paymentId,
-      'paymentTimestamp': paymentTimestamp != null ? Timestamp.fromDate(paymentTimestamp!) : null,
+      'paymentTimestamp': paymentTimestamp != null
+          ? Timestamp.fromDate(paymentTimestamp!)
+          : null,
       'chefNote': chefNote,
+      'cancellationReason': cancellationReason,
     };
   }
 
@@ -180,21 +193,28 @@ class OrderDetails {
         orderId: map['orderId']?.toString() ?? '',
         guestId: map['guestId']?.toString() ?? '',
         tableId: map['tableId']?.toString(),
+        tableName: map['tableName']?.toString(),
         tenantId: map['tenantId']?.toString() ?? '',
-        type: map['type'] != null 
+        type: map['type'] != null
             ? OrderType.values.firstWhere(
                 (e) => e.name == map['type'],
                 orElse: () => OrderType.dineIn,
               )
             : OrderType.dineIn,
         items: map['items'] != null
-            ? (map['items'] as List).map((item) => OrderItem.fromMap(item)).toList()
+            ? (map['items'] as List)
+                  .map((item) => OrderItem.fromMap(item))
+                  .toList()
             : [],
-        timestamp: map['timestamp'] != null
-            ? (map['timestamp'] is Timestamp 
-                ? (map['timestamp'] as Timestamp).toDate() 
-                : DateTime.parse(map['timestamp'].toString()))
-            : DateTime.now(),
+        timestamp: map['createdAt'] != null
+            ? (map['createdAt'] is Timestamp
+                  ? (map['createdAt'] as Timestamp).toDate()
+                  : DateTime.parse(map['createdAt'].toString()))
+            : (map['timestamp'] != null
+                ? (map['timestamp'] is Timestamp
+                      ? (map['timestamp'] as Timestamp).toDate()
+                      : DateTime.parse(map['timestamp'].toString()))
+                : DateTime.now()),
         status: map['status'] != null
             ? OrderStatus.values.firstWhere(
                 (e) => e.name == map['status'],
@@ -222,10 +242,11 @@ class OrderDetails {
         paymentId: map['paymentId']?.toString(),
         paymentTimestamp: map['paymentTimestamp'] != null
             ? (map['paymentTimestamp'] is Timestamp
-                ? (map['paymentTimestamp'] as Timestamp).toDate()
-                : DateTime.parse(map['paymentTimestamp'].toString()))
+                  ? (map['paymentTimestamp'] as Timestamp).toDate()
+                  : DateTime.parse(map['paymentTimestamp'].toString()))
             : null,
         chefNote: map['chefNote']?.toString(),
+        cancellationReason: map['cancellationReason']?.toString(),
       );
     } catch (e) {
       print('Error parsing OrderDetails: $e');
@@ -237,6 +258,30 @@ class OrderDetails {
   DateTime get estimatedReadyTime {
     return timestamp.add(Duration(minutes: estimatedWaitTime));
   }
+
+  static OrderDetails empty() => OrderDetails(
+    orderId: '',
+    guestId: '',
+    tableId: null,
+    tableName: null,
+    tenantId: '',
+    type: OrderType.dineIn,
+    items: [],
+    timestamp: DateTime.now(),
+    status: OrderStatus.pending,
+    estimatedWaitTime: 30,
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+    paymentStatus: PaymentStatus.pending,
+    paymentMethod: PaymentMethod.upi,
+    customerName: '',
+    customerPhone: null,
+    paymentId: null,
+    paymentTimestamp: null,
+    chefNote: null,
+    cancellationReason: null,
+  );
 }
 
 class OrderItem {

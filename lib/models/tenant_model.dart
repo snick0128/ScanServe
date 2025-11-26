@@ -57,8 +57,11 @@ class MenuItem {
   final String? category; // Breakfast, Lunch, Dinner
   final String? subcategory; // Veg, Non-Veg, Beverages, etc.
   late final String? itemType; // veg or nonveg
+  final int stockCount;
+  final bool isTracked;
 
   bool get isVeg => itemType?.toLowerCase() == 'veg';
+  bool get isOutOfStock => isTracked && stockCount <= 0;
 
   MenuItem({
     required this.id,
@@ -69,15 +72,17 @@ class MenuItem {
     this.category,
     this.subcategory,
     String? itemType,
+    this.stockCount = 0,
+    this.isTracked = false,
   }) {
     this.itemType = itemType;
   }
 
   factory MenuItem.fromMap(Map<String, dynamic> data) {
     final itemType = data['itemType'];
-    print(
-      '🔍 MenuItem.fromMap - itemType: $itemType, data keys: ${data.keys.toList()}',
-    );
+    // print(
+    //   '🔍 MenuItem.fromMap - itemType: $itemType, data keys: ${data.keys.toList()}',
+    // );
 
     return MenuItem(
       id: data['id'] ?? '',
@@ -88,6 +93,55 @@ class MenuItem {
       category: data['category'] ?? data['Category'], // Try both cases
       subcategory: data['subcategory'] ?? data['Subcategory'], // Try both cases
       itemType: itemType, // veg or nonveg
+      stockCount: data['stockCount'] ?? 0,
+      isTracked: data['isTracked'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'price': price,
+      'image_url': imageUrl,
+      'category': category,
+      'subcategory': subcategory,
+      'itemType': itemType,
+      'stockCount': stockCount,
+      'isTracked': isTracked,
+    };
+  }
+}
+
+class RestaurantTable {
+  final String id;
+  final String name;
+  final int capacity;
+  final bool isAvailable;
+
+  RestaurantTable({
+    required this.id,
+    required this.name,
+    required this.capacity,
+    this.isAvailable = true,
+  });
+
+  factory RestaurantTable.fromMap(Map<String, dynamic> data) {
+    return RestaurantTable(
+      id: data['id'] ?? '',
+      name: data['name'] ?? '',
+      capacity: data['capacity'] ?? 4,
+      isAvailable: data['isAvailable'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'capacity': capacity,
+      'isAvailable': isAvailable,
+    };
   }
 }

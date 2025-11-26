@@ -71,9 +71,12 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
                 vertical: 8,
               ),
               child: Card(
-                elevation: 2,
+                color: Colors.grey[50],
+                elevation: 6,
+                shadowColor: Colors.black.withOpacity(0.12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey[200]!),
                 ),
                 child: Padding(
                   padding: EdgeInsets.all(widget.isMobile ? 12 : 16),
@@ -132,13 +135,16 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
             final isExpanded = order.orderId == expandedOrderId;
 
             return Card(
-              elevation: 2,
+              color: Colors.grey[50],
+              elevation: 6,
+              shadowColor: Colors.black.withOpacity(0.12),
               margin: EdgeInsets.symmetric(
                 horizontal: widget.isMobile ? 4 : 8,
                 vertical: widget.isMobile ? 4 : 6,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey[200]!),
               ),
               child: Column(
                 children: [

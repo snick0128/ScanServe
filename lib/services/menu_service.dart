@@ -78,4 +78,100 @@ class MenuService {
       return [];
     }
   }
+
+  Future<List<Category>> getCategories(String tenantId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Category.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      print('Error fetching categories: $e');
+      return [];
+    }
+  }
+
+  Future<void> addMenuItem(String tenantId, String categoryId, MenuItem item) async {
+    try {
+      final categoryRef = _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .doc(categoryId);
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(categoryRef);
+        if (!snapshot.exists) throw Exception('Category not found');
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final items = List<Map<String, dynamic>>.from(data['menu_items'] ?? []);
+        
+        items.add(item.toMap());
+        
+        transaction.update(categoryRef, {'menu_items': items});
+      });
+    } catch (e) {
+      print('Error adding menu item: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateMenuItem(String tenantId, String categoryId, MenuItem item) async {
+    try {
+      final categoryRef = _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .doc(categoryId);
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(categoryRef);
+        if (!snapshot.exists) throw Exception('Category not found');
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final items = List<Map<String, dynamic>>.from(data['menu_items'] ?? []);
+        
+        final index = items.indexWhere((i) => i['id'] == item.id);
+        if (index != -1) {
+          items[index] = item.toMap();
+          transaction.update(categoryRef, {'menu_items': items});
+        } else {
+          throw Exception('Item not found in category');
+        }
+      });
+    } catch (e) {
+      print('Error updating menu item: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMenuItem(String tenantId, String categoryId, String itemId) async {
+    try {
+      final categoryRef = _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .doc(categoryId);
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(categoryRef);
+        if (!snapshot.exists) throw Exception('Category not found');
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final items = List<Map<String, dynamic>>.from(data['menu_items'] ?? []);
+        
+        items.removeWhere((i) => i['id'] == itemId);
+        
+        transaction.update(categoryRef, {'menu_items': items});
+      });
+    } catch (e) {
+      print('Error deleting menu item: $e');
+      rethrow;
+    }
+  }
 }

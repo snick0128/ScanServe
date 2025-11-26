@@ -18,6 +18,7 @@ class OrderController extends ChangeNotifier {
   final List<OrderDetails> _activeOrders = [];
   StreamSubscription<QuerySnapshot>? _ordersSubscription;
   StreamSubscription<QuerySnapshot>? _tableOrdersSubscription;
+  final Map<String, StreamSubscription> _orderStatusSubscriptions = {};
   final PaymentService _paymentService = PaymentService();
   String? _chefNote;
 
@@ -121,6 +122,29 @@ class OrderController extends ChangeNotifier {
     return _currentSession!;
   }
 
+  // Subscribe to order status changes
+  void _subscribeToOrderStatus(String orderId, String tenantId) {
+    if (_orderStatusSubscriptions.containsKey(orderId)) return;
+
+    _orderStatusSubscriptions[orderId] = _firestore
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('orders')
+        .doc(orderId)
+        .snapshots()
+        .listen((doc) {
+      if (!doc.exists) return;
+      
+      final updatedOrder = OrderDetails.fromMap(doc.data()!..['id'] = doc.id);
+      final index = _activeOrders.indexWhere((o) => o.orderId == orderId);
+      
+      if (index != -1) {
+        _activeOrders[index] = updatedOrder;
+        notifyListeners();
+      }
+    });
+  }
+
   // Initialize real-time order tracking
   Future<void> _initializeOrderTracking() async {
     if (_currentSession == null) {
@@ -130,18 +154,19 @@ class OrderController extends ChangeNotifier {
 
     final guestId = _currentSession!.guestId;
     final tenantId = _currentSession!.tenantId;
+    final tableId = _currentSession!.tableId;
 
     print(
-      '🚀 Initializing order tracking for guest: $guestId, tenant: $tenantId',
+      '🚀 Initializing order tracking for guest: $guestId, tenant: $tenantId, table: $tableId',
     );
 
     // Cancel existing subscriptions if any
     await _ordersSubscription?.cancel();
     await _tableOrdersSubscription?.cancel();
 
-    print('📍 Setting up parcel orders listener: tenants/$tenantId/orders');
+    print('📍 Setting up unified orders listener: tenants/$tenantId/orders');
 
-    // Listen to parcel orders (main tenant orders collection)
+    // Listen to ALL orders from unified location, filtered by guestId
     _ordersSubscription = _firestore
         .collection('tenants')
         .doc(tenantId)
@@ -154,91 +179,46 @@ class OrderController extends ChangeNotifier {
         .snapshots()
         .listen((snapshot) {
           print(
-            '📦 Received ${snapshot.docs.length} parcel orders from tenant collection',
+            '📦 Received ${snapshot.docs.length} orders from unified collection',
           );
 
-          // Remove existing parcel orders to avoid duplicates
-          _activeOrders.removeWhere((order) => order.type == OrderType.parcel);
+          // Clear existing orders
+          _activeOrders.clear();
 
           for (final doc in snapshot.docs) {
             final orderData = doc.data();
-            final orderType = OrderType.values.firstWhere(
-              (type) => type.name == orderData['type'],
-              orElse: () => OrderType.parcel,
-            );
-
-            if (orderType == OrderType.parcel) {
-              print('➕ Adding parcel order: ${orderData['orderId']}');
-              _activeOrders.add(OrderDetails.fromMap(orderData));
+            
+            try {
+              final orderDetails = OrderDetails.fromMap(orderData);
+              
+              // If we have a tableId filter, only show orders for this table (dine-in)
+              // Otherwise show all orders for this guest
+              if (tableId != null) {
+                if (orderDetails.tableId == tableId) {
+                  print('➕ Adding dine-in order: ${orderDetails.orderId}');
+                  _activeOrders.add(orderDetails);
+                  _subscribeToOrderStatus(orderDetails.orderId, tenantId);
+                }
+              } else {
+                // Show all orders (parcel orders)
+                if (orderDetails.type == OrderType.parcel) {
+                  print('➕ Adding parcel order: ${orderDetails.orderId}');
+                  _activeOrders.add(orderDetails);
+                  _subscribeToOrderStatus(orderDetails.orderId, tenantId);
+                }
+              }
+            } catch (e) {
+              print('Error parsing order ${doc.id}: $e');
             }
           }
 
           print(
-            '📊 Total active orders after parcel update: ${_activeOrders.length}',
+            '📊 Total active orders: ${_activeOrders.length}',
           );
           // Sort by timestamp, newest first
           _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           notifyListeners();
         });
-
-    // Listen to dine-in orders if we have a table
-    if (_currentSession?.tableId != null) {
-      final tableId = _currentSession!.tableId!;
-      print(
-        '🍽️ Setting up dine-in orders listener: tenants/$tenantId/tables/$tableId/orders',
-      );
-
-      _tableOrdersSubscription = _firestore
-          .collection('tenants')
-          .doc(tenantId)
-          .collection('tables')
-          .doc(tableId)
-          .collection('orders')
-          .where('guestId', isEqualTo: guestId)
-          .where(
-            'status',
-            whereNotIn: [
-              OrderStatus.completed.name,
-              OrderStatus.confirmed.name,
-            ],
-          )
-          .snapshots()
-          .listen((snapshot) {
-            print(
-              '🍽️ Received ${snapshot.docs.length} dine-in orders from table collection',
-            );
-
-            // Remove existing dine-in orders to avoid duplicates
-            _activeOrders.removeWhere(
-              (order) => order.type == OrderType.dineIn,
-            );
-
-            for (final doc in snapshot.docs) {
-              final orderData = doc.data();
-              // Add tenantId from the path since it's not in the document
-              orderData['tenantId'] = tenantId;
-
-              final orderType = OrderType.values.firstWhere(
-                (type) => type.name == orderData['type'],
-                orElse: () => OrderType.dineIn,
-              );
-
-              if (orderType == OrderType.dineIn) {
-                print('➕ Adding dine-in order: ${orderData['orderId']}');
-                _activeOrders.add(OrderDetails.fromMap(orderData));
-              }
-            }
-
-            print(
-              '📊 Total active orders after dine-in update: ${_activeOrders.length}',
-            );
-            // Sort by timestamp, newest first
-            _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-            notifyListeners();
-          });
-    } else {
-      print('⚠️ No table ID, skipping dine-in orders listener');
-    }
   }
 
   // Check if there are active orders for the current table

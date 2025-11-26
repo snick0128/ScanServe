@@ -33,12 +33,29 @@ class OrderService {
 
       print('Creating order: $orderId for guest: $guestId, type: ${orderType.name}, tableId: $tableId');
 
+      // Get table name if this is a dine-in order
+      String? tableName;
+      if (orderType == OrderType.dineIn && tableId != null) {
+        try {
+          final tableDoc = await _firestore
+              .collection('tenants')
+              .doc(tenantId)
+              .collection('tables')
+              .doc(tableId)
+              .get();
+          tableName = tableDoc.data()?['name'] as String?;
+        } catch (e) {
+          print('Warning: Could not fetch table name: $e');
+        }
+      }
+
       final orderDetails = OrderDetails.fromCart(
         orderId: orderId,
         guestId: guestId,
         tenantId: tenantId,
         type: orderType,
         tableId: tableId,
+        tableName: tableName,
         cartItems: cartItems,
         avgPrepTime: 25,
         taxRate: taxRate,
@@ -49,33 +66,58 @@ class OrderService {
         chefNote: chefNote,
       );
 
-      // Store in appropriate location based on order type
-      if (orderType == OrderType.dineIn && tableId != null) {
-        print('🍽️ Saving dine-in order to: tenants/$tenantId/tables/$tableId/orders/$orderId');
-        // Dine-in: Store under table
-        await _firestore
-            .collection('tenants')
-            .doc(tenantId)
-            .collection('tables')
-            .doc(tableId)
-            .collection('orders')
-            .doc(orderId)
-            .set(orderDetails.toMap());
-      } else {
-        print('📦 Saving parcel order to: tenants/$tenantId/orders/$orderId');
-        // Parcel: Store directly under tenant orders
-        await _firestore
-            .collection('tenants')
-            .doc(tenantId)
-            .collection('orders')
-            .doc(orderId)
-            .set(orderDetails.toMap());
-      }
+      // UNIFIED STORAGE: Store ALL orders in tenants/$tenantId/orders
+      print('💾 Saving order to unified location: tenants/$tenantId/orders/$orderId');
+      await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('orders')
+          .doc(orderId)
+          .set(orderDetails.toMap());
 
       print('Order saved successfully: $orderId');
+
+      // Update table status if dine-in
+      if (orderType == OrderType.dineIn && tableId != null) {
+        try {
+          await _firestore
+              .collection('tenants')
+              .doc(tenantId)
+              .collection('tables')
+              .doc(tableId)
+              .update({'isAvailable': false});
+          print('Table $tableId marked as occupied');
+        } catch (e) {
+          print('Error updating table status: $e');
+        }
+      }
+
       return orderId;
     } catch (e) {
       print('Error placing order: $e');
+      rethrow;
+    }
+  }
+
+  /// Update order status
+  Future<void> updateOrderStatus({
+    required String tenantId,
+    required String orderId,
+    required OrderStatus newStatus,
+  }) async {
+    try {
+      await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('orders')
+          .doc(orderId)
+          .update({
+        'status': newStatus.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      print('Order $orderId status updated to ${newStatus.name}');
+    } catch (e) {
+      print('Error updating order status: $e');
       rethrow;
     }
   }
