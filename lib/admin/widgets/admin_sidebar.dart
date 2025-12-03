@@ -114,13 +114,20 @@ class AdminSidebar extends StatelessWidget {
                 _buildNavItem(
                   context: context,
                   index: 4,
+                  icon: Icons.receipt_outlined,
+                  label: 'Bills',
+                  isCollapsed: isCollapsed,
+                ),
+                _buildNavItem(
+                  context: context,
+                  index: 5,
                   icon: Icons.analytics_outlined,
                   label: 'Analytics',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
-                  index: 5,
+                  index: 6,
                   icon: Icons.inventory_2_outlined,
                   label: 'Inventory',
                   isCollapsed: isCollapsed,
@@ -140,14 +147,14 @@ class AdminSidebar extends StatelessWidget {
                 ),
                 _buildNavItem(
                   context: context,
-                  index: 6,
+                  index: 7,
                   icon: Icons.settings_outlined,
                   label: 'Settings',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
-                  index: 7,
+                  index: 8,
                   icon: Icons.help_outline,
                   label: 'Help & Support',
                   isCollapsed: isCollapsed,

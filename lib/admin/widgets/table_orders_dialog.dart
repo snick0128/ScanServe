@@ -135,20 +135,78 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                             model.OrderStatus.ready.toString().split('.').last,
                             model.OrderStatus.served.toString().split('.').last,
                           ])
-                          .orderBy('createdAt', descending: false)
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
+                          final error = snapshot.error.toString();
+                          if (error.contains('requires an index') || error.contains('failed-precondition')) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.build_circle_outlined, size: 48, color: Colors.orange),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Database Setup Required',
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'A Firestore index is required for this query.',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    SelectableText(
+                                      error,
+                                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.grey),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                const SizedBox(height: 16),
+                                const Text('Something went wrong loading orders.'),
+                                TextButton(
+                                  onPressed: () => setState(() {}),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          );
                         }
 
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator());
                         }
 
-                        final orders = snapshot.data!.docs
-                            .map((doc) => model.Order.fromFirestore(doc))
-                            .toList();
+                        List<model.Order> orders;
+                        try {
+                          orders = snapshot.data!.docs
+                              .map((doc) => model.Order.fromFirestore(doc))
+                              .toList();
+                          // Sort client-side to avoid composite index requirement
+                          orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                        } catch (e) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                const SizedBox(height: 16),
+                                Text('Error parsing orders: $e', textAlign: TextAlign.center),
+                              ],
+                            ),
+                          );
+                        }
 
                         if (orders.isEmpty) {
                           return const Center(

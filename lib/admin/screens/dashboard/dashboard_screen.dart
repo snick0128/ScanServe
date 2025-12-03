@@ -11,6 +11,7 @@ import '../tables/tables_screen.dart';
 import '../analytics/analytics_screen.dart';
 import '../settings/settings_screen.dart';
 import '../help/help_screen.dart';
+import '../bills/bills_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String tenantId;
@@ -48,10 +49,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1: return 'Menu Items';
       case 2: return 'Tables';
       case 3: return 'Orders';
-      case 4: return 'Analytics';
-      case 5: return 'Inventory';
-      case 6: return 'Settings';
-      case 7: return 'Help & Support';
+      case 4: return 'Bills';
+      case 5: return 'Analytics';
+      case 6: return 'Inventory';
+      case 7: return 'Settings';
+      case 8: return 'Help & Support';
       default: return 'ScanServe Admin';
     }
   }
@@ -175,13 +177,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return TablesScreen(tenantId: widget.tenantId);
       case 3:
         return OrdersScreen(tenantId: widget.tenantId);
-      case 4: // Analytics
+      case 4: // Bills
+        return BillsScreen(tenantId: widget.tenantId);
+      case 5: // Analytics
         return AnalyticsScreen(tenantId: widget.tenantId);
-      case 5:
+      case 6:
         return InventoryScreen(tenantId: widget.tenantId);
-      case 6: // Settings
+      case 7: // Settings
         return SettingsScreen(tenantId: widget.tenantId);
-      case 7: // Help & Support
+      case 8: // Help & Support
         return const HelpScreen();
       default:
         return const Center(
@@ -229,39 +233,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Active users (unique guest IDs from active orders)
         // Note: This is an approximation based on orders
-        final activeUsers = activeOrders.length; 
+        final activeOrdersCount = activeOrders.length; 
 
-        print('🔥 Dashboard Stats: Total=$totalOrders, Revenue=$todaysRevenue, Tables=$activeTables, Active=$activeUsers');
+        print('🔥 Dashboard Stats: Total=$totalOrders, Revenue=$todaysRevenue, Tables=$activeTables, Active=$activeOrdersCount');
 
-        return GridView.count(
-          crossAxisCount: 4,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.5,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStatCard(
-              title: 'Total Orders',
-              value: totalOrders.toString(),
-              icon: Icons.shopping_cart_outlined,
-              color: Colors.blue,
+            // Filter Chips
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Row(
+                children: [
+                  const Text(
+                    'Quick Filters:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ChoiceChip(
+                    label: const Text('Today'),
+                    selected: true,
+                    onSelected: (selected) {
+                      // Filter logic can be added here
+                    },
+                    selectedColor: Colors.blue.withOpacity(0.3),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('This Week'),
+                    selected: false,
+                    onSelected: (selected) {
+                      // Filter logic can be added here
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('This Month'),
+                    selected: false,
+                    onSelected: (selected) {
+                      // Filter logic can be added here
+                    },
+                  ),
+                ],
+              ),
             ),
-            _buildStatCard(
-              title: 'Active Tables',
-              value: activeTables.toString(),
-              icon: Icons.table_restaurant_outlined,
-              color: Colors.green,
-            ),
-            _buildStatCard(
-              title: 'Today\'s Revenue',
-              value: '₹${todaysRevenue.toStringAsFixed(0)}',
-              icon: Icons.currency_rupee_outlined,
-              color: Colors.orange,
-            ),
-            _buildStatCard(
-              title: 'Active Orders',
-              value: activeUsers.toString(),
-              icon: Icons.receipt_long_outlined, // Changed icon to represent orders
-              color: Colors.purple,
+
+            // Metrics Grid
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 4,
+                crossAxisSpacing: 20,
+                mainAxisSpacing: 20,
+                childAspectRatio: 1.4,
+                children: [
+                  _buildStatCard(
+                    title: 'Total Orders',
+                    value: totalOrders.toString(),
+                    icon: Icons.shopping_cart_outlined,
+                    color: Colors.blue,
+                  ),
+                  _buildStatCard(
+                    title: 'Active Tables',
+                    value: activeTables.toString(),
+                    icon: Icons.table_restaurant_outlined,
+                    color: Colors.green,
+                  ),
+                  _buildStatCard(
+                    title: 'Today\'s Revenue',
+                    value: '₹${todaysRevenue.toStringAsFixed(0)}',
+                    icon: Icons.currency_rupee_outlined,
+                    color: Colors.orange,
+                  ),
+                  _buildStatCard(
+                    title: 'Active Orders',
+                    value: activeOrdersCount.toString(),
+                    icon: Icons.receipt_long_outlined,
+                    color: Colors.purple,
+                  ),
+                ],
+              ),
             ),
           ],
         );
@@ -276,9 +329,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color color,
   }) {
     return Card(
-      elevation: 2,
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -286,30 +342,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: color, size: 32),
                 ),
               ],
+            ),
+            const Spacer(),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
               ),
             ),
           ],

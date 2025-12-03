@@ -109,6 +109,12 @@ class Order {
         .map((item) => OrderItem.fromMap(Map<String, dynamic>.from(item)))
         .toList();
 
+    DateTime parseDateTime(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return Order(
       id: doc.id,
       tenantId: data['tenantId'] ?? '',
@@ -123,10 +129,8 @@ class Order {
       status: data['status'] != null
           ? OrderStatus.fromString(data['status'])
           : OrderStatus.pending,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: data['updatedAt'] != null
-          ? (data['updatedAt'] as Timestamp).toDate()
-          : null,
+      createdAt: parseDateTime(data['createdAt']),
+      updatedAt: data['updatedAt'] != null ? parseDateTime(data['updatedAt']) : null,
       paymentMethod: data['paymentMethod'],
       paymentStatus: data['paymentStatus'],
       notes: data['notes'],

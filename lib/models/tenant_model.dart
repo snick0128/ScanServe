@@ -119,12 +119,16 @@ class RestaurantTable {
   final String name;
   final int capacity;
   final bool isAvailable;
+  final String status; // 'available', 'occupied', 'billRequested'
+  final DateTime? occupiedAt;
 
   RestaurantTable({
     required this.id,
     required this.name,
     required this.capacity,
     this.isAvailable = true,
+    this.status = 'available',
+    this.occupiedAt,
   });
 
   factory RestaurantTable.fromMap(Map<String, dynamic> data) {
@@ -133,6 +137,10 @@ class RestaurantTable {
       name: data['name'] ?? '',
       capacity: data['capacity'] ?? 4,
       isAvailable: data['isAvailable'] ?? true,
+      status: data['status'] ?? 'available',
+      occupiedAt: data['occupiedAt'] != null 
+        ? DateTime.parse(data['occupiedAt']) 
+        : null,
     );
   }
 
@@ -142,6 +150,23 @@ class RestaurantTable {
       'name': name,
       'capacity': capacity,
       'isAvailable': isAvailable,
+      'status': status,
+      'occupiedAt': occupiedAt?.toIso8601String(),
     };
+  }
+  
+  String getTimeOccupied() {
+    if (occupiedAt == null) return '';
+    
+    final now = DateTime.now();
+    final difference = now.difference(occupiedAt!);
+    
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hr ${difference.inMinutes % 60} min';
+    } else {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
+    }
   }
 }

@@ -49,6 +49,7 @@ class _TablesScreenState extends State<TablesScreen> {
       text: table?.capacity.toString() ?? '4',
     );
     bool isAvailable = table?.isAvailable ?? true;
+    String status = table?.status ?? 'available';
 
     await showDialog(
       context: context,
@@ -67,6 +68,17 @@ class _TablesScreenState extends State<TablesScreen> {
                 controller: capacityController,
                 decoration: const InputDecoration(labelText: 'Capacity'),
                 keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: status,
+                decoration: const InputDecoration(labelText: 'Status'),
+                items: const [
+                  DropdownMenuItem(value: 'available', child: Text('Available')),
+                  DropdownMenuItem(value: 'occupied', child: Text('Occupied')),
+                  DropdownMenuItem(value: 'billRequested', child: Text('Bill Requested')),
+                ],
+                onChanged: (val) => setState(() => status = val!),
               ),
               const SizedBox(height: 16),
               SwitchListTile(
@@ -88,6 +100,10 @@ class _TablesScreenState extends State<TablesScreen> {
                   name: nameController.text,
                   capacity: int.tryParse(capacityController.text) ?? 4,
                   isAvailable: isAvailable,
+                  status: status,
+                  occupiedAt: status == 'occupied' || status == 'billRequested' 
+                    ? (table?.occupiedAt ?? DateTime.now())
+                    : null,
                 );
 
                 try {
@@ -190,10 +206,37 @@ class _TablesScreenState extends State<TablesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Color _getStatusColor(String status) {
+      switch (status) {
+        case 'available':
+          return Colors.green;
+        case 'occupied':
+          return Colors.red;
+        case 'billRequested':
+          return Colors.orange;
+        default:
+          return Colors.grey;
+      }
+    }
+
+    String _getStatusLabel(String status) {
+      switch (status) {
+        case 'available':
+          return 'Available';
+        case 'occupied':
+          return 'Occupied';
+        case 'billRequested':
+          return 'Bill Requested';
+        default:
+          return 'Unknown';
+      }
+    }
+
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showEditDialog(),
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Table'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -223,11 +266,14 @@ class _TablesScreenState extends State<TablesScreen> {
                     crossAxisCount: 3,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 1.2,
+                    childAspectRatio: 1.1,
                   ),
                   itemCount: _tables.length,
                   itemBuilder: (context, index) {
                     final table = _tables[index];
+                    final statusColor = _getStatusColor(table.status);
+                    final statusLabel = _getStatusLabel(table.status);
+
                     return InkWell(
                       onTap: () {
                         // Show table orders dialog
@@ -241,54 +287,114 @@ class _TablesScreenState extends State<TablesScreen> {
                         );
                       },
                       child: Card(
-                        elevation: 2,
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: statusColor.withOpacity(0.3),
+                            width: 2,
+                          ),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Icon(
-                                    Icons.table_restaurant,
-                                    color: table.isAvailable ? Colors.green : Colors.grey,
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.table_restaurant,
+                                      color: statusColor,
+                                      size: 28,
+                                    ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                     child: Text(
-                                      table.name,
+                                      statusLabel,
                                       style: const TextStyle(
-                                        fontSize: 18,
+                                        color: Colors.white,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Text('Capacity: ${table.capacity}'),
+                              const SizedBox(height: 12),
                               Text(
-                                table.isAvailable ? 'Available' : 'Occupied',
-                                style: TextStyle(
-                                  color: table.isAvailable ? Colors.green : Colors.orange,
-                                  fontWeight: FontWeight.w500,
+                                table.name,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(height: 4),
                               Row(
                                 children: [
+                                  Icon(Icons.people_outline, size: 16, color: Colors.grey[600]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Capacity: ${table.capacity}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (table.status == 'occupied' || table.status == 'billRequested') ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      table.getTimeOccupied(),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const Spacer(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
                                   IconButton(
-                                    icon: const Icon(Icons.qr_code_2),
+                                    icon: const Icon(Icons.qr_code_2, size: 20),
                                     onPressed: () => _showQRCode(table),
                                     tooltip: 'Show QR Code',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                   ),
+                                  const SizedBox(width: 8),
                                   IconButton(
-                                    icon: const Icon(Icons.edit),
+                                    icon: const Icon(Icons.edit_outlined, size: 20),
                                     onPressed: () => _showEditDialog(table),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                   ),
+                                  const SizedBox(width: 8),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
                                     onPressed: () => _deleteTable(table),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                   ),
                                 ],
                               ),

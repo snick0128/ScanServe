@@ -1,11 +1,11 @@
 {
-    "name": "scan_serve",
-    "short_name": "scan_serve",
+    "name": "ScanServe - Restaurant Ordering",
+    "short_name": "ScanServe",
     "start_url": ".",
-    "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "display": "fullscreen",
+    "background_color": "#1976D2",
+    "theme_color": "#1976D2",
+    "description": "QR Code based restaurant ordering system",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

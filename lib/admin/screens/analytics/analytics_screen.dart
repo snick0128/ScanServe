@@ -17,6 +17,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Map<String, double> _dailyRevenue = {};
   Map<String, int> _topItems = {};
   Map<String, dynamic> _stats = {};
+  
+  // Time filter: 'today', 'week', 'month'
+  String _selectedTimeFilter = 'week';
 
   @override
   void initState() {
@@ -27,6 +30,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Calculate date range based on filter
+      final now = DateTime.now();
+      DateTime startDate;
+      
+      switch (_selectedTimeFilter) {
+        case 'today':
+          startDate = DateTime(now.year, now.month, now.day);
+          break;
+        case 'week':
+          startDate = now.subtract(const Duration(days: 7));
+          break;
+        case 'month':
+          startDate = now.subtract(const Duration(days: 30));
+          break;
+        default:
+          startDate = now.subtract(const Duration(days: 7));
+      }
+      
       final revenue = await _analyticsService.getDailyRevenue(widget.tenantId);
       final items = await _analyticsService.getTopSellingItems(widget.tenantId);
       final stats = await _analyticsService.getOverallStats(widget.tenantId);
@@ -47,6 +68,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
+  String _getFilterLabel() {
+    switch (_selectedTimeFilter) {
+      case 'today':
+        return 'Today';
+      case 'week':
+        return 'Last 7 Days';
+      case 'month':
+        return 'Last 30 Days';
+      default:
+        return 'Last 7 Days';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -58,6 +92,59 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Time Filter Chips
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const Text(
+                  'Time Period:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ChoiceChip(
+                  label: const Text('Today'),
+                  selected: _selectedTimeFilter == 'today',
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedTimeFilter = 'today';
+                      _loadData();
+                    });
+                  },
+                  selectedColor: Colors.blue.withOpacity(0.3),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Last 7 Days'),
+                  selected: _selectedTimeFilter == 'week',
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedTimeFilter = 'week';
+                      _loadData();
+                    });
+                  },
+                  selectedColor: Colors.blue.withOpacity(0.3),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Last 30 Days'),
+                  selected: _selectedTimeFilter == 'month',
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedTimeFilter = 'month';
+                      _loadData();
+                    });
+                  },
+                  selectedColor: Colors.blue.withOpacity(0.3),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Stats Cards
           Row(
             children: [
@@ -92,9 +179,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 32),
 
           // Revenue Chart
-          const Text(
-            'Daily Revenue (Last 7 Days)',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Revenue Trend (${_getFilterLabel()})',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              if (_dailyRevenue.isNotEmpty)
+                Text(
+                  '₹${_dailyRevenue.values.reduce((a, b) => a + b).toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           Container(
@@ -125,14 +226,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               toY: entry.value,
                               color: Colors.blue,
                               width: 20,
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
                             ),
                           ],
                         );
                       }).toList(),
                       titlesData: FlTitlesData(
-                        leftTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 50,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '₹${value.toInt()}',
+                                style: const TextStyle(fontSize: 10),
+                              );
+                            },
+                          ),
                         ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
@@ -140,9 +250,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             getTitlesWidget: (value, meta) {
                               final keys = _dailyRevenue.keys.toList();
                               if (value.toInt() >= 0 && value.toInt() < keys.length) {
-                                return Text(
-                                  keys[value.toInt()],
-                                  style: const TextStyle(fontSize: 10),
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    keys[value.toInt()],
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
                                 );
                               }
                               return const Text('');
@@ -152,8 +265,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       ),
-                      gridData: const FlGridData(show: true),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: _dailyRevenue.values.isEmpty 
+                          ? 20 
+                          : (_dailyRevenue.values.reduce((a, b) => a > b ? a : b) * 1.2) / 5,
+                      ),
                       borderData: FlBorderData(show: false),
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            final keys = _dailyRevenue.keys.toList();
+                            return BarTooltipItem(
+                              '${keys[group.x.toInt()]}\n₹${rod.toY.toStringAsFixed(0)}',
+                              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
           ),
@@ -165,61 +295,123 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          Container(
-            height: 300,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+          
+          if (_topItems.isEmpty)
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: const Center(child: Text('No sales data available')),
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Pie Chart
+                Expanded(
+                  child: Container(
+                    height: 300,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: PieChart(
+                      PieChartData(
+                        sections: _topItems.entries.map((entry) {
+                          final index = _topItems.keys.toList().indexOf(entry.key);
+                          final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red];
+                          return PieChartSectionData(
+                            value: entry.value.toDouble(),
+                            title: '${entry.value}',
+                            color: colors[index % colors.length],
+                            radius: 100,
+                            titleStyle: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          );
+                        }).toList(),
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 40,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // List
+                Expanded(
+                  child: Container(
+                    height: 300,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: ListView.separated(
+                      itemCount: _topItems.length,
+                      separatorBuilder: (context, index) => const Divider(),
+                      itemBuilder: (context, index) {
+                        final entry = _topItems.entries.elementAt(index);
+                        final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: colors[index % colors.length].withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '#${index + 1}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: colors[index % colors.length],
+                                ),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            entry.key,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          trailing: Text(
+                            '${entry.value} sold',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: _topItems.isEmpty
-                ? const Center(child: Text('No sales data available'))
-                : PieChart(
-                    PieChartData(
-                      sections: _topItems.entries.map((entry) {
-                        final index = _topItems.keys.toList().indexOf(entry.key);
-                        final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red];
-                        return PieChartSectionData(
-                          value: entry.value.toDouble(),
-                          title: '${entry.value}',
-                          color: colors[index % colors.length],
-                          radius: 100,
-                          titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        );
-                      }).toList(),
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 40,
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 16),
-          // Legend
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: _topItems.entries.map((entry) {
-              final index = _topItems.keys.toList().indexOf(entry.key);
-              final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red];
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 16,
-                    height: 16,
-                    color: colors[index % colors.length],
-                  ),
-                  const SizedBox(width: 8),
-                  Text(entry.key),
-                ],
-              );
-            }).toList(),
-          ),
         ],
       ),
     );
@@ -229,24 +421,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon, color: color, size: 24),
-                const Spacer(),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 28),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
           ],
         ),

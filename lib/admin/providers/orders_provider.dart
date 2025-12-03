@@ -29,6 +29,7 @@ class OrderItem {
   final int quantity;
   final String? notes;
   final List<String>? addons;
+  final String? imageUrl;
 
   OrderItem({
     required this.id,
@@ -37,6 +38,7 @@ class OrderItem {
     required this.quantity,
     this.notes,
     this.addons,
+    this.imageUrl,
   });
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
@@ -47,6 +49,7 @@ class OrderItem {
       quantity: data['quantity'] ?? 1,
       notes: data['notes'],
       addons: data['addons'] != null ? List<String>.from(data['addons']) : null,
+      imageUrl: data['imageUrl'],
     );
   }
 
@@ -58,6 +61,7 @@ class OrderItem {
       'quantity': quantity,
       if (notes != null) 'notes': notes,
       if (addons != null) 'addons': addons,
+      if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
 }

@@ -15,8 +15,15 @@ class MenuItemsScreen extends StatefulWidget {
 class _MenuItemsScreenState extends State<MenuItemsScreen> {
   final MenuService _menuService = MenuService();
   List<MenuItem> _items = [];
+  List<MenuItem> _filteredItems = [];
   List<Category> _categories = [];
   bool _isLoading = true;
+
+  // Filter states
+  String _searchQuery = '';
+  String? _selectedCategoryFilter;
+  String? _selectedTypeFilter; // 'all', 'veg', 'nonveg'
+  String? _selectedAvailabilityFilter; // 'all', 'available', 'outofstock'
 
   @override
   void initState() {
@@ -32,6 +39,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
       setState(() {
         _items = items;
         _categories = categories;
+        _applyFilters();
         _isLoading = false;
       });
     } catch (e) {
@@ -40,6 +48,87 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
           SnackBar(content: Text('Error loading menu: $e')),
         );
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _filteredItems = _items.where((item) {
+        // Search filter
+        if (_searchQuery.isNotEmpty) {
+          final query = _searchQuery.toLowerCase();
+          if (!item.name.toLowerCase().contains(query) &&
+              !(item.category?.toLowerCase().contains(query) ?? false)) {
+            return false;
+          }
+        }
+
+        // Category filter
+        if (_selectedCategoryFilter != null && _selectedCategoryFilter != 'all') {
+          if (item.category != _selectedCategoryFilter) {
+            return false;
+          }
+        }
+
+        // Type filter (Veg/Non-Veg)
+        if (_selectedTypeFilter != null && _selectedTypeFilter != 'all') {
+          if (_selectedTypeFilter == 'veg' && !item.isVeg) {
+            return false;
+          }
+          if (_selectedTypeFilter == 'nonveg' && item.isVeg) {
+            return false;
+          }
+        }
+
+        // Availability filter
+        if (_selectedAvailabilityFilter != null && _selectedAvailabilityFilter != 'all') {
+          if (_selectedAvailabilityFilter == 'available' && item.isOutOfStock) {
+            return false;
+          }
+          if (_selectedAvailabilityFilter == 'outofstock' && !item.isOutOfStock) {
+            return false;
+          }
+        }
+
+        return true;
+      }).toList();
+    });
+  }
+
+  Future<void> _toggleAvailability(MenuItem item) async {
+    try {
+      // Find category ID
+      String? categoryId;
+      for (var cat in _categories) {
+        if (cat.items.any((i) => i.id == item.id)) {
+          categoryId = cat.id;
+          break;
+        }
+      }
+
+      if (categoryId != null) {
+        final updatedItem = MenuItem(
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          imageUrl: item.imageUrl,
+          category: item.category,
+          subcategory: item.subcategory,
+          itemType: item.itemType,
+          stockCount: item.isOutOfStock ? 10 : 0, // Toggle stock
+          isTracked: true,
+        );
+
+        await _menuService.updateMenuItem(widget.tenantId, categoryId, updatedItem);
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating availability: $e')),
+        );
       }
     }
   }
@@ -85,7 +174,10 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                 ),
                 TextField(
                   controller: priceController,
-                  decoration: const InputDecoration(labelText: 'Price'),
+                  decoration: const InputDecoration(
+                    labelText: 'Price (₹)',
+                    prefixText: '₹ ',
+                  ),
                   keyboardType: TextInputType.number,
                 ),
                 TextField(
@@ -140,9 +232,9 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                   imageUrl: imageController.text.isEmpty ? null : imageController.text,
                   itemType: itemType,
                   category: _categories.firstWhere((c) => c.id == selectedCategoryId).name,
-                  subcategory: itemType == 'veg' ? 'Veg' : 'Non-Veg', // Simplified logic
-                  stockCount: item?.stockCount ?? 0,
-                  isTracked: item?.isTracked ?? false,
+                  subcategory: itemType == 'veg' ? 'Veg' : 'Non-Veg',
+                  stockCount: item?.stockCount ?? 10,
+                  isTracked: item?.isTracked ?? true,
                 );
 
                 try {
@@ -212,44 +304,360 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
     }
   }
 
+  Widget _buildFilterChips() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.white,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // Category Filter
+            PopupMenuButton<String>(
+              child: Chip(
+                avatar: const Icon(Icons.category, size: 18),
+                label: Text(_selectedCategoryFilter == null || _selectedCategoryFilter == 'all' 
+                  ? 'Category' 
+                  : _selectedCategoryFilter!),
+              ),
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'all', child: Text('All Categories')),
+                ..._categories.map((cat) => PopupMenuItem(
+                  value: cat.name,
+                  child: Text(cat.name),
+                )),
+              ],
+              onSelected: (value) {
+                setState(() {
+                  _selectedCategoryFilter = value;
+                  _applyFilters();
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            // Type Filter
+            ChoiceChip(
+              label: const Text('All'),
+              selected: _selectedTypeFilter == null || _selectedTypeFilter == 'all',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedTypeFilter = 'all';
+                  _applyFilters();
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, color: Colors.green, size: 12),
+                  SizedBox(width: 4),
+                  Text('Veg'),
+                ],
+              ),
+              selected: _selectedTypeFilter == 'veg',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedTypeFilter = 'veg';
+                  _applyFilters();
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, color: Colors.red, size: 12),
+                  SizedBox(width: 4),
+                  Text('Non-Veg'),
+                ],
+              ),
+              selected: _selectedTypeFilter == 'nonveg',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedTypeFilter = 'nonveg';
+                  _applyFilters();
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            // Availability Filter
+            ChoiceChip(
+              label: const Text('Available'),
+              selected: _selectedAvailabilityFilter == 'available',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedAvailabilityFilter = selected ? 'available' : 'all';
+                  _applyFilters();
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Out of Stock'),
+              selected: _selectedAvailabilityFilter == 'outofstock',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedAvailabilityFilter = selected ? 'outofstock' : 'all';
+                  _applyFilters();
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showEditDialog(),
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Item'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _items.length,
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                return Card(
-                  child: ListTile(
-                    leading: item.imageUrl != null
-                        ? CircleAvatar(backgroundImage: NetworkImage(item.imageUrl!))
-                        : const CircleAvatar(child: Icon(Icons.fastfood)),
-                    title: Text(item.name),
-                    subtitle: Text('₹${item.price} • ${item.category}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _showEditDialog(item),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _deleteItem(item),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+      body: Column(
+        children: [
+          // Search Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search menu items...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                  _applyFilters();
+                });
               },
             ),
+          ),
+
+          // Filter Chips
+          _buildFilterChips(),
+
+          const Divider(height: 1),
+
+          // Results count
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.grey[100],
+            child: Row(
+              children: [
+                Text(
+                  '${_filteredItems.length} item${_filteredItems.length != 1 ? 's' : ''}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+
+          // Table Header
+          Container(
+            color: Colors.grey[200],
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: const Row(
+              children: [
+                SizedBox(width: 60, child: Text('Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                SizedBox(width: 12),
+                Expanded(flex: 2, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                SizedBox(width: 8),
+                Expanded(child: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                SizedBox(width: 8),
+                SizedBox(width: 40, child: Text('Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                SizedBox(width: 8),
+                SizedBox(width: 80, child: Text('Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                SizedBox(width: 8),
+                SizedBox(width: 90, child: Text('Available', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                SizedBox(width: 8),
+                SizedBox(width: 100, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+              ],
+            ),
+          ),
+
+          // Items List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredItems.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              _items.isEmpty ? 'No menu items yet' : 'No items match your filters',
+                              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                            ),
+                            if (_items.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _selectedCategoryFilter = 'all';
+                                    _selectedTypeFilter = 'all';
+                                    _selectedAvailabilityFilter = 'all';
+                                    _applyFilters();
+                                  });
+                                },
+                                child: const Text('Clear Filters'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _filteredItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _filteredItems[index];
+                          return Container(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: Colors.grey[300]!),
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: () => _showEditDialog(item),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    // Photo
+                                    SizedBox(
+                                      width: 60,
+                                      child: item.imageUrl != null
+                                          ? ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Image.network(
+                                                item.imageUrl!,
+                                                width: 50,
+                                                height: 50,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) =>
+                                                    const Icon(Icons.fastfood, size: 50),
+                                              ),
+                                            )
+                                          : const Icon(Icons.fastfood, size: 50),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    // Name
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (item.description.isNotEmpty)
+                                            Text(
+                                              item.description,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Category
+                                    Expanded(
+                                      child: Text(
+                                        item.category ?? 'N/A',
+                                        style: const TextStyle(fontSize: 13),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Type (Veg/Non-Veg)
+                                    SizedBox(
+                                      width: 40,
+                                      child: Icon(
+                                        Icons.circle,
+                                        color: item.isVeg ? Colors.green : Colors.red,
+                                        size: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Price
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        '₹${item.price.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Availability Toggle
+                                    SizedBox(
+                                      width: 90,
+                                      child: Switch(
+                                        value: !item.isOutOfStock,
+                                        onChanged: (value) => _toggleAvailability(item),
+                                        activeColor: Colors.green,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Actions
+                                    SizedBox(
+                                      width: 100,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit_outlined, size: 20),
+                                            onPressed: () => _showEditDialog(item),
+                                            tooltip: 'Edit',
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                            onPressed: () => _deleteItem(item),
+                                            tooltip: 'Delete',
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }
