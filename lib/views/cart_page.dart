@@ -30,6 +30,7 @@ class _CartPageState extends State<CartPage> {
     final orderService = OrderService();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Your Order',
@@ -136,8 +137,8 @@ class _CartPageState extends State<CartPage> {
 }
 
 class _CartItemsWithNotes extends StatelessWidget {
-  final List items;
-  final Function(dynamic, int) onUpdateQuantity;
+  final List<CartItem> items;
+  final Function(CartItem, int) onUpdateQuantity;
   final Map<String, String> itemNotes;
   final Function(String, String) onNoteUpdate;
   final bool isMobile;
@@ -153,8 +154,8 @@ class _CartItemsWithNotes extends StatelessWidget {
     required this.isTablet,
   }) : super(key: key);
 
-  void _showNoteBottomSheet(BuildContext context, dynamic item) {
-    final itemId = item.id ?? item.hashCode.toString();
+  void _showNoteBottomSheet(BuildContext context, CartItem item) {
+    final itemId = item.item.id;
     final currentNote = itemNotes[itemId] ?? '';
     final noteController = TextEditingController(text: currentNote);
     final theme = Theme.of(context);
@@ -221,7 +222,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Special instructions for ${item.name ?? "this item"}',
+                    'Special instructions for ${item.item.name}',
                     style: TextStyle(
                       fontSize: isMobile ? 13 : 14,
                       color: Colors.grey[600],
@@ -360,13 +361,16 @@ class _CartItemsWithNotes extends StatelessWidget {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final item = items[index];
-        final itemId = item.id ?? item.hashCode.toString();
+        final itemId = item.item.id;
         final hasNote = itemNotes.containsKey(itemId);
 
         return Card(
-          elevation: 2,
+          color: Colors.grey[50],
+          elevation: 6,
+          shadowColor: Colors.black.withOpacity(0.12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey[200]!),
           ),
           child: Padding(
             padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -382,7 +386,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.name ?? 'Item',
+                            item.item.name,
                             style: TextStyle(
                               fontSize: isMobile ? 15 : 16,
                               fontWeight: FontWeight.w600,
@@ -390,7 +394,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '₹${(item.price ?? 0).toStringAsFixed(2)}',
+                            '₹${(item.item.price).toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: isMobile ? 13 : 14,
                               color: Colors.deepPurple,
@@ -413,7 +417,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                             icon: const Icon(Icons.remove),
                             iconSize: isMobile ? 18 : 20,
                             onPressed: () {
-                              final currentQty = item.quantity ?? 1;
+                              final currentQty = item.quantity;
                               onUpdateQuantity(item, currentQty - 1);
                             },
                             padding: EdgeInsets.all(isMobile ? 4 : 8),
@@ -422,7 +426,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Text(
-                              '${item.quantity ?? 1}',
+                              '${item.quantity}',
                               style: TextStyle(
                                 fontSize: isMobile ? 14 : 16,
                                 fontWeight: FontWeight.bold,
@@ -433,7 +437,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                             icon: const Icon(Icons.add),
                             iconSize: isMobile ? 18 : 20,
                             onPressed: () {
-                              final currentQty = item.quantity ?? 1;
+                              final currentQty = item.quantity;
                               onUpdateQuantity(item, currentQty + 1);
                             },
                             padding: EdgeInsets.all(isMobile ? 4 : 8),

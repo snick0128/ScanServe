@@ -11,6 +11,7 @@ class OrderListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(title: const Text('My Orders')),
       body: Consumer<OrderController>(
         builder: (context, orderController, child) {
@@ -161,6 +162,13 @@ class _OrderCardState extends State<_OrderCard> {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.grey[50],
+      elevation: 6,
+      shadowColor: Colors.black.withOpacity(0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey[200]!),
+      ),
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () => setState(() => _isExpanded = !_isExpanded),
