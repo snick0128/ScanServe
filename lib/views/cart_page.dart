@@ -253,7 +253,15 @@ class _CartItemsWithNotes extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Special instructions for ${item.item.name}',
+                    style: TextStyle(
+                      fontSize: isMobile ? 13 : 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: noteController,
                     autofocus: true,
