@@ -61,35 +61,23 @@ class _OrderStatusStyle {
           background: Colors.grey.shade300,
           foreground: Colors.grey.shade900,
         );
-      case OrderStatus.confirmed:
-        return _OrderStatusStyle(
-          label: "Confirmed",
-          background: colorScheme.primary.withOpacity(0.18),
-          foreground: colorScheme.primary,
-        );
       case OrderStatus.preparing:
         return _OrderStatusStyle(
           label: "Preparing",
           background: Colors.orange.shade100,
           foreground: Colors.orange.shade800,
         );
-      case OrderStatus.ready:
-        return _OrderStatusStyle(
-          label: "Ready",
-          background: Colors.green.shade100,
-          foreground: Colors.green.shade800,
-        );
       case OrderStatus.served:
         return _OrderStatusStyle(
           label: "Served",
-          background: Colors.purple.shade100,
-          foreground: Colors.purple.shade800,
+          background: Colors.green.shade100,
+          foreground: Colors.green.shade800,
         );
-      case OrderStatus.completed:
+      case OrderStatus.cancelled:
         return _OrderStatusStyle(
-          label: "Completed",
-          background: Colors.teal.shade100,
-          foreground: Colors.teal.shade800,
+          label: "Cancelled",
+          background: Colors.red.shade100,
+          foreground: Colors.red.shade800,
         );
       default:
         return _OrderStatusStyle(

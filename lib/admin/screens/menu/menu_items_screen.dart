@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/tenant_model.dart';
 import '../../../services/menu_service.dart';
+import 'widgets/menu_item_dialog.dart';
 
 class MenuItemsScreen extends StatefulWidget {
   final String tenantId;
@@ -134,129 +136,35 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
   }
 
   Future<void> _showEditDialog([MenuItem? item]) async {
-    final isEditing = item != null;
-    final nameController = TextEditingController(text: item?.name);
-    final descController = TextEditingController(text: item?.description);
-    final priceController = TextEditingController(text: item?.price.toString());
-    final imageController = TextEditingController(text: item?.imageUrl);
-    
-    // Find initial category ID
-    String? selectedCategoryId;
-    if (isEditing) {
-      for (var cat in _categories) {
-        if (cat.items.any((i) => i.id == item.id)) {
-          selectedCategoryId = cat.id;
-          break;
-        }
-      }
-    } else if (_categories.isNotEmpty) {
-      selectedCategoryId = _categories.first.id;
-    }
-
-    String itemType = item?.itemType ?? 'veg';
-
-    await showDialog(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(isEditing ? 'Edit Item' : 'Add Item'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                ),
-                TextField(
-                  controller: priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Price (₹)',
-                    prefixText: '₹ ',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: imageController,
-                  decoration: const InputDecoration(labelText: 'Image URL'),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedCategoryId,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: _categories.map((c) => DropdownMenuItem(
-                    value: c.id,
-                    child: Text(c.name),
-                  )).toList(),
-                  onChanged: (val) => setState(() => selectedCategoryId = val),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Text('Type: '),
-                    Radio<String>(
-                      value: 'veg',
-                      groupValue: itemType,
-                      onChanged: (val) => setState(() => itemType = val!),
-                    ),
-                    const Text('Veg'),
-                    Radio<String>(
-                      value: 'nonveg',
-                      groupValue: itemType,
-                      onChanged: (val) => setState(() => itemType = val!),
-                    ),
-                    const Text('Non-Veg'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (selectedCategoryId == null) return;
-                
-                final newItem = MenuItem(
-                  id: item?.id ?? const Uuid().v4(),
-                  name: nameController.text,
-                  description: descController.text,
-                  price: double.tryParse(priceController.text) ?? 0.0,
-                  imageUrl: imageController.text.isEmpty ? null : imageController.text,
-                  itemType: itemType,
-                  category: _categories.firstWhere((c) => c.id == selectedCategoryId).name,
-                  subcategory: itemType == 'veg' ? 'Veg' : 'Non-Veg',
-                  stockCount: item?.stockCount ?? 10,
-                  isTracked: item?.isTracked ?? true,
-                );
-
-                try {
-                  if (isEditing) {
-                    await _menuService.updateMenuItem(widget.tenantId, selectedCategoryId!, newItem);
-                  } else {
-                    await _menuService.addMenuItem(widget.tenantId, selectedCategoryId!, newItem);
-                  }
-                  if (mounted) Navigator.pop(context);
-                  _loadData();
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error saving item: $e')),
-                  );
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+      builder: (context) => MenuItemDialog(
+        item: item,
+        categories: _categories,
+        tenantId: widget.tenantId,
       ),
     );
+
+    if (result != null) {
+      final newItem = result['item'] as MenuItem;
+      final categoryId = result['categoryId'] as String;
+      final isEditing = item != null;
+
+      try {
+        if (isEditing) {
+          await _menuService.updateMenuItem(widget.tenantId, categoryId, newItem);
+        } else {
+          await _menuService.addMenuItem(widget.tenantId, categoryId, newItem);
+        }
+        _loadData();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error saving item: $e')),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _deleteItem(MenuItem item) async {
@@ -315,7 +223,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
             // Category Filter
             PopupMenuButton<String>(
               child: Chip(
-                avatar: const Icon(Icons.category, size: 18),
+                avatar: const Icon(Ionicons.grid_outline, size: 18),
                 label: Text(_selectedCategoryFilter == null || _selectedCategoryFilter == 'all' 
                   ? 'Category' 
                   : _selectedCategoryFilter!),
@@ -351,7 +259,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
               label: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.circle, color: Colors.green, size: 12),
+                  Icon(Ionicons.leaf_outline, color: Colors.green, size: 14),
                   SizedBox(width: 4),
                   Text('Veg'),
                 ],
@@ -369,7 +277,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
               label: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.circle, color: Colors.red, size: 12),
+                  Icon(Ionicons.nutrition_outline, color: Colors.red, size: 14),
                   SizedBox(width: 4),
                   Text('Non-Veg'),
                 ],
@@ -416,7 +324,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showEditDialog(),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Ionicons.add_circle_outline),
         label: const Text('Add Item'),
       ),
       body: Column(
@@ -428,7 +336,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search menu items...',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Ionicons.search_outline),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -547,10 +455,10 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                                                 height: 50,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (context, error, stackTrace) =>
-                                                    const Icon(Icons.fastfood, size: 50),
+                                                  const Icon(Ionicons.restaurant_outline, size: 50),
                                               ),
                                             )
-                                          : const Icon(Icons.fastfood, size: 50),
+                                          : const Icon(Ionicons.restaurant_outline, size: 50),
                                     ),
                                     const SizedBox(width: 12),
                                     // Name
@@ -596,9 +504,9 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                                     SizedBox(
                                       width: 40,
                                       child: Icon(
-                                        Icons.circle,
+                                        item.isVeg ? Ionicons.leaf : Ionicons.nutrition,
                                         color: item.isVeg ? Colors.green : Colors.red,
-                                        size: 16,
+                                        size: 18,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -631,7 +539,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(Icons.edit_outlined, size: 20),
+                                            icon: const Icon(Ionicons.create_outline, size: 20),
                                             onPressed: () => _showEditDialog(item),
                                             tooltip: 'Edit',
                                             padding: EdgeInsets.zero,
@@ -639,7 +547,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           IconButton(
-                                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                            icon: const Icon(Ionicons.trash_outline, size: 20, color: Colors.red),
                                             onPressed: () => _deleteItem(item),
                                             tooltip: 'Delete',
                                             padding: EdgeInsets.zero,

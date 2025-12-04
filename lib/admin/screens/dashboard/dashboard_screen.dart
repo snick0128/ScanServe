@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:provider/provider.dart';
 import '../../../theme/app_theme.dart';
 import '../../providers/admin_auth_provider.dart';
@@ -100,7 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.menu),
+                        icon: const Icon(Ionicons.menu_outline),
                         onPressed: () {
                           setState(() {
                             _isSidebarCollapsed = !_isSidebarCollapsed;
@@ -117,7 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const Spacer(),
                       // User profile and notifications would go here
                       IconButton(
-                        icon: const Icon(Icons.notifications_none),
+                        icon: const Icon(Ionicons.notifications_outline),
                         onPressed: () {},
                       ),
                       const SizedBox(width: 8),
@@ -144,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: const CircleAvatar(
                           radius: 16,
                           backgroundColor: Colors.blue,
-                          child: Icon(Icons.person, size: 20, color: Colors.white),
+                          child: Icon(Ionicons.person, size: 20, color: Colors.white),
                         ),
                       ),
                     ],
@@ -224,8 +225,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
 
         // Active tables (unique table IDs from active orders)
+        // Active = pending or preparing (not served or cancelled)
         final activeOrders = orders.where((order) => 
-          order.status != OrderStatus.completed && 
+          order.status != OrderStatus.served && 
           order.status != OrderStatus.cancelled &&
           order.tableId != null
         );
@@ -292,25 +294,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildStatCard(
                     title: 'Total Orders',
                     value: totalOrders.toString(),
-                    icon: Icons.shopping_cart_outlined,
+                    icon: Ionicons.cart_outline,
                     color: Colors.blue,
                   ),
                   _buildStatCard(
                     title: 'Active Tables',
                     value: activeTables.toString(),
-                    icon: Icons.table_restaurant_outlined,
+                    icon: Ionicons.restaurant_outline,
                     color: Colors.green,
                   ),
                   _buildStatCard(
                     title: 'Today\'s Revenue',
                     value: '₹${todaysRevenue.toStringAsFixed(0)}',
-                    icon: Icons.currency_rupee_outlined,
+                    icon: Ionicons.cash_outline,
                     color: Colors.orange,
                   ),
                   _buildStatCard(
                     title: 'Active Orders',
                     value: activeOrdersCount.toString(),
-                    icon: Icons.receipt_long_outlined,
+                    icon: Ionicons.receipt_outline,
                     color: Colors.purple,
                   ),
                 ],

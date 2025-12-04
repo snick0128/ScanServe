@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../models/guest_profile_model.dart';
 
 /// Guest Session Service
 /// 
@@ -7,10 +8,14 @@ import 'package:uuid/uuid.dart';
 /// Uses SharedPreferences to store a single UUID per device/browser.
 /// This ensures that one device always has the same guestId, even when
 /// opening multiple tabs or refreshing the page.
+/// 
+/// Also manages guest profile (name + phone) to prevent duplicate customer
+/// records and enable prefilling of customer details.
 class GuestSessionService {
   static const String _guestIdKey = 'guest_id';
   static const String _currentTenantKey = 'current_tenant';
   static const String _currentTableKey = 'current_table';
+  static const String _guestProfileKey = 'guest_profile';
 
   final _prefs = SharedPreferences.getInstance();
   final _uuid = const Uuid();
@@ -71,6 +76,75 @@ class GuestSessionService {
     await prefs.remove(_guestIdKey);
     await prefs.remove(_currentTenantKey);
     await prefs.remove(_currentTableKey);
+    await prefs.remove(_guestProfileKey);
     print('🗑️ Cleared guest session - new guestId will be created on next load');
+  }
+
+  // ============================================================
+  // GUEST PROFILE MANAGEMENT
+  // ============================================================
+
+  /// Save guest profile to local storage
+  /// This stores customer name and phone to prevent duplicate records
+  /// and enable prefilling of customer details
+  Future<void> saveGuestProfile(GuestProfile profile) async {
+    final prefs = await _prefs;
+    await prefs.setString(_guestProfileKey, profile.toJsonString());
+    print('💾 Saved guest profile: ${profile.name}');
+  }
+
+  /// Get saved guest profile from local storage
+  /// Returns null if no profile exists
+  Future<GuestProfile?> getGuestProfile() async {
+    final prefs = await _prefs;
+    final profileJson = prefs.getString(_guestProfileKey);
+    
+    if (profileJson == null) {
+      print('📭 No guest profile found');
+      return null;
+    }
+
+    try {
+      final profile = GuestProfile.fromJsonString(profileJson);
+      print('📬 Retrieved guest profile: ${profile.name}');
+      return profile;
+    } catch (e) {
+      print('❌ Error parsing guest profile: $e');
+      return null;
+    }
+  }
+
+  /// Update guest profile with new name and/or phone
+  /// Creates a new profile if none exists
+  Future<void> updateGuestProfile({
+    required String name,
+    String? phone,
+  }) async {
+    final guestId = await getGuestId();
+    final existingProfile = await getGuestProfile();
+
+    final updatedProfile = existingProfile?.copyWith(
+      name: name,
+      phone: phone,
+    ) ?? GuestProfile.create(
+      guestId: guestId,
+      name: name,
+      phone: phone,
+    );
+
+    await saveGuestProfile(updatedProfile);
+  }
+
+  /// Check if a guest profile exists
+  Future<bool> hasGuestProfile() async {
+    final prefs = await _prefs;
+    return prefs.containsKey(_guestProfileKey);
+  }
+
+  /// Clear only the guest profile (keeps guestId and session)
+  Future<void> clearGuestProfile() async {
+    final prefs = await _prefs;
+    await prefs.remove(_guestProfileKey);
+    print('🗑️ Cleared guest profile');
   }
 }

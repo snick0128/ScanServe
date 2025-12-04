@@ -66,7 +66,7 @@ class BillService {
           .doc(billId)
           .set(billData);
       
-      // Mark all orders as completed
+      // Mark all orders as served (final state)
       final batch = _firestore.batch();
       for (final order in orders) {
         final orderRef = _firestore
@@ -76,7 +76,7 @@ class BillService {
             .doc(order.id);
         
         batch.update(orderRef, {
-          'status': model.OrderStatus.completed.toString().split('.').last,
+          'status': model.OrderStatus.served.toString().split('.').last,
           'updatedAt': FieldValue.serverTimestamp(),
           'billId': billId,
         });

@@ -38,6 +38,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String? _orderId;
 
   @override
+  void initState() {
+    super.initState();
+    _loadGuestProfile();
+  }
+
+  /// Load saved guest profile and prefill form fields
+  Future<void> _loadGuestProfile() async {
+    final profile = await _guestSession.getGuestProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _nameController.text = profile.name;
+        _phoneController.text = profile.phone ?? '';
+      });
+      print('✅ Prefilled customer details from saved profile');
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
@@ -301,8 +319,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
               TextFormField(
                 controller: _phoneController,
                 decoration: InputDecoration(
-                  labelText: 'Phone Number (Optional)',
+                  labelText: widget.orderType == OrderType.parcel
+                      ? 'Phone Number *'
+                      : 'Phone Number (Optional)',
                   hintText: '+91 9876543210',
+                  helperText: 'Your details will be saved for next time',
+                  helperStyle: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -315,6 +337,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ),
                 ),
                 keyboardType: TextInputType.phone,
+                validator: (value) {
+                  // Phone is required for parcel orders
+                  if (widget.orderType == OrderType.parcel) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Phone number is required for parcel orders';
+                    }
+                  }
+                  return null;
+                },
               ),
             ],
           ),
@@ -541,6 +572,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
         tableId: widget.tableId,
       );
 
+      // Save/update guest profile
+      await _guestSession.updateGuestProfile(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
+      );
+
       // Clear cart
       cart.clear();
 
@@ -740,6 +779,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
         paymentStatus:
             PaymentStatus.pending, // No payment yet for send to kitchen
         paymentMethod: PaymentMethod.cash, // Default for kitchen orders
+      );
+
+      // Save/update guest profile
+      await _guestSession.updateGuestProfile(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
       );
 
       // Clear cart

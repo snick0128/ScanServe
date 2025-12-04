@@ -4,27 +4,18 @@ import 'order_model.dart';
 
 enum OrderStatus {
   pending,
-  confirmed,
   preparing,
-  ready,
   served,
-  completed,
   cancelled;
 
   String get displayName {
     switch (this) {
       case OrderStatus.pending:
         return 'Pending';
-      case OrderStatus.confirmed:
-        return 'Confirmed';
       case OrderStatus.preparing:
         return 'Preparing';
-      case OrderStatus.ready:
-        return 'Ready';
       case OrderStatus.served:
         return 'Served';
-      case OrderStatus.completed:
-        return 'Completed';
       case OrderStatus.cancelled:
         return 'Cancelled';
     }
@@ -187,6 +178,27 @@ class OrderDetails {
     };
   }
 
+  /// Parse order status from database with legacy migration support
+  static OrderStatus _parseOrderStatus(dynamic status) {
+    final statusStr = status.toString().toLowerCase();
+    
+    // Handle legacy statuses from database migration
+    switch (statusStr) {
+      case 'confirmed':
+        return OrderStatus.pending; // Map old 'confirmed' to 'pending'
+      case 'ready':
+        return OrderStatus.preparing; // Map old 'ready' to 'preparing'
+      case 'completed':
+        return OrderStatus.served; // Map old 'completed' to 'served'
+      default:
+        // Try to match current enum values
+        return OrderStatus.values.firstWhere(
+          (e) => e.name == statusStr,
+          orElse: () => OrderStatus.pending,
+        );
+    }
+  }
+
   factory OrderDetails.fromMap(Map<String, dynamic> map) {
     try {
       return OrderDetails(
@@ -216,10 +228,7 @@ class OrderDetails {
                       : DateTime.parse(map['timestamp'].toString()))
                 : DateTime.now()),
         status: map['status'] != null
-            ? OrderStatus.values.firstWhere(
-                (e) => e.name == map['status'],
-                orElse: () => OrderStatus.pending,
-              )
+            ? _parseOrderStatus(map['status'])
             : OrderStatus.pending,
         estimatedWaitTime: (map['estimatedWaitTime'] as num?)?.toInt() ?? 30,
         subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,

@@ -167,15 +167,12 @@ class OrderController extends ChangeNotifier {
     print('📍 Setting up unified orders listener: tenants/$tenantId/orders');
 
     // Listen to ALL orders from unified location, filtered by guestId
+    // Show all orders except cancelled (pending, preparing, served)
     _ordersSubscription = _firestore
         .collection('tenants')
         .doc(tenantId)
         .collection('orders')
         .where('guestId', isEqualTo: guestId)
-        .where(
-          'status',
-          whereNotIn: [OrderStatus.completed.name, OrderStatus.confirmed.name],
-        )
         .snapshots()
         .listen((snapshot) {
           print(
@@ -190,6 +187,11 @@ class OrderController extends ChangeNotifier {
             
             try {
               final orderDetails = OrderDetails.fromMap(orderData);
+              
+              // Skip cancelled orders (optional - show all other statuses)
+              if (orderDetails.status == OrderStatus.cancelled) {
+                continue;
+              }
               
               // If we have a tableId filter, only show orders for this table (dine-in)
               // Otherwise show all orders for this guest
@@ -227,8 +229,7 @@ class OrderController extends ChangeNotifier {
       (order) =>
           order.tableId == tableId &&
           order.type == OrderType.dineIn &&
-          (order.status == OrderStatus.pending ||
-              order.status == OrderStatus.confirmed),
+          order.status == OrderStatus.pending,
     );
   }
 

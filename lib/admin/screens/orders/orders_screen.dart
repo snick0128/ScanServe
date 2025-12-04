@@ -130,9 +130,7 @@ class _OrdersScreenState extends State<OrdersScreen>
       case OrderStatus.pending:
         return 'Start Preparing';
       case OrderStatus.preparing:
-        return 'Mark Ready';
-      case OrderStatus.ready:
-        return 'Mark Completed';
+        return 'Mark Served';
       default:
         return '';
     }
@@ -143,9 +141,7 @@ class _OrdersScreenState extends State<OrdersScreen>
       case OrderStatus.pending:
         return OrderStatus.preparing;
       case OrderStatus.preparing:
-        return OrderStatus.ready;
-      case OrderStatus.ready:
-        return OrderStatus.completed;
+        return OrderStatus.served;
       default:
         return null;
     }
@@ -402,7 +398,7 @@ class _OrdersScreenState extends State<OrdersScreen>
           const SizedBox(height: 8),
           const Divider(height: 1),
           _buildOrderSummary(order),
-          if (order.status != OrderStatus.completed &&
+          if (order.status != OrderStatus.served &&
               order.status != OrderStatus.cancelled)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -521,12 +517,8 @@ class _OrdersScreenState extends State<OrdersScreen>
         return Colors.orange;
       case OrderStatus.preparing:
         return Colors.blue;
-      case OrderStatus.ready:
-        return Colors.green;
       case OrderStatus.served:
-        return Colors.grey;
-      case OrderStatus.completed:
-        return Colors.grey;
+        return Colors.green;
       case OrderStatus.cancelled:
         return Colors.red;
     }

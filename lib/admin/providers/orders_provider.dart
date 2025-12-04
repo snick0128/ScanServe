@@ -5,9 +5,7 @@ import 'package:flutter/foundation.dart';
 enum OrderStatus {
   pending('Pending', '🕒'),
   preparing('Preparing', '👨‍🍳'),
-  ready('Ready to Serve', '✅'),
-  served('Served', '🍽️'),
-  completed('Completed', '👍'),
+  served('Served', '✅'),
   cancelled('Cancelled', '❌');
 
   final String displayName;
@@ -15,10 +13,21 @@ enum OrderStatus {
   const OrderStatus(this.displayName, this.emoji);
 
   static OrderStatus fromString(String status) {
-    return OrderStatus.values.firstWhere(
-      (s) => s.toString().split('.').last == status,
-      orElse: () => OrderStatus.pending,
-    );
+    // Handle legacy statuses from database migration
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return OrderStatus.pending; // Map old 'confirmed' to 'pending'
+      case 'ready':
+        return OrderStatus.preparing; // Map old 'ready' to 'preparing'
+      case 'completed':
+        return OrderStatus.served; // Map old 'completed' to 'served'
+      default:
+        // Try to match current enum values
+        return OrderStatus.values.firstWhere(
+          (s) => s.toString().split('.').last == status,
+          orElse: () => OrderStatus.pending,
+        );
+    }
   }
 }
 

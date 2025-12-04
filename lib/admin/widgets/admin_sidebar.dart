@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:go_router/go_router.dart';
 
 class AdminSidebar extends StatelessWidget {
@@ -64,8 +65,8 @@ class AdminSidebar extends StatelessWidget {
                 IconButton(
                   icon: Icon(
                     isCollapsed
-                        ? Icons.chevron_right
-                        : Icons.chevron_left,
+                        ? Ionicons.chevron_forward_outline
+                        : Ionicons.chevron_back_outline,
                     color: Colors.grey,
                   ),
                   onPressed: onToggleCollapse,
@@ -86,49 +87,49 @@ class AdminSidebar extends StatelessWidget {
                 _buildNavItem(
                   context: context,
                   index: 0,
-                  icon: Icons.dashboard_outlined,
+                  icon: Ionicons.grid_outline,
                   label: 'Dashboard',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 1,
-                  icon: Icons.restaurant_menu_outlined,
+                  icon: Ionicons.restaurant_outline,
                   label: 'Menu Items',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 2,
-                  icon: Icons.table_restaurant_outlined,
+                  icon: Ionicons.apps_outline,
                   label: 'Tables',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 3,
-                  icon: Icons.receipt_long_outlined,
+                  icon: Ionicons.list_outline,
                   label: 'Orders',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 4,
-                  icon: Icons.receipt_outlined,
+                  icon: Ionicons.receipt_outline,
                   label: 'Bills',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 5,
-                  icon: Icons.analytics_outlined,
+                  icon: Ionicons.stats_chart_outline,
                   label: 'Analytics',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 6,
-                  icon: Icons.inventory_2_outlined,
+                  icon: Ionicons.cube_outline,
                   label: 'Inventory',
                   isCollapsed: isCollapsed,
                 ),
@@ -148,14 +149,14 @@ class AdminSidebar extends StatelessWidget {
                 _buildNavItem(
                   context: context,
                   index: 7,
-                  icon: Icons.settings_outlined,
+                  icon: Ionicons.settings_outline,
                   label: 'Settings',
                   isCollapsed: isCollapsed,
                 ),
                 _buildNavItem(
                   context: context,
                   index: 8,
-                  icon: Icons.help_outline,
+                  icon: Ionicons.help_circle_outline,
                   label: 'Help & Support',
                   isCollapsed: isCollapsed,
                 ),
@@ -176,7 +177,7 @@ class AdminSidebar extends StatelessWidget {
               leading: const CircleAvatar(
                 radius: 16,
                 backgroundColor: Colors.blue,
-                child: Icon(Icons.person, size: 16, color: Colors.white),
+                child: Icon(Ionicons.person, size: 16, color: Colors.white),
               ),
               title: !isCollapsed
                   ? const Text(
