@@ -85,7 +85,7 @@ class PaymentService {
 
       // If payment is paid, also update order status
       if (paymentStatus == PaymentStatus.paid) {
-        updateData['status'] = tableId != null ? OrderStatus.preparing.name : OrderStatus.confirmed.name;
+        updateData['status'] = tableId != null ? OrderStatus.preparing.name : OrderStatus.pending.name;
       }
 
       if (tableId != null) {

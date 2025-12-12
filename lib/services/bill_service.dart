@@ -91,6 +91,8 @@ class BillService {
           .doc(tableId)
           .update({
         'isAvailable': true,
+        'status': 'available',
+        'occupiedAt': null,
         'lastBillId': billId,
         'lastBillTime': FieldValue.serverTimestamp(),
       });

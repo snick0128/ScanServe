@@ -24,4 +24,22 @@ class TenantService {
       return null;
     }
   }
+
+
+  /// Verify if a table exists for a tenant
+  Future<bool> verifyTableExists(String tenantId, String tableId) async {
+    try {
+      final docSnapshot = await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('tables')
+          .doc(tableId)
+          .get();
+
+      return docSnapshot.exists;
+    } catch (e) {
+      print('Error verifying table existence: $e');
+      return false;
+    }
+  }
 }

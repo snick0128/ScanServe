@@ -48,6 +48,21 @@ class BillRequestService {
           .doc(requestId)
           .set(billRequest.toMap());
 
+      // Update table status to 'billRequested' if tableId is provided
+      if (tableId != null) {
+        try {
+          await _firestore
+              .collection('tenants')
+              .doc(tenantId)
+              .collection('tables')
+              .doc(tableId)
+              .update({'status': 'billRequested'});
+          print('📋 Table $tableId status updated to billRequested');
+        } catch (e) {
+          print('⚠️ Error updating table status: $e');
+        }
+      }
+
       print('📝 Bill request created: $requestId for $customerName');
       return requestId;
     } catch (e) {

@@ -9,6 +9,7 @@ import 'package:scan_serve/models/order_model.dart';
 import 'controllers/auth_controller.dart';
 import 'services/guest_session_service.dart';
 import 'services/offline_service.dart';
+import 'services/tenant_service.dart';
 
 class App extends StatelessWidget {
   const App({Key? key}) : super(key: key);
@@ -105,24 +106,44 @@ class _InitializerState extends State<Initializer> {
     String url = Uri.base.toString();
     print('Current URL: $url');
 
-    // For development/testing, use a default tenant if no URL parameters
-    if (!url.contains('tenantId')) {
-      print('No tenantId in URL, using demo_tenant');
-      url =
-          '$url${url.contains('?') ? '&' : '?'}tenantId=demo_tenant&tableId=table_1';
-    }
-
+    // Parse parameters using robust parser (handles hash routing)
     final params = QrUrlParser.parseUrl(url);
     print('Parsed URL parameters: $params');
+
+    // Use parsed values OR fallback to defaults/demo ONLY if missing
+    // This allows testing in IDE without params, but respects actual QR codes.
+    final tenantId = params['tenantId'] ?? 'demo_tenant';
+    String? tableId = params['tableId']; // tableId is optional (e.g. for parcel)
+
+    // Verify Is Table Valid?
+    if (tableId != null && tableId.isNotEmpty) {
+       final tenantService = TenantService(); // Assuming TenantService is available or imported
+       final isValidTable = await tenantService.verifyTableExists(tenantId, tableId);
+       
+       if (!isValidTable) {
+         print('⚠️ Invalid Table ID: $tableId - Fallback to Parcel Mode');
+         tableId = null; // Reset invalid table ID
+         
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(
+               content: Text('Invalid QR: Table not found. Switching to takeaway mode.'),
+               backgroundColor: Colors.orange,
+               duration: Duration(seconds: 5),
+             ),
+           );
+         }
+       }
+    }
+
+    print('🚀 Initializing session - Tenant: $tenantId, Table: $tableId');
 
     final guestSession = GuestSessionService();
     await guestSession.getOrCreateGuestId();
     await guestSession.startSession(
-      tenantId: params['tenantId'] ?? 'demo_tenant',
+      tenantId: tenantId,
+      tableId: tableId,
     );
-
-    final tenantId = params['tenantId'];
-    final tableId = params['tableId'];
 
     if (tenantId != null) {
       // Automatically determine order type based on tableId presence

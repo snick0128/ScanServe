@@ -398,6 +398,104 @@ class _HomeContentState extends State<HomeContent> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
+                        // Recommended Items Section (New)
+                        Consumer<app_controller.MenuController>(
+                          builder: (context, menuController, child) {
+                            // Logic for recommendations:
+                            // Fallback to taking items 5-8 from the list if available,
+                            // or just random ones.
+                            final items = menuController.filteredItems;
+                            final recommendedItems = items.length > 5 
+                                ? items.skip(5).take(5).toList() 
+                                : items.take(3).toList(); // Fallback
+
+                            if (recommendedItems.isEmpty) return const SizedBox.shrink();
+
+                            return Container(
+                              margin: const EdgeInsets.only(top: 8, bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(5),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Colors.pinkAccent,
+                                                Colors.deepOrangeAccent,
+                                              ],
+                                              begin: Alignment.centerLeft,
+                                              end: Alignment.centerRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: const Text(
+                                            'Recommended for you',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      height: 240,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: recommendedItems.length,
+                                        physics: const BouncingScrollPhysics(),
+                                        itemBuilder: (context, index) {
+                                          final item = recommendedItems[index];
+                                          return Container(
+                                            width: 160,
+                                            margin: EdgeInsets.only(
+                                              right: index == recommendedItems.length - 1 ? 0 : 16,
+                                            ),
+                                            child: MenuItemCard(
+                                              item: item,
+                                              onAddPressed: () {
+                                                context
+                                                    .read<CartController>()
+                                                    .addItem(item);
+                                                SnackbarHelper.showTopSnackBar(
+                                                  context,
+                                                  '${item.name} added to cart',
+                                                  duration: const Duration(seconds: 1),
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
                         // Most Ordered Items Section
                         Container(
                           margin: const EdgeInsets.only(top: 8),
@@ -666,8 +764,9 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
 
-                        // Bottom spacing
-                        const SizedBox(height: 8),
+                        // Bottom spacing to prevent overlap with floating UI
+                        const SizedBox(height: 100),
+
                       ],
                     ),
                   ),
@@ -678,13 +777,20 @@ class _HomeContentState extends State<HomeContent> {
           bottomNavigationBar: ViewOrderBar(tenantId: widget.tenantId),
         ),
         // Custom positioned FAB with tooltip
-        Positioned(
-          right: 20,
-          bottom: 80, // Position above the bottom navigation bar
-          child: Tooltip(
-            message: 'Call Waiter',
-            preferBelow: false,
-            verticalOffset: 10,
+        Consumer2<CartController, OrderController>(
+          builder: (context, cartController, orderController, child) {
+            // Determine if ViewOrderBar is visible
+            final hasPendingOrders = orderController.activeOrders.isNotEmpty;
+            final cartIsEmpty = cartController.itemCount == 0;
+            final isBarVisible = !cartIsEmpty || hasPendingOrders;
+
+            return Positioned(
+              right: 20,
+              bottom: isBarVisible ? 85 : 30, // Adjust based on bar visibility
+              child: Tooltip(
+                message: 'Call Waiter',
+                preferBelow: false,
+                verticalOffset: 10,
             decoration: BoxDecoration(
               color: Colors.deepPurple[800],
               borderRadius: BorderRadius.circular(8),
@@ -736,6 +842,8 @@ class _HomeContentState extends State<HomeContent> {
               ),
             ),
           ),
+            );
+          },
         ),
       ],
     );

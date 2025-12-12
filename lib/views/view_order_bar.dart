@@ -7,6 +7,7 @@ import '../services/tenant_service.dart';
 import '../utils/snackbar_helper.dart';
 import 'order_type_dialog.dart';
 import 'cart_page.dart';
+import 'package:scan_serve/views/order_list_screen.dart';
 
 class ViewOrderBar extends StatelessWidget {
   final String tenantId;
@@ -95,18 +96,13 @@ class ViewOrderBar extends StatelessWidget {
                 _showOrderTypeSnackBar(context, selectedType);
               }
             }
-
-            // If showing Pay Now (cart empty but has pending orders), go to checkout
+            // If showing Pay Now (cart empty but has pending orders), go to OrderListScreen
             if (showPayNow) {
-              Navigator.pushNamed(
+              Navigator.push(
                 context,
-                '/checkout',
-                arguments: {
-                  'tenantId': tenantId,
-                  'orderType': orderController.currentOrderType,
-                  'tableId': orderController.currentSession?.tableId,
-                  'requirePayment': true,
-                },
+                MaterialPageRoute(
+                  builder: (context) => const OrderListScreen(),
+                ),
               );
             } else {
               // Otherwise go to cart page

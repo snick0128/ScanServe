@@ -195,7 +195,8 @@ class _CartItemsWithNotes extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SingleChildScrollView(
+          child: SingleChildScrollView( // Ensure scrollable content
+            physics: const ClampingScrollPhysics(),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: Column(
@@ -499,10 +500,10 @@ class _CartItemsWithNotes extends StatelessWidget {
                               const SizedBox(width: 8),
                               // Horizontal Quantity controls
                               Container(
-                                height: 28,
+                                height: 36, // Increased height
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF5F7FA),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12), // Smoother radius
                                   border: Border.all(
                                     color: const Color(0xFFE5E7EB),
                                     width: 1,
@@ -522,17 +523,17 @@ class _CartItemsWithNotes extends StatelessWidget {
                                         },
                                         borderRadius:
                                             const BorderRadius.horizontal(
-                                              left: Radius.circular(7),
+                                              left: Radius.circular(11),
                                             ),
                                         child: Container(
-                                          width: 28,
-                                          height: 28,
+                                          width: 36, // Larger width
+                                          height: 36,
                                           alignment: Alignment.center,
                                           child: Icon(
                                             item.quantity > 1
                                                 ? Icons.remove
                                                 : Icons.delete_outline,
-                                            size: 16,
+                                            size: 18,
                                             color: item.quantity > 1
                                                 ? Colors.deepPurple
                                                 : Colors.red[400],
@@ -542,22 +543,22 @@ class _CartItemsWithNotes extends StatelessWidget {
                                     ),
                                     Container(
                                       width: 1,
-                                      height: 28,
+                                      height: 20, // Smaller separator height
                                       color: const Color(0xFFE5E7EB),
                                     ),
                                     Container(
                                       constraints: const BoxConstraints(
-                                        minWidth: 28,
+                                        minWidth: 32,
                                       ),
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                       ),
-                                      height: 28,
+                                      height: 36,
                                       alignment: Alignment.center,
                                       child: Text(
                                         '${item.quantity}',
                                         style: const TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xFF1A1A1A),
                                         ),
@@ -565,7 +566,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                     ),
                                     Container(
                                       width: 1,
-                                      height: 28,
+                                      height: 20,
                                       color: const Color(0xFFE5E7EB),
                                     ),
                                     Material(
@@ -579,15 +580,15 @@ class _CartItemsWithNotes extends StatelessWidget {
                                         },
                                         borderRadius:
                                             const BorderRadius.horizontal(
-                                              right: Radius.circular(7),
+                                              right: Radius.circular(11),
                                             ),
                                         child: Container(
-                                          width: 28,
-                                          height: 28,
+                                          width: 36, // Larger width
+                                          height: 36,
                                           alignment: Alignment.center,
                                           child: const Icon(
                                             Icons.add,
-                                            size: 16,
+                                            size: 18,
                                             color: Colors.deepPurple,
                                           ),
                                         ),
@@ -785,19 +786,48 @@ class _OrderSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildSummaryRow(
-                  'Subtotal',
-                  '₹${subtotal.toStringAsFixed(2)}',
-                  false,
-                ),
-                const SizedBox(height: 8),
-                _buildSummaryRow(
-                  'Tax (${(taxRate * 100).toStringAsFixed(0)}%)',
-                  '₹${tax.toStringAsFixed(2)}',
-                  false,
+                Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Price Breakdown',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          'Tap to view',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.deepPurple,
+                          ),
+                        ),
+                      ],
+                    ),
+                    tilePadding: EdgeInsets.zero,
+                    children: [
+                      _buildSummaryRow(
+                        'Subtotal',
+                        '₹${subtotal.toStringAsFixed(2)}',
+                        false,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSummaryRow(
+                        'Tax (${(taxRate * 100).toStringAsFixed(0)}%)',
+                        '₹${tax.toStringAsFixed(2)}',
+                        false,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 0),
                   child: Container(
                     height: 1,
                     decoration: BoxDecoration(

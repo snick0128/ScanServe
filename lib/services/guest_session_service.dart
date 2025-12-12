@@ -50,6 +50,8 @@ class GuestSessionService {
     await prefs.setString(_currentTenantKey, tenantId);
     if (tableId != null) {
       await prefs.setString(_currentTableKey, tableId);
+    } else {
+      await prefs.remove(_currentTableKey);
     }
   }
 

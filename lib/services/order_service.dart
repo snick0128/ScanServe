@@ -85,7 +85,11 @@ class OrderService {
               .doc(tenantId)
               .collection('tables')
               .doc(tableId)
-              .update({'isAvailable': false});
+              .update({
+            'isAvailable': false,
+            'status': 'occupied',
+            'occupiedAt': FieldValue.serverTimestamp(),
+          });
           print('Table $tableId marked as occupied');
         } catch (e) {
           print('Error updating table status: $e');
@@ -133,9 +137,8 @@ class OrderService {
           'status',
           whereIn: [
             OrderStatus.pending.name,
-            OrderStatus.confirmed.name,
             OrderStatus.preparing.name,
-            OrderStatus.ready.name,
+            OrderStatus.served.name,
           ],
         )
         .orderBy('timestamp', descending: true)
