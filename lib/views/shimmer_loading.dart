@@ -289,11 +289,13 @@ class ShimmerLoading {
       padding: EdgeInsets.all(isMobile ? 8 : 16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        childAspectRatio: 1,
+        childAspectRatio: 0.7, // Adjusted ratio to match cards better
         crossAxisSpacing: isMobile ? 8 : 16,
         mainAxisSpacing: isMobile ? 8 : 16,
       ),
       itemCount: itemCount,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
           baseColor: Colors.grey[300]!,

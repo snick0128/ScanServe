@@ -52,15 +52,15 @@ class _MenuItemCardState extends State<MenuItemCard>
 
   Widget _buildAddButton() {
     return Container(
-      height: 30,
-      width: 80,
+      height: 28,
+      width: 70,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFF914D), Color(0xFFFF6E40)],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10), // Slightly smaller radius
         boxShadow: _isHovered
             ? [
                 BoxShadow(
@@ -75,17 +75,17 @@ class _MenuItemCardState extends State<MenuItemCard>
         color: Colors.transparent,
         child: InkWell(
           onTap: _onAddPressed,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           child: const Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add_shopping_cart, size: 14, color: Colors.white),
+                Icon(Icons.add_shopping_cart, size: 12, color: Colors.white),
                 SizedBox(width: 4),
                 Text(
                   'Add',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                     height: 1.2,

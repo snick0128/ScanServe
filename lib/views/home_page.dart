@@ -39,7 +39,6 @@ class _HomeContentState extends State<HomeContent> {
   bool? _isVegOnly;
   bool _showNonVeg = false;
   String? _guestId;
-  bool _showSwipeHint = true;
   final ScrollController _mostOrderedScrollController = ScrollController();
 
   @override
@@ -49,7 +48,7 @@ class _HomeContentState extends State<HomeContent> {
     _loadTenantInfo();
 
     // Initialize scroll controller
-    _mostOrderedScrollController.addListener(_onMostOrderedScroll);
+    // Initialize scroll controller
 
     // Load menu items when the home content is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,18 +59,10 @@ class _HomeContentState extends State<HomeContent> {
     });
   }
 
-  void _onMostOrderedScroll() {
-    // Hide the hint when user starts scrolling
-    if (_showSwipeHint && _mostOrderedScrollController.offset > 0) {
-      setState(() {
-        _showSwipeHint = false;
-      });
-    }
-  }
+
 
   @override
   void dispose() {
-    _mostOrderedScrollController.removeListener(_onMostOrderedScroll);
     _mostOrderedScrollController.dispose();
     super.dispose();
   }
@@ -207,8 +198,11 @@ class _HomeContentState extends State<HomeContent> {
     return Stack(
       children: [
         Scaffold(
+          backgroundColor: Colors.grey[50], // Single source of background color
           extendBody: true, // This helps with bottom navigation bar spacing
           appBar: AppBar(
+            backgroundColor: Colors.grey[50], // Match scaffold background
+            surfaceTintColor: Colors.transparent, // No surface tint
             title: LayoutBuilder(
               builder: (context, constraints) {
                 final orderController = context.watch<OrderController>();
@@ -377,18 +371,17 @@ class _HomeContentState extends State<HomeContent> {
             children: [
               // Fixed Search Bar Section
               Container(
-                color: Colors.white,
+                color: Colors.transparent, // Transparent background
                 padding: searchPadding,
                 child: custom_search.SearchBar(maxWidth: searchBarMaxWidth),
               ),
 
-              // Subtle separator
-              Container(height: 1, color: Colors.grey[200]),
+              // Removed separator for cleaner look
 
               // Scrollable Content
               Expanded(
                 child: Container(
-                  color: Colors.grey[50],
+                  color: Colors.transparent, // Transparent to show Scaffold background
                   padding: const EdgeInsets.fromLTRB(
                     4,
                     0,
@@ -398,118 +391,12 @@ class _HomeContentState extends State<HomeContent> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // Recommended Items Section (New)
-                        Consumer<app_controller.MenuController>(
-                          builder: (context, menuController, child) {
-                            // Logic for recommendations:
-                            // Fallback to taking items 5-8 from the list if available,
-                            // or just random ones.
-                            final items = menuController.filteredItems;
-                            final recommendedItems = items.length > 5 
-                                ? items.skip(5).take(5).toList() 
-                                : items.take(3).toList(); // Fallback
 
-                            if (recommendedItems.isEmpty) return const SizedBox.shrink();
-
-                            return Container(
-                              margin: const EdgeInsets.only(top: 8, bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(5),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                Colors.pinkAccent,
-                                                Colors.deepOrangeAccent,
-                                              ],
-                                              begin: Alignment.centerLeft,
-                                              end: Alignment.centerRight,
-                                            ),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: const Text(
-                                            'Recommended for you',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    SizedBox(
-                                      height: 240,
-                                      child: ListView.builder(
-                                        scrollDirection: Axis.horizontal,
-                                        itemCount: recommendedItems.length,
-                                        physics: const BouncingScrollPhysics(),
-                                        itemBuilder: (context, index) {
-                                          final item = recommendedItems[index];
-                                          return Container(
-                                            width: 160,
-                                            margin: EdgeInsets.only(
-                                              right: index == recommendedItems.length - 1 ? 0 : 16,
-                                            ),
-                                            child: MenuItemCard(
-                                              item: item,
-                                              onAddPressed: () {
-                                                context
-                                                    .read<CartController>()
-                                                    .addItem(item);
-                                                SnackbarHelper.showTopSnackBar(
-                                                  context,
-                                                  '${item.name} added to cart',
-                                                  duration: const Duration(seconds: 1),
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
 
                         // Most Ordered Items Section
                         Container(
                           margin: const EdgeInsets.only(top: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(5),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
+                          // No decoration (background/shadow) for section
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16.0,
@@ -536,7 +423,7 @@ class _HomeContentState extends State<HomeContent> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        'Most Ordered',
+                                        '🔥 Crowd Favorites',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
@@ -630,26 +517,11 @@ class _HomeContentState extends State<HomeContent> {
                                               left: 4,
                                               bottom: 8,
                                             ),
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.arrow_forward_ios,
-                                                  size: 14,
-                                                  color: Colors.grey[500],
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Swipe to see more',
-                                                  style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 12,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        // Scrollable list
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Scrollable list
                                         SizedBox(
                                           height:
                                               240, // Increased height to accommodate the card
@@ -710,17 +582,7 @@ class _HomeContentState extends State<HomeContent> {
                         // Menu Grid with responsive spacing
                         Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(5),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
+                          // No decoration (background/shadow) for section
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(
                               16, // Align with 4px parent padding
