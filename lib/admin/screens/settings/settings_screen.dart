@@ -20,6 +20,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _taxRateController;
   late TextEditingController _avgPrepTimeController;
   bool _isVegOnly = false;
+  bool _captainCanDeleteItems = true;
+  bool _captainRequiresApproval = false;
 
   @override
   void initState() {
@@ -53,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _taxRateController.text = ((data['taxRate'] ?? 0.18) * 100).toString();
           _avgPrepTimeController.text = (data['avgPrepTime'] ?? 25).toString();
           _isVegOnly = data['isVegOnly'] ?? false;
+          final captainSettings = data['settings']?['captainPermissions'] ?? {};
+          _captainCanDeleteItems = captainSettings['canDeleteItems'] ?? true;
+          _captainRequiresApproval = captainSettings['requiresApproval'] ?? false;
           _isLoading = false;
         });
       }
@@ -76,6 +81,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'taxRate': double.parse(_taxRateController.text) / 100,
         'avgPrepTime': int.parse(_avgPrepTimeController.text),
         'isVegOnly': _isVegOnly,
+        'settings.captainPermissions': {
+          'canDeleteItems': _captainCanDeleteItems,
+          'requiresApproval': _captainRequiresApproval,
+        },
       });
 
       if (mounted) {
@@ -173,6 +182,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('Vegetarian Only Restaurant'),
               value: _isVegOnly,
               onChanged: (val) => setState(() => _isVegOnly = val),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const Divider(height: 32),
+            const Text(
+              'Captain / Waiter Permissions',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Can Delete Order Items'),
+              subtitle: const Text('Allow captains to remove items before kitchen acceptance'),
+              value: _captainCanDeleteItems,
+              onChanged: (val) => setState(() => _captainCanDeleteItems = val),
+              contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              title: const Text('Require Supervisor Approval'),
+              subtitle: const Text('Require a supervisor pin for item deletions'),
+              value: _captainRequiresApproval,
+              onChanged: (val) => setState(() => _captainRequiresApproval = val),
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 32),

@@ -27,21 +27,38 @@ class BillService {
         total += order.total;
       }
       
-      // Apply discount
-      final discountAmount = total * (discount / 100);
-      final finalTotal = total - discountAmount;
+      // Apply discount on subtotal (Requirement 9)
+      final discountAmount = subtotal * (discount / 100);
+      final discountedSubtotal = subtotal - discountAmount;
       
+      // Recalculate tax based on discounted subtotal
+      // (Assuming tax rate is proportional to subtotal)
+      final taxRate = subtotal > 0 ? (tax / subtotal) : 0.05; 
+      final newTax = discountedSubtotal * taxRate;
+      final finalTotal = discountedSubtotal + newTax;
+      
+      // Harvest customer info from orders
+      String? customerName;
+      String? customerPhone;
+      for (final order in orders) {
+        if (order.customerName != null && customerName == null) customerName = order.customerName;
+        if (order.customerPhone != null && customerPhone == null) customerPhone = order.customerPhone;
+        if (customerName != null && customerPhone != null) break;
+      }
+
       // Create bill document
       final billData = {
         'billId': billId,
         'tenantId': tenantId,
         'tableId': tableId,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
         'orders': orders.map((model.Order o) => o.id).toList(),
         'subtotal': subtotal,
-        'tax': tax,
+        'tax': newTax, // Use recalculated tax
         'discount': discount,
         'discountAmount': discountAmount,
-        'total': total,
+        'total': subtotal + tax, // Original total
         'finalTotal': finalTotal,
         'createdAt': FieldValue.serverTimestamp(),
         'orderDetails': orders.map((model.Order o) => {
@@ -83,7 +100,7 @@ class BillService {
       }
       await batch.commit();
       
-      // Mark table as available
+      /* Table release moved to Mark Paid button in UI 
       await _firestore
           .collection('tenants')
           .doc(tenantId)
@@ -92,10 +109,13 @@ class BillService {
           .update({
         'isAvailable': true,
         'status': 'available',
+        'isOccupied': false,
+        'currentSessionId': null,
         'occupiedAt': null,
         'lastBillId': billId,
         'lastBillTime': FieldValue.serverTimestamp(),
       });
+      */
       
       print('Bill generated successfully: $billId');
       return billId;

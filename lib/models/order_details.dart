@@ -5,7 +5,9 @@ import 'order_model.dart';
 enum OrderStatus {
   pending,
   preparing,
+  ready,
   served,
+  completed,
   cancelled;
 
   String get displayName {
@@ -14,8 +16,12 @@ enum OrderStatus {
         return 'Pending';
       case OrderStatus.preparing:
         return 'Preparing';
+      case OrderStatus.ready:
+        return 'Ready to Serve';
       case OrderStatus.served:
         return 'Served';
+      case OrderStatus.completed:
+        return 'Completed';
       case OrderStatus.cancelled:
         return 'Cancelled';
     }
@@ -185,11 +191,10 @@ class OrderDetails {
     // Handle legacy statuses from database migration
     switch (statusStr) {
       case 'confirmed':
-        return OrderStatus.pending; // Map old 'confirmed' to 'pending'
-      case 'ready':
-        return OrderStatus.preparing; // Map old 'ready' to 'preparing'
-      case 'completed':
-        return OrderStatus.served; // Map old 'completed' to 'served'
+      case 'ordered':
+        return OrderStatus.pending;
+      case 'ready_to_serve':
+        return OrderStatus.ready;
       default:
         // Try to match current enum values
         return OrderStatus.values.firstWhere(
@@ -298,12 +303,14 @@ class OrderItem {
   final String name;
   final double price;
   final int quantity;
+  final String? notes;
 
   OrderItem({
     required this.id,
     required this.name,
     required this.price,
     required this.quantity,
+    this.notes,
   });
 
   factory OrderItem.fromCartItem(CartItem cartItem) {
@@ -312,19 +319,27 @@ class OrderItem {
       name: cartItem.item.name,
       price: cartItem.item.price,
       quantity: cartItem.quantity,
+      notes: cartItem.note,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'name': name, 'price': price, 'quantity': quantity};
+    return {
+      'id': id,
+      'name': name,
+      'price': price,
+      'quantity': quantity,
+      'notes': notes,
+    };
   }
 
   factory OrderItem.fromMap(Map<String, dynamic> map) {
     return OrderItem(
-      id: map['id'],
-      name: map['name'],
-      price: map['price'],
-      quantity: map['quantity'],
+      id: map['id']?.toString() ?? '',
+      name: map['name']?.toString() ?? 'Unknown',
+      price: (map['price'] as num?)?.toDouble() ?? 0.0,
+      quantity: (map['quantity'] as num?)?.toInt() ?? 1,
+      notes: map['notes']?.toString(),
     );
   }
 

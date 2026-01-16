@@ -5,6 +5,8 @@ import '../controllers/menu_controller.dart' as app_controller;
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../services/session_service.dart';
+import '../services/waiter_call_service.dart';
+import '../services/guest_session_service.dart';
 import 'meal_time_tabs.dart';
 import 'search_bar.dart' as custom_search;
 import 'menu_grid.dart';
@@ -12,6 +14,7 @@ import 'menu_item_card.dart';
 import 'view_order_bar.dart';
 import 'order_list_screen.dart';
 import '../utils/snackbar_helper.dart';
+import '../services/offline_service.dart';
 
 class HomePage extends StatelessWidget {
   final String tenantId;
@@ -37,7 +40,7 @@ class _HomeContentState extends State<HomeContent> {
   String? _tenantName;
   bool _isLoadingTenant = true;
   bool? _isVegOnly;
-  bool _showNonVeg = false;
+  bool _showNonVeg = true;
   String? _guestId;
   final ScrollController _mostOrderedScrollController = ScrollController();
 
@@ -54,8 +57,8 @@ class _HomeContentState extends State<HomeContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final menuController = context.read<app_controller.MenuController>();
       menuController.loadMenuItems(widget.tenantId);
-      // Set default filter to Veg
-      menuController.setVegFilter(false);
+      // Set default filter to Show All
+      menuController.setVegFilter(true);
     });
   }
 
@@ -135,11 +138,19 @@ class _HomeContentState extends State<HomeContent> {
       final tenantService = TenantService();
       final tenant = await tenantService.getTenantInfo(widget.tenantId);
       if (mounted) {
+        final isVegOnly = tenant?.isVegOnly ?? false;
         setState(() {
           _tenantName = tenant?.name ?? 'Restaurant';
-          _isVegOnly = tenant?.isVegOnly ?? false;
+          _isVegOnly = isVegOnly;
+          if (isVegOnly) {
+            _showNonVeg = false;
+          }
           _isLoadingTenant = false;
         });
+
+        if (isVegOnly) {
+          context.read<app_controller.MenuController>().setVegFilter(false);
+        }
       }
     } catch (e) {
       print('Error loading tenant info: $e');
@@ -198,90 +209,103 @@ class _HomeContentState extends State<HomeContent> {
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: Colors.grey[50], // Single source of background color
-          extendBody: true, // This helps with bottom navigation bar spacing
+          backgroundColor: Colors.grey[50],
+          extendBody: true,
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
-            backgroundColor: Colors.grey[50], // Match scaffold background
-            surfaceTintColor: Colors.transparent, // No surface tint
-            title: LayoutBuilder(
-              builder: (context, constraints) {
-                final orderController = context.watch<OrderController>();
-                final tableId = orderController.currentSession?.tableId;
-
-                return Container(
-                  constraints: BoxConstraints(
-                    maxWidth: constraints.maxWidth * 0.8,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Tenant name with proper alignment
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: searchPadding
-                                .left, // Match search bar left padding
-                          ),
-                          child: Text(
-                            _isLoadingTenant
-                                ? 'Loading...'
-                                : (_tenantName ?? 'Restaurant'),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                          ),
+            backgroundColor: Colors.grey[50],
+            surfaceTintColor: Colors.transparent,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StreamBuilder<bool>(
+                  stream: context.read<OfflineService>().connectionStatus,
+                  initialData: context.read<OfflineService>().isOnline,
+                  builder: (context, snapshot) {
+                    final isOnline = snapshot.data ?? true;
+                    if (isOnline) return const SizedBox.shrink();
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      color: Colors.orange,
+                      child: const Center(
+                        child: Text(
+                          'Offline – actions will sync when internet returns',
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
-                        // Table badge (only show if tableId exists)
-                        if (tableId != null && tableId.isNotEmpty) ...[
-                          const SizedBox(width: 10), // 10px spacing from name
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10, // Reduced from 14 to 10
-                              vertical: 5, // Reduced from 7 to 5
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Colors.deepPurple,
-                                  Colors.deepPurpleAccent,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.deepPurple.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                      ),
+                    );
+                  },
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final orderController = context.watch<OrderController>();
+                    final tableId = orderController.currentSession?.tableId;
+
+                    return Container(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * 0.8,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(left: searchPadding.left),
+                              child: Text(
+                                _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            child: Text(
-                              _formatTableId(tableId),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                maxLines: 1,
                               ),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
+                            if (tableId != null && tableId.isNotEmpty) ...[
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Colors.deepPurple, Colors.deepPurpleAccent],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.deepPurple.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  _formatTableId(tableId),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             elevation: appBarElevation,
             actions: [
@@ -510,18 +534,7 @@ class _HomeContentState extends State<HomeContent> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        // Scroll hint indicator (only show on first load)
-                                        if (_showSwipeHint)
-                                          Container(
-                                            padding: const EdgeInsets.only(
-                                              left: 4,
-                                              bottom: 8,
-                                            ),
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Scrollable list
+                                        // Scrollable list
                                         SizedBox(
                                           height:
                                               240, // Increased height to accommodate the card
@@ -648,62 +661,77 @@ class _HomeContentState extends State<HomeContent> {
 
             return Positioned(
               right: 20,
-              bottom: isBarVisible ? 85 : 30, // Adjust based on bar visibility
+              bottom: isBarVisible ? 85 : 30,
               child: Tooltip(
                 message: 'Call Waiter',
                 preferBelow: false,
                 verticalOffset: 10,
-            decoration: BoxDecoration(
-              color: Colors.deepPurple[800],
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            textStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                // Show call waiter dialog or snackbar
-                SnackbarHelper.showTopSnackBar(
-                  context,
-                  'Waiter has been notified!',
-                  duration: const Duration(seconds: 3),
-                );
-              },
-              child: Container(
-                width: 56,
-                height: 56,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
+                  color: Colors.deepPurple[800],
+                  borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.deepPurple.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.notifications_active_rounded,
+                textStyle: const TextStyle(
                   color: Colors.white,
-                  size: 24,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                child: GestureDetector(
+                  onTap: () async {
+                    try {
+                      final waiterCallService = WaiterCallService();
+                      final guestSessionService = GuestSessionService();
+                      
+                      final guestId = await guestSessionService.getGuestId();
+                      final session = await guestSessionService.getCurrentSession();
+                      final profile = await guestSessionService.getGuestProfile();
+                      
+                      await waiterCallService.createWaiterCall(
+                        tenantId: widget.tenantId,
+                        guestId: guestId,
+                        tableId: session['tableId'],
+                        tableName: session['tableId'] != null ? 'Table ${session['tableId']}' : null,
+                        customerName: profile?.name,
+                      );
+                      
+                      if (context.mounted) {
+                        SnackbarHelper.showTopSnackBar(context, 'Waiter called! Someone will be with you shortly.');
+                      }
+                    } catch (e) {
+                      print('Error calling waiter: $e');
+                      if (context.mounted) {
+                        SnackbarHelper.showTopSnackBar(context, 'Failed to call waiter. Please try again.');
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.deepPurple.withOpacity(0.3),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.person_pin_circle,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
             );
           },
         ),

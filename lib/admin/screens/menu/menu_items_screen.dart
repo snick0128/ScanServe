@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
+import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/tenant_model.dart';
+import '../../../models/activity_log_model.dart';
 import '../../../services/menu_service.dart';
+import '../../providers/admin_auth_provider.dart';
+import '../../providers/activity_provider.dart';
 import 'widgets/menu_item_dialog.dart';
 
 class MenuItemsScreen extends StatefulWidget {
@@ -119,14 +123,49 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
           category: item.category,
           subcategory: item.subcategory,
           itemType: item.itemType,
-          stockCount: item.isOutOfStock ? 10 : 0, // Toggle stock
-          isTracked: true,
+          stockCount: item.stockCount,
+          isTracked: item.isTracked,
+          isManualAvailable: !item.isManualAvailable,
+          inventoryTrackingType: item.inventoryTrackingType,
+          inventoryIngredients: item.inventoryIngredients,
         );
 
+        // Optimistic UI Update
+        setState(() {
+          final index = _items.indexWhere((i) => i.id == item.id);
+          if (index != -1) {
+            _items[index] = updatedItem;
+            _applyFilters();
+          }
+        });
+
         await _menuService.updateMenuItem(widget.tenantId, categoryId, updatedItem);
-        _loadData();
+        
+        // Log activity (non-blocking)
+        if (mounted) {
+          final auth = context.read<AdminAuthProvider>();
+          final activity = context.read<ActivityProvider>();
+          activity.logAction(
+            action: 'Availability Changed',
+            description: '${item.name} is now ${updatedItem.isManualAvailable ? 'AVAILABLE' : 'SOLD OUT'}',
+            actorId: auth.user?.uid ?? 'demo',
+            actorName: auth.role == 'kitchen' ? 'Kitchen Staff' : 'Admin User',
+            actorRole: auth.role ?? 'admin',
+            type: ActivityType.menuItemUpdate,
+            tenantId: widget.tenantId,
+            metadata: {'itemId': item.id, 'isAvailable': updatedItem.isManualAvailable},
+          );
+        }
       }
     } catch (e) {
+      // Revert optimistic update on failure
+      setState(() {
+        final index = _items.indexWhere((i) => i.id == item.id);
+        if (index != -1) {
+          _items[index] = item;
+          _applyFilters();
+        }
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error updating availability: $e')),
@@ -156,6 +195,35 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
         } else {
           await _menuService.addMenuItem(widget.tenantId, categoryId, newItem);
         }
+
+        // Log activity
+        if (mounted) {
+          final auth = context.read<AdminAuthProvider>();
+          final activity = context.read<ActivityProvider>();
+          
+          String description = isEditing ? 'Updated menu item: ${newItem.name}' : 'Added new menu item: ${newItem.name}';
+          
+          if (isEditing && item.price != newItem.price) {
+            description = 'Price changed for ${newItem.name}: ₹${item.price.toStringAsFixed(0)} ➔ ₹${newItem.price.toStringAsFixed(0)}';
+          }
+
+          await activity.logAction(
+            action: isEditing ? 'Menu Updated' : 'Item Added',
+            description: description,
+            actorId: auth.user?.uid ?? 'demo',
+            actorName: auth.role == 'kitchen' ? 'Kitchen Staff' : 'Admin User',
+            actorRole: auth.role ?? 'admin',
+            type: isEditing ? ActivityType.menuItemUpdate : ActivityType.menuItemAdd,
+            tenantId: widget.tenantId,
+            metadata: {
+              'itemId': newItem.id, 
+              'category': newItem.category,
+              'oldPrice': isEditing ? item.price : null,
+              'newPrice': newItem.price,
+            },
+          );
+        }
+
         _loadData();
       } catch (e) {
         if (mounted) {
@@ -200,6 +268,22 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
 
         if (categoryId != null) {
           await _menuService.deleteMenuItem(widget.tenantId, categoryId, item.id);
+          
+          // Log activity
+          if (mounted) {
+            final auth = context.read<AdminAuthProvider>();
+            context.read<ActivityProvider>().logAction(
+              action: 'Menu Item Deleted',
+              description: 'Deleted menu item: ${item.name}',
+              actorId: auth.user?.uid ?? 'demo',
+              actorName: auth.role == 'kitchen' ? 'Kitchen Staff' : 'Admin User',
+              actorRole: auth.role ?? 'admin',
+              type: ActivityType.menuItemDelete,
+              tenantId: widget.tenantId,
+              metadata: {'itemId': item.id, 'name': item.name},
+            );
+          }
+          
           _loadData();
         }
       } catch (e) {
@@ -371,198 +455,441 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
             ),
           ),
 
-          // Table Header
-          Container(
-            color: Colors.grey[200],
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: const Row(
-              children: [
-                SizedBox(width: 60, child: Text('Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 12),
-                Expanded(flex: 2, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 8),
-                Expanded(child: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 8),
-                SizedBox(width: 40, child: Text('Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 8),
-                SizedBox(width: 80, child: Text('Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 8),
-                SizedBox(width: 90, child: Text('Available', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 8),
-                SizedBox(width: 100, child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-              ],
-            ),
-          ),
-
-          // Items List
+          // Responsive Content
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredItems.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              _items.isEmpty ? 'No menu items yet' : 'No items match your filters',
-                              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                            ),
-                            if (_items.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _searchQuery = '';
-                                    _selectedCategoryFilter = 'all';
-                                    _selectedTypeFilter = 'all';
-                                    _selectedAvailabilityFilter = 'all';
-                                    _applyFilters();
-                                  });
-                                },
-                                child: const Text('Clear Filters'),
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 900;
+
+                      if (_filteredItems.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.restaurant_menu,
+                                  size: 64, color: Colors.grey[400]),
+                              const SizedBox(height: 16),
+                              Text(
+                                _items.isEmpty
+                                    ? 'No menu items yet'
+                                    : 'No items match your filters',
+                                style: TextStyle(
+                                    fontSize: 16, color: Colors.grey[600]),
                               ),
+                              if (_items.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _selectedCategoryFilter = 'all';
+                                      _selectedTypeFilter = 'all';
+                                      _selectedAvailabilityFilter = 'all';
+                                      _applyFilters();
+                                    });
+                                  },
+                                  child: const Text('Clear Filters'),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = _filteredItems[index];
-                          return Container(
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          // Table Header (Desktop Only)
+                          if (!isMobile)
+                            Container(
+                              color: Colors.grey[200],
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              child: const Row(
+                                children: [
+                                  SizedBox(
+                                      width: 60,
+                                      child: Text('Photo',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                      flex: 2,
+                                      child: Text('Name',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                      child: Text('Category',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                  SizedBox(width: 8),
+                                  SizedBox(
+                                      width: 40,
+                                      child: Text('Type',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                  SizedBox(width: 8),
+                                  SizedBox(
+                                      width: 80,
+                                      child: Text('Price',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                  SizedBox(width: 8),
+                                  SizedBox(
+                                      width: 90,
+                                      child: Text('Available',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                  SizedBox(width: 8),
+                                  SizedBox(
+                                      width: 100,
+                                      child: Text('Actions',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12))),
+                                ],
                               ),
                             ),
-                            child: InkWell(
-                              onTap: () => _showEditDialog(item),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                child: Row(
-                                  children: [
-                                    // Photo
-                                    SizedBox(
-                                      width: 60,
-                                      child: item.imageUrl != null
-                                          ? ClipRRect(
-                                              borderRadius: BorderRadius.circular(8),
-                                              child: Image.network(
-                                                item.imageUrl!,
-                                                width: 50,
-                                                height: 50,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) =>
-                                                  const Icon(Ionicons.restaurant_outline, size: 50),
-                                              ),
-                                            )
-                                          : const Icon(Ionicons.restaurant_outline, size: 50),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // Name
-                                    Expanded(
-                                      flex: 2,
+
+                          // Items List
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: _filteredItems.length,
+                              itemBuilder: (context, index) {
+                                final item = _filteredItems[index];
+
+                                if (isMobile) {
+                                  // Mobile Card View
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12)),
+                                    elevation: 2,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            item.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 14,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (item.description.isNotEmpty)
-                                            Text(
-                                              item.description,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              // Photo
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: item.imageUrl != null
+                                                    ? Image.network(
+                                                        item.imageUrl!,
+                                                        width: 70,
+                                                        height: 70,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context,
+                                                                error,
+                                                                stackTrace) =>
+                                                            Container(
+                                                          width: 70,
+                                                          height: 70,
+                                                          color:
+                                                              Colors.grey[200],
+                                                          child: const Icon(
+                                                              Ionicons
+                                                                  .restaurant_outline,
+                                                              size: 30),
+                                                        ),
+                                                      )
+                                                    : Container(
+                                                        width: 70,
+                                                        height: 70,
+                                                        color:
+                                                            Colors.grey[200],
+                                                        child: const Icon(
+                                                            Ionicons
+                                                                .restaurant_outline,
+                                                            size: 30),
+                                                      ),
                                               ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            item.name,
+                                                            style: const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 16),
+                                                          ),
+                                                        ),
+                                                        Icon(
+                                                          item.isVeg
+                                                              ? Ionicons.leaf
+                                                              : Ionicons
+                                                                  .nutrition,
+                                                          color: item.isVeg
+                                                              ? Colors.green
+                                                              : Colors.red,
+                                                          size: 16,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      item.category ?? 'N/A',
+                                                      style: TextStyle(
+                                                          color:
+                                                              Colors.grey[600],
+                                                          fontSize: 13),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      '₹${item.price.toStringAsFixed(0)}',
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 15,
+                                                          color: Colors
+                                                              .deepPurple),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const Divider(height: 20),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    item.isOutOfStock
+                                                        ? 'Out of Stock'
+                                                        : 'Available',
+                                                    style: TextStyle(
+                                                      color: item.isOutOfStock
+                                                          ? Colors.red
+                                                          : Colors.green,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  Switch(
+                                                    value: !item.isOutOfStock,
+                                                    onChanged: (value) =>
+                                                        _toggleAvailability(
+                                                            item),
+                                                    activeColor: Colors.green,
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                        Ionicons.create_outline,
+                                                        size: 20),
+                                                    onPressed: () =>
+                                                        _showEditDialog(item),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                        Ionicons.trash_outline,
+                                                        size: 20,
+                                                        color: Colors.red),
+                                                    onPressed: () =>
+                                                        _deleteItem(item),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                // Desktop Table Row
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                          color: Colors.grey[300]!),
+                                    ),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () => _showEditDialog(item),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 12),
+                                      child: Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 60,
+                                            child: item.imageUrl != null
+                                                ? ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    child: Image.network(
+                                                      item.imageUrl!,
+                                                      width: 50,
+                                                      height: 50,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context,
+                                                              error,
+                                                              stackTrace) =>
+                                                          const Icon(
+                                                              Ionicons
+                                                                  .restaurant_outline,
+                                                              size: 50),
+                                                    ),
+                                                  )
+                                                : const Icon(
+                                                    Ionicons.restaurant_outline,
+                                                    size: 50),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  item.name,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    fontSize: 14,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                if (item.description.isNotEmpty)
+                                                  Text(
+                                                    item.description,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              item.category ?? 'N/A',
+                                              style:
+                                                  const TextStyle(fontSize: 13),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Category
-                                    Expanded(
-                                      child: Text(
-                                        item.category ?? 'N/A',
-                                        style: const TextStyle(fontSize: 13),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Type (Veg/Non-Veg)
-                                    SizedBox(
-                                      width: 40,
-                                      child: Icon(
-                                        item.isVeg ? Ionicons.leaf : Ionicons.nutrition,
-                                        color: item.isVeg ? Colors.green : Colors.red,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Price
-                                    SizedBox(
-                                      width: 80,
-                                      child: Text(
-                                        '₹${item.price.toStringAsFixed(0)}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Availability Toggle
-                                    SizedBox(
-                                      width: 90,
-                                      child: Switch(
-                                        value: !item.isOutOfStock,
-                                        onChanged: (value) => _toggleAvailability(item),
-                                        activeColor: Colors.green,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Actions
-                                    SizedBox(
-                                      width: 100,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Ionicons.create_outline, size: 20),
-                                            onPressed: () => _showEditDialog(item),
-                                            tooltip: 'Edit',
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
                                           ),
                                           const SizedBox(width: 8),
-                                          IconButton(
-                                            icon: const Icon(Ionicons.trash_outline, size: 20, color: Colors.red),
-                                            onPressed: () => _deleteItem(item),
-                                            tooltip: 'Delete',
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
+                                          SizedBox(
+                                            width: 40,
+                                            child: Icon(
+                                              item.isVeg
+                                                  ? Ionicons.leaf
+                                                  : Ionicons.nutrition,
+                                              color: item.isVeg
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                              size: 18,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 80,
+                                            child: Text(
+                                              '₹${item.price.toStringAsFixed(0)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 90,
+                                            child: Switch(
+                                              value: !item.isOutOfStock,
+                                              onChanged: (value) =>
+                                                  _toggleAvailability(item),
+                                              activeColor: Colors.green,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 100,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Ionicons.create_outline,
+                                                      size: 20),
+                                                  onPressed: () =>
+                                                      _showEditDialog(item),
+                                                  tooltip: 'Edit',
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Ionicons.trash_outline,
+                                                      size: 20,
+                                                      color: Colors.red),
+                                                  onPressed: () =>
+                                                      _deleteItem(item),
+                                                  tooltip: 'Delete',
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
           ),
         ],
       ),

@@ -99,14 +99,18 @@ class OrderController extends ChangeNotifier {
     );
 
     // Save the session to Firestore which will trigger the real-time listener
-    await _firestore.collection('orders').add({
+    await _firestore
+        .collection('tenants')
+        .doc(_currentSession!.tenantId)
+        .collection('orders')
+        .add({
       'guestId': guestId,
       'tenantId': _currentSession!.tenantId,
       'type': type.name,
       'tableId': _currentSession!.tableId,
       'status': OrderStatus.pending.name,
       'timestamp': FieldValue.serverTimestamp(),
-      'estimatedWaitTime': 0, // Will be updated by the restaurant
+      'createdAt': FieldValue.serverTimestamp(), // Added for consistency with Admin model
       'items': [], // Will be populated when order is placed
       'subtotal': 0,
       'tax': 0,
@@ -188,8 +192,9 @@ class OrderController extends ChangeNotifier {
             try {
               final orderDetails = OrderDetails.fromMap(orderData);
               
-              // Skip cancelled orders (optional - show all other statuses)
-              if (orderDetails.status == OrderStatus.cancelled) {
+              // REQUIREMENT 2: Completed orders must NEVER appear active in the session tracking
+              if (orderDetails.status == OrderStatus.cancelled || 
+                  orderDetails.status == OrderStatus.completed) {
                 continue;
               }
               
@@ -202,7 +207,7 @@ class OrderController extends ChangeNotifier {
                   _subscribeToOrderStatus(orderDetails.orderId, tenantId);
                 }
               } else {
-                // Show all orders (parcel orders)
+                // Show all active orders (parcel orders)
                 if (orderDetails.type == OrderType.parcel) {
                   print('➕ Adding parcel order: ${orderDetails.orderId}');
                   _activeOrders.add(orderDetails);

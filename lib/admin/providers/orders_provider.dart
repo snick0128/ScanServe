@@ -1,194 +1,37 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-
-enum OrderStatus {
-  pending('Pending', '🕒'),
-  preparing('Preparing', '👨‍🍳'),
-  served('Served', '✅'),
-  cancelled('Cancelled', '❌');
-
-  final String displayName;
-  final String emoji;
-  const OrderStatus(this.displayName, this.emoji);
-
-  static OrderStatus fromString(String status) {
-    // Handle legacy statuses from database migration
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return OrderStatus.pending; // Map old 'confirmed' to 'pending'
-      case 'ready':
-        return OrderStatus.preparing; // Map old 'ready' to 'preparing'
-      case 'completed':
-        return OrderStatus.served; // Map old 'completed' to 'served'
-      default:
-        // Try to match current enum values
-        return OrderStatus.values.firstWhere(
-          (s) => s.toString().split('.').last == status,
-          orElse: () => OrderStatus.pending,
-        );
-    }
-  }
-}
-
-class OrderItem {
-  final String id;
-  final String name;
-  final double price;
-  final int quantity;
-  final String? notes;
-  final List<String>? addons;
-  final String? imageUrl;
-
-  OrderItem({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.quantity,
-    this.notes,
-    this.addons,
-    this.imageUrl,
-  });
-
-  factory OrderItem.fromMap(Map<String, dynamic> data) {
-    return OrderItem(
-      id: data['id'] ?? '',
-      name: data['name'] ?? 'Unknown Item',
-      price: (data['price'] ?? 0).toDouble(),
-      quantity: data['quantity'] ?? 1,
-      notes: data['notes'],
-      addons: data['addons'] != null ? List<String>.from(data['addons']) : null,
-      imageUrl: data['imageUrl'],
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'price': price,
-      'quantity': quantity,
-      if (notes != null) 'notes': notes,
-      if (addons != null) 'addons': addons,
-      if (imageUrl != null) 'imageUrl': imageUrl,
-    };
-  }
-}
-
-class Order {
-  final String id;
-  final String tenantId;
-  final String? tableId;
-  final String? tableName;
-  final String? customerName;
-  final String? customerPhone;
-  final List<OrderItem> items;
-  final double subtotal;
-  final double tax;
-  final double total;
-  final OrderStatus status;
-  final DateTime createdAt;
-  final DateTime? updatedAt;
-  final String? paymentMethod;
-  final String? paymentStatus;
-  final String? notes;
-  final String? cancellationReason;
-
-  Order({
-    required this.id,
-    required this.tenantId,
-    this.tableId,
-    this.tableName,
-    this.customerName,
-    this.customerPhone,
-    required this.items,
-    required this.subtotal,
-    required this.tax,
-    required this.total,
-    required this.status,
-    required this.createdAt,
-    this.updatedAt,
-    this.paymentMethod,
-    this.paymentStatus,
-    this.notes,
-    this.cancellationReason,
-  });
-
-  factory Order.fromFirestore(DocumentSnapshot doc) {
-    try {
-      final data = doc.data() as Map<String, dynamic>;
-      
-      // Parse items
-      final items = (data['items'] as List<dynamic>? ?? [])
-          .map((item) => OrderItem.fromMap(Map<String, dynamic>.from(item)))
-          .toList();
-      
-      // Parse dates
-      final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-      final updatedAt = data['updatedAt'] != null 
-          ? (data['updatedAt'] as Timestamp).toDate() 
-          : null;
-      
-      // Parse status
-      final status = data['status'] != null 
-          ? OrderStatus.fromString(data['status']) 
-          : OrderStatus.pending;
-      
-      return Order(
-        id: doc.id,
-        tenantId: data['tenantId']?.toString() ?? '',
-        tableId: data['tableId']?.toString(),
-        tableName: data['tableName']?.toString(),
-        customerName: data['customerName']?.toString(),
-        customerPhone: data['customerPhone']?.toString(),
-        items: items,
-        subtotal: (data['subtotal'] ?? 0).toDouble(),
-        tax: (data['tax'] ?? 0).toDouble(),
-        total: (data['total'] ?? 0).toDouble(),
-        status: status,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-        paymentMethod: data['paymentMethod']?.toString(),
-        paymentStatus: data['paymentStatus']?.toString(),
-        notes: data['notes']?.toString(),
-        cancellationReason: data['cancellationReason']?.toString(),
-      );
-    } catch (e) {
-      debugPrint('Error parsing order: $e');
-      rethrow;
-    }
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'tenantId': tenantId,
-      'tableId': tableId,
-      'tableName': tableName,
-      'customerName': customerName,
-      'customerPhone': customerPhone,
-      'items': items.map((item) => item.toMap()).toList(),
-      'subtotal': subtotal,
-      'tax': tax,
-      'total': total,
-      'status': status.toString().split('.').last,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
-      'paymentMethod': paymentMethod,
-      'paymentStatus': paymentStatus,
-      'notes': notes,
-      if (cancellationReason != null) 'cancellationReason': cancellationReason,
-    };
-  }
-}
+import 'package:audioplayers/audioplayers.dart';
+import './activity_provider.dart';
+import '../../models/activity_log_model.dart';
+import '../../models/order.dart' as model; // Imported the shared model
+import './admin_auth_provider.dart';
+import '../../services/menu_service.dart';
+import '../../services/inventory_service.dart';
+import '../../models/tenant_model.dart';
 
 class OrdersProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Order> _orders = [];
+  List<model.Order> _orders = [];
   bool _isLoading = false;
   String? _tenantId;
   String? _error;
+  Map<String, dynamic> _tenantSettings = {};
+  AdminAuthProvider? _auth;
+  ActivityProvider? _activity;
   StreamSubscription<QuerySnapshot>? _ordersSubscription;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  DateTime? _lastOrderTime;
+  bool _isFirstLoad = true;
   final Map<String, StreamSubscription> _orderSubscriptions = {};
+  final Map<String, Timer> _prepTimers = {};
+  model.Order? _latestNewOrder;
+  model.Order? get latestNewOrder => _latestNewOrder;
+
+  void clearLatestNewOrder() {
+    _latestNewOrder = null;
+    notifyListeners();
+  }
   
   // Firestore collections
   CollectionReference get _ordersCollection => _firestore.collection('orders');
@@ -198,14 +41,32 @@ class OrdersProvider with ChangeNotifier {
   }
 
   // Getters
-  List<Order> get orders => _orders;
+  List<model.Order> get orders {
+    // Return only active orders based on strict flow: ORDERED, PREPARING, READY, SERVED
+    var filtered = _orders.where((o) => 
+      o.status == model.OrderStatus.pending ||
+      o.status == model.OrderStatus.preparing ||
+      o.status == model.OrderStatus.ready ||
+      o.status == model.OrderStatus.served
+    ).toList();
+
+    if (_auth?.isCaptain == true) {
+      if (_auth!.assignedTables.isNotEmpty) {
+        filtered = filtered.where((o) => _auth!.assignedTables.contains(o.tableId)).toList();
+      }
+    }
+    return filtered;
+  }
+
+  List<model.Order> get allOrders => _orders;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String? get tenantId => _tenantId;
+  Map<String, dynamic> get tenantSettings => _tenantSettings;
 
-  // Initialize with tenant ID
-  void initialize(String tenantId) {
-    if (_tenantId == tenantId) return; // Already initialized with this tenant
+  // Initialize with tenant ID and optional logging
+  void initialize(String tenantId, {AdminAuthProvider? auth, ActivityProvider? activity}) {
+    if (_tenantId == tenantId && _auth == auth && _activity == activity) return; 
     
     // Clean up existing subscriptions
     _ordersSubscription?.cancel();
@@ -215,11 +76,27 @@ class OrdersProvider with ChangeNotifier {
     _orderSubscriptions.clear();
     
     _tenantId = tenantId;
+    _auth = auth;
+    _activity = activity;
     _isLoading = true;
     _orders = [];
     notifyListeners();
     
+    _fetchTenantSettings();
     _listenToOrders();
+  }
+
+  Future<void> _fetchTenantSettings() async {
+    if (_tenantId == null) return;
+    try {
+      final doc = await _firestore.collection('tenants').doc(_tenantId).get();
+      if (doc.exists) {
+        _tenantSettings = doc.data()?['settings'] ?? {};
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching tenant settings: $e');
+    }
   }
 
   void _listenToOrders() {
@@ -233,54 +110,111 @@ class OrdersProvider with ChangeNotifier {
         return;
       }
       
-      debugPrint('🔥 OrdersProvider: Listening to orders for tenant $_tenantId');
-      debugPrint('🔥 OrdersProvider: Collection path: ${_tenantOrdersCollection.path}');
+      debugPrint('🔥 OrdersProvider: Setting up stream for tenant: $_tenantId');
 
-      // Listen to tenant's orders subcollection
+      // REMOVED orderBy('createdAt') to avoid silent failure if index is missing
       _ordersSubscription = _tenantOrdersCollection
-          .orderBy('createdAt', descending: true)
           .snapshots(includeMetadataChanges: true)
           .listen(
         (snapshot) async {
           try {
-            if (snapshot.metadata.isFromCache) {
-              debugPrint('Using cached orders data');
-            }
+            debugPrint('📊 OrdersProvider: Received ${snapshot.docs.length} order documents');
+            final orders = <model.Order>[];
+            bool shouldAlert = false;
 
-            debugPrint('🔥 OrdersProvider: Received ${snapshot.docs.length} order documents');
-
-            // Process new orders
-            final orders = <Order>[];
             for (var doc in snapshot.docs) {
               try {
-                final orderData = doc.data() as Map<String, dynamic>;
-                debugPrint('🔥 OrdersProvider: Processing order ${doc.id}');
-                final order = Order.fromFirestore(doc);
+                // debugPrint('  - Processing order doc: ${doc.id}');
+                final order = model.Order.fromFirestore(doc);
                 orders.add(order);
+
+                // Find if we already track this order for notifications
+                final existingOrder = _orders.firstWhere(
+                  (o) => o.id == order.id, 
+                  orElse: () => model.Order(id: '', tenantId: '', items: [], subtotal: 0, tax: 0, total: 0, status: model.OrderStatus.pending, createdAt: DateTime.now())
+                );
+                
+                if (!_isFirstLoad) {
+                  if (existingOrder.id.isEmpty) {
+                    shouldAlert = true;
+                    _latestNewOrder = order;
+                    print('🔔 New Order Alert: ${order.id}');
+                  } else {
+                    if (order.items.length > existingOrder.items.length) {
+                      shouldAlert = true;
+                      _latestNewOrder = order;
+                      print('🔔 Add-on Item Alert for Order: ${order.id}');
+                    }
+                    if (order.chefNote != existingOrder.chefNote && order.chefNote != null && order.chefNote!.isNotEmpty) {
+                      shouldAlert = true;
+                      _latestNewOrder = order;
+                      print('🔔 Chef Note Alert for Order: ${order.id}');
+                    }
+                  }
+                }
               } catch (e) {
-                debugPrint('Error parsing order ${doc.id}: $e');
+                debugPrint('❌ Error parsing order ${doc.id}: $e');
+                // debugPrint('    Data: ${doc.data()}');
               }
             }
 
-            debugPrint('🔥 OrdersProvider: Parsed ${orders.length} orders successfully');
+            // Sort by createdAt in memory
+            orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+            if (shouldAlert) {
+              _playNotificationSound();
+            }
+
+            _isFirstLoad = false;
             _orders = orders;
-            // _setupOrderSubscriptions(_orders); // Removed redundant subscriptions
             _isLoading = false;
             _error = null;
+            debugPrint('📊 OrdersProvider: Successfully loaded ${orders.length} orders');
             notifyListeners();
           } catch (e) {
             _handleError('Error processing orders: $e');
           }
         },
-        onError: (e) => _handleError(e.toString()), // Fixed error callback signature
+        onError: (e) {
+          debugPrint('❌ OrdersProvider Stream Error: $e');
+          _handleError(e.toString());
+        },
         cancelOnError: false,
       );
     } catch (e) {
       _handleError('Error setting up orders listener: $e');
     }
   }
-  
-  // Removed _setupOrderSubscriptions method as it was causing issues and redundant reads
+
+  void _handleAutoTransitions(List<model.Order> orders) {
+    for (final order in orders) {
+      // Automatic Preparing -> Ready transition after prep time
+      if (order.status == model.OrderStatus.preparing) {
+        _scheduleReadyTransition(order);
+      } else {
+        // Cancel existing timer if status changed away from preparing
+        _prepTimers[order.id]?.cancel();
+        _prepTimers.remove(order.id);
+      }
+    }
+  }
+
+  void _scheduleReadyTransition(model.Order order) {
+    if (_prepTimers.containsKey(order.id)) return;
+
+    final now = DateTime.now();
+    final readyAt = order.createdAt.add(Duration(minutes: order.estimatedWaitTime));
+    final remainingMillis = readyAt.difference(now).inMilliseconds;
+
+    if (remainingMillis <= 0) {
+      updateOrderStatus(order.id, model.OrderStatus.ready, isSystemAction: true);
+    } else {
+      _prepTimers[order.id] = Timer(Duration(milliseconds: remainingMillis), () {
+        updateOrderStatus(order.id, model.OrderStatus.ready, isSystemAction: true);
+        _prepTimers.remove(order.id);
+      });
+    }
+  }
 
   void _handleError(String message) {
     debugPrint(message);
@@ -289,10 +223,24 @@ class OrdersProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
+  Future<void> _playNotificationSound() async {
+    try {
+      // Premium notification sound
+      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
+    } catch (e) {
+      debugPrint('Error playing sound: $e');
+    }
+  }
+
+  Future<void> updateOrderStatus(String orderId, model.OrderStatus newStatus, {bool isSystemAction = false}) async {
     try {
       if (_tenantId == null) {
         throw Exception('Tenant ID not set');
+      }
+
+      // 1. COMPLETED status can only be set via payment callback or Mark as Paid (Cash)
+      if (newStatus == model.OrderStatus.completed && !isSystemAction) {
+        throw Exception('COMPLETED status is system-driven and cannot be set manually.');
       }
 
       // Update in tenant's orders subcollection
@@ -301,17 +249,162 @@ class OrdersProvider with ChangeNotifier {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // Also update in the main orders collection - REMOVED (Legacy)
-      // await _ordersCollection.doc(orderId).update({
-      //   'status': newStatus.toString().split('.').last,
-      //   'updatedAt': FieldValue.serverTimestamp(),
-      // });
-
       debugPrint('Order $orderId status updated to $newStatus');
+
+      // 2. Auto-release table if status becomes COMPLETED
+      if (newStatus == model.OrderStatus.completed) {
+        final order = _orders.firstWhere((o) => o.id == orderId);
+        if (order.tableId != null) {
+          debugPrint('🔓 Order $orderId COMPLETED. Auto-releasing table ${order.tableId}');
+          await _firestore.collection('tenants').doc(_tenantId).collection('tables').doc(order.tableId).update({
+            'status': 'available',
+            'isAvailable': true,
+            'isOccupied': false,
+            'currentSessionId': null,
+            'occupiedAt': null,
+          });
+        }
+      }
+
+      // 3. Auto-deduct inventory if status becomes PREPARING (Fired to kitchen)
+      if (newStatus == model.OrderStatus.preparing) {
+        _deductInventoryForOrder(orderId);
+      }
+
+      // Log activity
+      if (_auth != null && _activity != null) {
+        final order = _orders.firstWhere((o) => o.id == orderId);
+        _activity!.logAction(
+          action: 'Order Status Updated',
+          description: 'Order #${orderId.substring(0, 8)} status changed to ${newStatus.displayName} for ${order.tableName ?? 'Unknown table'}',
+          actorId: _auth!.user?.uid ?? 'demo',
+          actorName: _auth!.role == 'kitchen' ? 'Kitchen Staff' : 'Admin User',
+          actorRole: _auth!.role ?? 'admin',
+          type: ActivityType.orderStatusUpdate,
+          tenantId: _tenantId!,
+          metadata: {
+            'orderId': orderId,
+            'status': newStatus.name,
+            'table': order.tableName,
+          },
+        );
+      }
     } catch (e) {
       debugPrint('Error updating order status: $e');
       _handleError('Failed to update order status: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _deductInventoryForOrder(String orderId) async {
+    try {
+      final order = _orders.firstWhere((o) => o.id == orderId);
+      if (_tenantId == null) return;
+
+      final menuService = MenuService();
+      final inventoryService = InventoryService();
+      
+      final menuItems = await menuService.getMenuItems(_tenantId!);
+      
+      await inventoryService.deductStockForOrder(
+        tenantId: _tenantId!,
+        orderId: orderId,
+        orderItems: order.items,
+        menuDefinitions: menuItems,
+        performedBy: _auth?.userName ?? 'System',
+      );
+      
+      debugPrint('✅ Inventory deducted for order $orderId');
+    } catch (e) {
+      debugPrint('❌ Failed to deduct inventory for order $orderId: $e');
+    }
+  }
+
+  Future<void> markTableAsPaid(String tableId) async {
+    if (_tenantId == null) return;
+    
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // Implement atomic settlement logic directly in provider to reuse _firestore and auth
+      await _firestore.runTransaction((transaction) async {
+        final ordersQuery = await _firestore
+            .collection('tenants')
+            .doc(_tenantId)
+            .collection('orders')
+            .where('tableId', isEqualTo: tableId)
+            .where('status', whereNotIn: [
+              model.OrderStatus.completed.name,
+              model.OrderStatus.cancelled.name
+            ])
+            .get();
+
+        for (var doc in ordersQuery.docs) {
+          transaction.update(doc.reference, {
+            'status': model.OrderStatus.completed.name,
+            'paymentStatus': model.PaymentStatus.paid.name,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'closedAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        final tableRef = _firestore
+            .collection('tenants')
+            .doc(_tenantId)
+            .collection('tables')
+            .doc(tableId);
+        
+        transaction.update(tableRef, {
+          'status': 'available',
+          'isAvailable': true,
+          'isOccupied': false,
+          'currentSessionId': null,
+          'occupiedAt': null,
+          'lastReleasedAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      // Log activity
+      if (_auth != null && _activity != null) {
+        _activity!.logAction(
+          action: 'Table Settled',
+          description: 'All orders for Table $tableId marked as Paid & Table Vacated',
+          actorId: _auth!.user?.uid ?? 'demo',
+          actorName: _auth!.user?.email ?? 'Unknown',
+          actorRole: _auth!.role ?? 'admin',
+          type: ActivityType.payment,
+          tenantId: _tenantId!,
+          metadata: {'tableId': tableId, 'method': 'Cash'},
+        );
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _handleError('Failed to settle table: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> markAsPaid(String orderId) async {
+    // This is a system action (manual cash payment confirmation)
+    await updateOrderStatus(orderId, model.OrderStatus.completed, isSystemAction: true);
+    
+    // Log activity
+    if (_auth != null && _activity != null) {
+       final order = _orders.firstWhere((o) => o.id == orderId);
+       _activity!.logAction(
+        action: 'Order Paid',
+        description: 'Order #${orderId.substring(0, 8)} marked as Paid (Cash)',
+        actorId: _auth!.user?.uid ?? 'demo',
+        actorName: _auth!.user?.email ?? 'Unknown',
+        actorRole: _auth!.role ?? 'admin',
+        type: ActivityType.payment,
+        tenantId: _tenantId!,
+        metadata: {'orderId': orderId, 'total': order.total, 'method': 'Cash'},
+      );
     }
   }
 
@@ -324,7 +417,7 @@ class OrdersProvider with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      await updateOrderStatus(orderId, OrderStatus.cancelled);
+      await updateOrderStatus(orderId, model.OrderStatus.cancelled);
       
       // Update cancellation reason if provided
       if (reason.isNotEmpty) {
@@ -344,6 +437,25 @@ class OrdersProvider with ChangeNotifier {
       }
       
       debugPrint('Order $orderId cancelled with reason: $reason');
+
+      // Log activity
+      if (_auth != null && _activity != null) {
+        final order = _orders.firstWhere((o) => o.id == orderId);
+        _activity!.logAction(
+          action: 'Order Cancelled',
+          description: 'Order #${orderId.substring(0, 8)} was cancelled${reason.isNotEmpty ? ' ($reason)' : ''}',
+          actorId: _auth!.user?.uid ?? 'demo',
+          actorName: _auth!.role == 'kitchen' ? 'Kitchen Staff' : 'Admin User',
+          actorRole: _auth!.role ?? 'admin',
+          type: ActivityType.orderCancel,
+          tenantId: _tenantId!,
+          metadata: {
+            'orderId': orderId,
+            'reason': reason,
+            'table': order.tableName,
+          },
+        );
+      }
     } catch (e) {
       debugPrint('Error cancelling order: $e');
       _handleError('Failed to cancel order: $e');
@@ -354,14 +466,301 @@ class OrdersProvider with ChangeNotifier {
     }
   }
 
+  Future<void> fireOrder(String orderId) async {
+    await updateOrderStatus(orderId, model.OrderStatus.preparing);
+    
+    // Log activity
+    if (_auth != null && _activity != null) {
+      final order = _orders.firstWhere((o) => o.id == orderId);
+      _activity!.logAction(
+        action: 'Order Fired',
+        description: 'Order #${orderId.substring(0, 8)} for ${order.tableName ?? 'Unknown'} was fired to the kitchen',
+        actorId: _auth!.user?.uid ?? 'demo',
+        actorName: _auth!.user?.email ?? 'Unknown',
+        actorRole: _auth!.role ?? 'captain',
+        type: ActivityType.orderStatusUpdate,
+        tenantId: _tenantId!,
+        metadata: {'orderId': orderId, 'table': order.tableName},
+      );
+    }
+  }
+
+  Future<void> addOrderItem(String orderId, model.OrderItem item) async {
+    final order = _orders.firstWhere((o) => o.id == orderId);
+    // Allow adding items at any stage (except cancelled/completed maybe? for now allow all active)
+    if (order.status == model.OrderStatus.cancelled || order.status == model.OrderStatus.completed) {
+       throw Exception('Cannot add items to completed/cancelled orders');
+    }
+    // if (order.status != OrderStatus.pending) {
+    //   throw Exception('Cannot add items after kitchen acceptance');
+    // }
+
+    final newItems = List<model.OrderItem>.from(order.items)..add(item);
+    await _updateOrderItems(orderId, newItems);
+
+    // Log activity
+    _logItemAction('Item Added', 'Added ${item.quantity}x ${item.name} to order #${orderId.substring(0, 8)}', orderId, ActivityType.orderItemAdd, {'item': item.name, 'qty': item.quantity});
+  }
+
+  Future<void> updateOrderItem(String orderId, model.OrderItem updatedItem) async {
+    final order = _orders.firstWhere((o) => o.id == orderId);
+    if (order.status != model.OrderStatus.pending) {
+      throw Exception('Cannot update items after kitchen acceptance');
+    }
+
+    final index = order.items.indexWhere((i) => i.id == updatedItem.id);
+    if (index == -1) throw Exception('Item not found');
+
+    final newItems = List<model.OrderItem>.from(order.items);
+    newItems[index] = updatedItem;
+    await _updateOrderItems(orderId, newItems);
+
+    // Log activity
+    _logItemAction('Item Updated', 'Updated ${updatedItem.name} in order #${orderId.substring(0, 8)}', orderId, ActivityType.orderItemUpdate, {'item': updatedItem.name});
+  }
+
+  Future<void> removeOrderItem(String orderId, String itemId, {bool supervisorApproved = false}) async {
+    final order = _orders.firstWhere((o) => o.id == orderId);
+    if (order.status != model.OrderStatus.pending) {
+      throw Exception('Cannot remove items after kitchen acceptance');
+    }
+
+    if (_auth?.isCaptain == true) {
+      final captainPerms = _tenantSettings['captainPermissions'] ?? {};
+      final canDelete = captainPerms['canDeleteItems'] ?? true;
+      final requiresApproval = captainPerms['requiresApproval'] ?? false;
+
+      if (!canDelete) {
+        throw Exception('You do not have permission to delete items');
+      }
+
+      if (requiresApproval && !supervisorApproved) {
+        throw Exception('Supervisor approval required for deletion');
+      }
+    }
+
+    final item = order.items.firstWhere((i) => i.id == itemId);
+    final newItems = order.items.where((i) => i.id != itemId).toList();
+    
+    await _updateOrderItems(orderId, newItems);
+
+    // Log activity
+    _logItemAction('Item Removed', 'Removed ${item.name} from order #${orderId.substring(0, 8)}${supervisorApproved ? ' (Supervisor Approved)' : ''}', orderId, ActivityType.orderItemDelete, {'item': item.name, 'approved': supervisorApproved});
+  }
+
+  Future<void> addItemNote(String orderId, String itemId, String note) async {
+    final order = _orders.firstWhere((o) => o.id == orderId);
+    final index = order.items.indexWhere((i) => i.id == itemId);
+    if (index == -1) throw Exception('Item not found');
+
+    final updatedItem = order.items[index].copyWith(notes: note);
+    final newItems = List<model.OrderItem>.from(order.items);
+    newItems[index] = updatedItem;
+
+    await _updateOrderItems(orderId, newItems);
+  }
+
+  /// 4️⃣ Item-level status control (P0)
+  Future<void> updateOrderItemStatus(String orderId, String itemId, model.OrderItemStatus newStatus) async {
+    final order = _orders.firstWhere((o) => o.id == orderId);
+    final index = order.items.indexWhere((i) => i.id == itemId);
+    if (index == -1) throw Exception('Item not found');
+
+    final updatedItem = order.items[index].copyWith(
+      status: newStatus,
+      servedAt: newStatus == model.OrderItemStatus.served ? DateTime.now() : order.items[index].servedAt,
+    );
+    final newItems = List<model.OrderItem>.from(order.items);
+    newItems[index] = updatedItem;
+
+    await _updateOrderItems(orderId, newItems);
+
+    // Log activity
+    _logItemAction(
+      'Item Status Updated', 
+      'Marked ${updatedItem.name} as ${newStatus.displayName} in order #${orderId.substring(0, 8)}', 
+      orderId, 
+      ActivityType.orderItemStatusUpdate, 
+      {'item': updatedItem.name, 'status': newStatus.name}
+    );
+  }
+
+  Future<void> markItemAsServed(String orderId, String itemId) async {
+    await updateOrderItemStatus(orderId, itemId, model.OrderItemStatus.served);
+  }
+
+  Future<void> _updateOrderItems(String orderId, List<model.OrderItem> items) async {
+    final subtotal = items.fold<double>(0, (sum, item) => sum + (item.price * item.quantity));
+    final order = _orders.firstWhere((o) => o.id == orderId);
+    final taxRate = (order.tax / order.subtotal);
+    final tax = subtotal * taxRate;
+    final total = subtotal + tax;
+
+    // Derive top-level status
+    final tempOrder = order.copyWith(items: items);
+    final newStatus = tempOrder.derivedStatus;
+
+    await _tenantOrdersCollection.doc(orderId).update({
+      'items': items.map((i) => i.toMap()).toList(),
+      'subtotal': subtotal,
+      'tax': tax,
+      'total': total,
+      'status': newStatus.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  void _logItemAction(String action, String description, String orderId, ActivityType type, Map<String, dynamic> metadata) {
+    if (_auth != null && _activity != null) {
+      _activity!.logAction(
+        action: action,
+        description: description,
+        actorId: _auth!.user?.uid ?? 'demo',
+        actorName: _auth!.user?.email ?? 'Unknown',
+        actorRole: _auth!.role ?? 'captain',
+        type: type,
+        tenantId: _tenantId!,
+        metadata: {...metadata, 'orderId': orderId},
+      );
+    }
+  }
+
+  Future<void> mergeTableOrders(String tableId) async {
+    final activeOrders = _orders.where((o) => 
+      o.tableId == tableId && 
+      o.status != model.OrderStatus.completed && 
+      o.status != model.OrderStatus.cancelled
+    ).toList();
+
+    if (activeOrders.length <= 1) return;
+
+    print('🚑 Auto-Merging ${activeOrders.length} orders for table $tableId');
+    
+    // Sort so we merge into the OLDEST order to preserve history
+    activeOrders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final baseOrder = activeOrders.first;
+    final otherOrders = activeOrders.sublist(1);
+
+    List<model.OrderItem> mergedItems = List.from(baseOrder.items);
+    
+    for (final other in otherOrders) {
+      for (final newItem in other.items) {
+        final existingItemIndex = mergedItems.indexWhere((i) => i.id == newItem.id);
+        if (existingItemIndex != -1) {
+          final oldItem = mergedItems[existingItemIndex];
+          mergedItems[existingItemIndex] = oldItem.copyWith(
+            quantity: oldItem.quantity + newItem.quantity,
+          );
+        } else {
+          mergedItems.add(newItem);
+        }
+      }
+    }
+
+    // Recalculate totals
+    final subtotal = mergedItems.fold<double>(0, (sum, item) => sum + (item.price * item.quantity));
+    final taxRate = baseOrder.subtotal > 0 ? (baseOrder.tax / baseOrder.subtotal) : 0.05;
+    final tax = subtotal * taxRate;
+    final total = subtotal + tax;
+
+    // Update base order
+    await _tenantOrdersCollection.doc(baseOrder.id).update({
+      'items': mergedItems.map((i) => i.toMap()).toList(),
+      'subtotal': subtotal,
+      'tax': tax,
+      'total': total,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // Delete/Cancel other orders
+    for (final other in otherOrders) {
+      // Option 1: Delete
+      await _tenantOrdersCollection.doc(other.id).delete();
+      // Option 2: Mark as cancelled? No, delete is cleaner for merging.
+    }
+  }
+
+  Future<String> createOrder(model.Order order) async {
+    try {
+      // FIRST: Ensure any existing mess is cleaned up
+      if (order.tableId != null) {
+        await mergeTableOrders(order.tableId!);
+      }
+
+      // NOW check for the (now singular) existing running order
+      if (order.tableId != null) {
+        final existingOrderIndex = _orders.indexWhere((o) => 
+          o.tableId == order.tableId && 
+          o.status != model.OrderStatus.completed && 
+          o.status != model.OrderStatus.cancelled
+        );
+
+        if (existingOrderIndex != -1) {
+          final existingOrder = _orders[existingOrderIndex];
+          print('🔄 OrdersProvider: Appending to existing order: ${existingOrder.id} for table ${order.tableId}');
+
+          // Merge items
+          List<model.OrderItem> mergedItems = List.from(existingOrder.items);
+          for (var newItem in order.items) {
+            final existingItemIndex = mergedItems.indexWhere((i) => i.id == newItem.id);
+            if (existingItemIndex != -1) {
+              final oldItem = mergedItems[existingItemIndex];
+              mergedItems[existingItemIndex] = oldItem.copyWith(
+                quantity: oldItem.quantity + newItem.quantity,
+              );
+            } else {
+              mergedItems.add(newItem);
+            }
+          }
+
+          // Recalculate totals
+          final subtotal = mergedItems.fold<double>(0, (sum, item) => sum + (item.price * item.quantity));
+          final taxRate = existingOrder.subtotal > 0 ? (existingOrder.tax / existingOrder.subtotal) : 0.05;
+          final tax = subtotal * taxRate;
+          final total = subtotal + tax;
+
+          await _tenantOrdersCollection.doc(existingOrder.id).update({
+            'items': mergedItems.map((i) => i.toMap()).toList(),
+            'subtotal': subtotal,
+            'tax': tax,
+            'total': total,
+            'status': model.OrderStatus.pending.name, // Reset to pending
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          return existingOrder.id;
+        }
+      }
+
+      // NO EXISTING ORDER FOUND: Create new doc
+      final docRef = await _tenantOrdersCollection.add(order.toMap());
+      // Log activity
+      if (_auth != null && _activity != null) {
+        _activity!.logAction(
+          action: 'Order Created',
+          description: 'New order created for ${order.tableName}',
+          actorId: _auth!.user?.uid ?? 'demo',
+          actorName: _auth!.user?.email ?? 'Unknown',
+          actorRole: _auth!.role ?? 'captain',
+          type: ActivityType.orderCreate,
+          tenantId: _tenantId!,
+          metadata: {'orderId': docRef.id, 'table': order.tableName},
+        );
+      }
+      return docRef.id;
+    } catch (e) {
+      debugPrint('Error creating order: $e');
+      rethrow;
+    }
+  }
+
   @override
   void dispose() {
-    _ordersSubscription?.cancel();
-    // Cancel all order subscriptions
-    for (var subscription in _orderSubscriptions.values) {
-      subscription.cancel();
+    // Cancel all timers
+    for (var timer in _prepTimers.values) {
+      timer.cancel();
     }
-    _orderSubscriptions.clear();
+    _prepTimers.clear();
     super.dispose();
   }
 }

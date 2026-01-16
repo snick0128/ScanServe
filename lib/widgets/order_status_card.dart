@@ -66,9 +66,6 @@ class OrderStatusCard extends StatelessWidget {
       case OrderStatus.pending:
         statusColor = Colors.orange;
         break;
-      case OrderStatus.confirmed:
-        statusColor = Colors.blue.shade300;
-        break;
       case OrderStatus.preparing:
         statusColor = Colors.blue;
         break;
@@ -76,22 +73,23 @@ class OrderStatusCard extends StatelessWidget {
         statusColor = Colors.green;
         break;
       case OrderStatus.served:
-        statusColor = Colors.green.shade700;
-        break;
       case OrderStatus.completed:
-        statusColor = Colors.grey;
+        statusColor = Colors.teal;
+        break;
+      case OrderStatus.cancelled:
+        statusColor = Colors.red;
         break;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.1),
+        color: statusColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: statusColor),
       ),
       child: Text(
-        status.toString().split('.').last.toUpperCase(),
+        status.displayName.toUpperCase(),
         style: TextStyle(
           color: statusColor,
           fontWeight: FontWeight.bold,
@@ -105,21 +103,17 @@ class OrderStatusCard extends StatelessWidget {
     final double progress;
     switch (status) {
       case OrderStatus.pending:
-        progress = 0.2;
-        break;
-      case OrderStatus.confirmed:
-        progress = 0.35;
+        progress = 0.25;
         break;
       case OrderStatus.preparing:
         progress = 0.5;
         break;
       case OrderStatus.ready:
-        progress = 0.8;
+        progress = 0.75;
         break;
       case OrderStatus.served:
-        progress = 0.9;
-        break;
       case OrderStatus.completed:
+      case OrderStatus.cancelled:
         progress = 1.0;
         break;
     }
@@ -161,23 +155,24 @@ class OrderStatusCard extends StatelessWidget {
   }
 
   int _getStatusIndex(OrderStatus status) {
-    return OrderStatus.values.indexOf(status);
+    // cancelled treated as last for ordering in linear progress if needed, 
+    // but typically cancelled hides this view or shows error.
+    return OrderStatus.values.indexOf(status); 
   }
 
   Color _getStatusColor(OrderStatus status) {
     switch (status) {
       case OrderStatus.pending:
         return Colors.orange;
-      case OrderStatus.confirmed:
-        return Colors.blue.shade300;
       case OrderStatus.preparing:
         return Colors.blue;
       case OrderStatus.ready:
         return Colors.green;
       case OrderStatus.served:
-        return Colors.green.shade700;
       case OrderStatus.completed:
-        return Colors.grey;
+        return Colors.teal;
+      case OrderStatus.cancelled:
+        return Colors.red;
     }
   }
 
@@ -185,16 +180,15 @@ class OrderStatusCard extends StatelessWidget {
     switch (status) {
       case OrderStatus.pending:
         return 'Your order has been received and is waiting to be processed.';
-      case OrderStatus.confirmed:
-        return 'Your order has been confirmed and will be prepared soon.';
       case OrderStatus.preparing:
         return 'Your order is being prepared. It will be ready soon!';
       case OrderStatus.ready:
-        return 'Your order is ready for pickup/delivery!';
+        return 'Your order is ready to be served! 🍽️';
       case OrderStatus.served:
-        return 'Your order has been served. Enjoy your meal!';
       case OrderStatus.completed:
-        return 'Order completed. Thank you for your purchase!';
+        return 'Thank you! Your order has been completed.';
+      case OrderStatus.cancelled:
+        return 'Order cancelled.';
     }
   }
 }

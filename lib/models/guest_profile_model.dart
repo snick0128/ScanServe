@@ -10,12 +10,16 @@ class GuestProfile {
   final String name;
   final String? phone;
   final DateTime lastUpdated;
+  final int visitCount;
+  final List<String> orderIds;
 
   GuestProfile({
     required this.guestId,
     required this.name,
     this.phone,
     required this.lastUpdated,
+    this.visitCount = 1,
+    this.orderIds = const [],
   });
 
   /// Create a new guest profile
@@ -29,29 +33,35 @@ class GuestProfile {
       name: name,
       phone: phone,
       lastUpdated: DateTime.now(),
+      visitCount: 1,
+      orderIds: [],
     );
   }
 
-  /// Convert to JSON for local storage
+  /// Convert to JSON for storage
   Map<String, dynamic> toJson() {
     return {
       'guestId': guestId,
       'name': name,
       'phone': phone,
       'lastUpdated': lastUpdated.toIso8601String(),
+      'visitCount': visitCount,
+      'orderIds': orderIds,
     };
   }
 
-  /// Create from JSON stored in SharedPreferences
+  /// Create from JSON
   factory GuestProfile.fromJson(Map<String, dynamic> json) {
     return GuestProfile(
       guestId: json['guestId'] as String,
       name: json['name'] as String,
       phone: json['phone'] as String?,
       lastUpdated: DateTime.parse(json['lastUpdated'] as String),
+      visitCount: json['visitCount'] ?? 1,
+      orderIds: List<String>.from(json['orderIds'] ?? []),
     );
   }
-
+  
   /// Convert to JSON string for storage
   String toJsonString() {
     return jsonEncode(toJson());
@@ -68,18 +78,22 @@ class GuestProfile {
     String? name,
     String? phone,
     DateTime? lastUpdated,
+    int? visitCount,
+    List<String>? orderIds,
   }) {
     return GuestProfile(
       guestId: guestId ?? this.guestId,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       lastUpdated: lastUpdated ?? DateTime.now(),
+      visitCount: visitCount ?? this.visitCount,
+      orderIds: orderIds ?? this.orderIds,
     );
   }
 
   @override
   String toString() {
-    return 'GuestProfile(guestId: $guestId, name: $name, phone: $phone, lastUpdated: $lastUpdated)';
+    return 'GuestProfile(guestId: $guestId, name: $name, phone: $phone, visitCount: $visitCount, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -88,11 +102,12 @@ class GuestProfile {
     return other is GuestProfile &&
         other.guestId == guestId &&
         other.name == name &&
-        other.phone == phone;
+        other.phone == phone &&
+        other.visitCount == visitCount;
   }
 
   @override
   int get hashCode {
-    return guestId.hashCode ^ name.hashCode ^ phone.hashCode;
+    return guestId.hashCode ^ name.hashCode ^ phone.hashCode ^ visitCount.hashCode;
   }
 }

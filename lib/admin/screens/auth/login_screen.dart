@@ -36,16 +36,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         _passwordController.text.trim(),
       );
 
-      if (!mounted) return;
-
-      if (authProvider.isAdmin && authProvider.tenantId != null) {
-        Navigator.of(context).pushReplacementNamed(
-          '/dashboard',
-          arguments: {'tenantId': authProvider.tenantId},
-        );
-      } else {
-        throw 'Access denied. Admin privileges required.';
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

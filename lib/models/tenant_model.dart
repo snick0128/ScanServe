@@ -1,9 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'inventory_item.dart';
+
 class Tenant {
   final String id;
   final String name;
   final String description;
   final List<Category> categories;
   final bool isVegOnly;
+  final Map<String, dynamic> settings;
 
   Tenant({
     required this.id,
@@ -11,6 +15,7 @@ class Tenant {
     required this.description,
     required this.categories,
     this.isVegOnly = false,
+    this.settings = const {},
   });
 
   factory Tenant.fromFirestore(Map<String, dynamic> data, String id) {
@@ -24,6 +29,7 @@ class Tenant {
               .toList() ??
           [],
       isVegOnly: data['isVegOnly'] ?? false,
+      settings: data['settings'] ?? {},
     );
   }
 }
@@ -48,6 +54,12 @@ class Category {
   }
 }
 
+enum InventoryTrackingType {
+  none,
+  simple,
+  recipe
+}
+
 class MenuItem {
   final String id;
   final String name;
@@ -59,9 +71,46 @@ class MenuItem {
   late final String? itemType; // veg or nonveg
   final int stockCount;
   final bool isTracked;
+  
+  // NEW: Inventory Linkage
+  final InventoryTrackingType inventoryTrackingType;
+  final Map<String, double> inventoryIngredients; // Map of itemId to quantity per sale
 
-  bool get isVeg => itemType?.toLowerCase() == 'veg';
-  bool get isOutOfStock => isTracked && stockCount <= 0;
+  bool get isVeg {
+    if (itemType == null) return true; // Default to veg if not specified
+    final type = itemType!.toLowerCase().replaceAll('-', '').replaceAll(' ', '').trim();
+    return type != 'nonveg';
+  }
+  
+  final bool isManualAvailable;
+  
+  bool get isOutOfStock => !isManualAvailable || (isTracked && stockCount <= 0);
+
+  /// Checks if the item is available based on linked inventory
+  bool isAvailable(List<InventoryItem> inventory) {
+    // If manually marked out of stock, return false
+    if (isOutOfStock) return false;
+    
+    // If not tracking inventory, it's available
+    if (inventoryTrackingType == InventoryTrackingType.none) return true;
+
+    // Check each linked ingredient
+    for (var entry in inventoryIngredients.entries) {
+      final itemId = entry.key;
+      final qtyNeeded = entry.value;
+      
+      try {
+        final invItem = inventory.firstWhere((i) => i.id == itemId);
+        // If any key ingredient is completely out (or below needed qty), item is unavailable
+        if (invItem.currentStock < qtyNeeded) return false;
+      } catch (_) {
+        // If a linked item is missing from inventory list, assume unavailable for safety
+        return false;
+      }
+    }
+    
+    return true;
+  }
 
   MenuItem({
     required this.id,
@@ -74,15 +123,32 @@ class MenuItem {
     String? itemType,
     this.stockCount = 0,
     this.isTracked = false,
+    this.isManualAvailable = true,
+    this.inventoryTrackingType = InventoryTrackingType.none,
+    this.inventoryIngredients = const {},
   }) {
     this.itemType = itemType;
   }
 
   factory MenuItem.fromMap(Map<String, dynamic> data) {
     final itemType = data['itemType'];
-    // print(
-    //   '🔍 MenuItem.fromMap - itemType: $itemType, data keys: ${data.keys.toList()}',
-    // );
+    
+    InventoryTrackingType trackingType = InventoryTrackingType.none;
+    if (data['inventoryTrackingType'] != null) {
+      try {
+        trackingType = InventoryTrackingType.values.firstWhere(
+          (e) => e.name == data['inventoryTrackingType'],
+        );
+      } catch (_) {
+        trackingType = InventoryTrackingType.none;
+      }
+    }
+
+    final ingredientsData = data['inventoryIngredients'] as Map<String, dynamic>? ?? {};
+    final Map<String, double> ingredients = {};
+    ingredientsData.forEach((key, value) {
+      ingredients[key] = (value as num).toDouble();
+    });
 
     return MenuItem(
       id: data['id'] ?? '',
@@ -90,11 +156,14 @@ class MenuItem {
       description: data['description'] ?? '',
       price: (data['price'] ?? 0.0).toDouble(),
       imageUrl: data['image_url'],
-      category: data['category'] ?? data['Category'], // Try both cases
-      subcategory: data['subcategory'] ?? data['Subcategory'], // Try both cases
-      itemType: itemType, // veg or nonveg
+      category: data['category'] ?? data['Category'],
+      subcategory: data['subcategory'] ?? data['Subcategory'],
+      itemType: itemType,
       stockCount: data['stockCount'] ?? 0,
       isTracked: data['isTracked'] ?? false,
+      isManualAvailable: data['isManualAvailable'] ?? true,
+      inventoryTrackingType: trackingType,
+      inventoryIngredients: ingredients,
     );
   }
 
@@ -110,6 +179,9 @@ class MenuItem {
       'itemType': itemType,
       'stockCount': stockCount,
       'isTracked': isTracked,
+      'isManualAvailable': isManualAvailable,
+      'inventoryTrackingType': inventoryTrackingType.name,
+      'inventoryIngredients': inventoryIngredients,
     };
   }
 }
@@ -119,28 +191,60 @@ class RestaurantTable {
   final String name;
   final int capacity;
   final bool isAvailable;
-  final String status; // 'available', 'occupied', 'billRequested'
+  final String status; // 'vacant', 'occupied', 'billRequested', 'settled'
+  final bool isOccupied;
+  final String? currentSessionId;
   final DateTime? occupiedAt;
+  final String section; // 'AC', 'Non-AC', 'Garden', etc.
+  final int orderIndex;
 
   RestaurantTable({
     required this.id,
     required this.name,
     required this.capacity,
     this.isAvailable = true,
-    this.status = 'available',
+    this.status = 'vacant',
+    this.isOccupied = false,
+    this.currentSessionId,
     this.occupiedAt,
+    this.section = 'General',
+    this.orderIndex = 0,
   });
 
-  factory RestaurantTable.fromMap(Map<String, dynamic> data) {
+  factory RestaurantTable.fromMap(Map<String, dynamic> data, [String? docId]) {
+    DateTime? parseOccupiedAt(dynamic value) {
+      if (value == null) return null;
+      
+      // Handle Firebase Timestamp
+      if (value is Timestamp) {
+        return value.toDate();
+      }
+      
+      // Handle String (ISO8601 format)
+      if (value is String) {
+        return DateTime.parse(value);
+      }
+      
+      return null;
+    }
+
+    String parseStatus(dynamic status) {
+      final s = (status ?? 'vacant').toString().toLowerCase();
+      if (s == 'available') return 'vacant';
+      return s;
+    }
+    
     return RestaurantTable(
-      id: data['id'] ?? '',
+      id: data['id'] ?? docId ?? '',
       name: data['name'] ?? '',
       capacity: data['capacity'] ?? 4,
       isAvailable: data['isAvailable'] ?? true,
-      status: data['status'] ?? 'available',
-      occupiedAt: data['occupiedAt'] != null 
-        ? DateTime.parse(data['occupiedAt']) 
-        : null,
+      status: parseStatus(data['status']),
+      isOccupied: data['isOccupied'] ?? false,
+      currentSessionId: data['currentSessionId'],
+      occupiedAt: parseOccupiedAt(data['occupiedAt']),
+      section: data['section'] ?? 'General',
+      orderIndex: data['orderIndex'] ?? 0,
     );
   }
 
@@ -151,7 +255,11 @@ class RestaurantTable {
       'capacity': capacity,
       'isAvailable': isAvailable,
       'status': status,
-      'occupiedAt': occupiedAt?.toIso8601String(),
+      'isOccupied': isOccupied,
+      'currentSessionId': currentSessionId,
+      'occupiedAt': occupiedAt != null ? Timestamp.fromDate(occupiedAt!) : null,
+      'section': section,
+      'orderIndex': orderIndex,
     };
   }
   
@@ -168,5 +276,31 @@ class RestaurantTable {
     } else {
       return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
     }
+  }
+
+  RestaurantTable copyWith({
+    String? id,
+    String? name,
+    int? capacity,
+    bool? isAvailable,
+    String? status,
+    bool? isOccupied,
+    String? currentSessionId,
+    DateTime? occupiedAt,
+    String? section,
+    int? orderIndex,
+  }) {
+    return RestaurantTable(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      capacity: capacity ?? this.capacity,
+      isAvailable: isAvailable ?? this.isAvailable,
+      status: status ?? this.status,
+      isOccupied: isOccupied ?? this.isOccupied,
+      currentSessionId: currentSessionId ?? this.currentSessionId,
+      occupiedAt: occupiedAt ?? this.occupiedAt,
+      section: section ?? this.section,
+      orderIndex: orderIndex ?? this.orderIndex,
+    );
   }
 }

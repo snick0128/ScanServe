@@ -19,7 +19,6 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  final Map<String, String> _itemNotes = {};
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +28,7 @@ class _CartPageState extends State<CartPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
+      resizeToAvoidBottomInset: false, // Prevent the main screen from jumping when keyboard opens
       appBar: AppBar(
         title: const Text(
           'Your Order',
@@ -126,15 +126,8 @@ class _CartPageState extends State<CartPage> {
                           );
                         }
                       },
-                      itemNotes: _itemNotes,
                       onNoteUpdate: (itemId, note) {
-                        setState(() {
-                          if (note.isEmpty) {
-                            _itemNotes.remove(itemId);
-                          } else {
-                            _itemNotes[itemId] = note;
-                          }
-                        });
+                        cartController.updateNote(itemId, note);
                       },
                       isMobile: isMobile,
                       isTablet: isTablet,
@@ -144,7 +137,6 @@ class _CartPageState extends State<CartPage> {
                     subtotal: cartController.totalAmount,
                     tenantId: widget.tenantId,
                     cartController: cartController,
-                    itemNotes: _itemNotes,
                     isMobile: isMobile,
                     isTablet: isTablet,
                     isDesktop: isDesktop,
@@ -162,7 +154,6 @@ class _CartPageState extends State<CartPage> {
 class _CartItemsWithNotes extends StatelessWidget {
   final List<CartItem> items;
   final Function(CartItem, int) onUpdateQuantity;
-  final Map<String, String> itemNotes;
   final Function(String, String) onNoteUpdate;
   final bool isMobile;
   final bool isTablet;
@@ -171,7 +162,6 @@ class _CartItemsWithNotes extends StatelessWidget {
     Key? key,
     required this.items,
     required this.onUpdateQuantity,
-    required this.itemNotes,
     required this.onNoteUpdate,
     required this.isMobile,
     required this.isTablet,
@@ -179,7 +169,7 @@ class _CartItemsWithNotes extends StatelessWidget {
 
   void _showNoteBottomSheet(BuildContext context, CartItem item) {
     final itemId = item.item.id;
-    final currentNote = itemNotes[itemId] ?? '';
+    final currentNote = item.note ?? '';
     final noteController = TextEditingController(text: currentNote);
 
     showModalBottomSheet(
@@ -191,162 +181,151 @@ class _CartItemsWithNotes extends StatelessWidget {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SingleChildScrollView( // Ensure scrollable content
-            physics: const ClampingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
+                        color: Colors.deepPurple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.restaurant_menu,
+                        color: Colors.deepPurple,
+                        size: 24,
                       ),
                     ),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.deepPurple.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.restaurant_menu,
-                          color: Colors.deepPurple,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Add Chef Note',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1A1A1A),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.item.name,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Special instructions for ${item.item.name}',
-                    style: TextStyle(
-                      fontSize: isMobile ? 13 : 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: noteController,
-                    autofocus: true,
-                    maxLines: 4,
-                    maxLength: 200,
-                    decoration: InputDecoration(
-                      hintText: 'e.g., Extra spicy, no onions, well done...',
-                      hintStyle: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 15,
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF5F7FA),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: Colors.deepPurple,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: BorderSide(color: Colors.grey[300]!),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Cancel',
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Add Chef Note',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                               color: Color(0xFF1A1A1A),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            onNoteUpdate(itemId, noteController.text.trim());
-                            Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Save Note',
+                          const SizedBox(height: 4),
+                          Text(
+                            item.item.name,
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.grey[600],
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  autofocus: true,
+                  maxLines: 3,
+                  maxLength: 150,
+                  decoration: InputDecoration(
+                    hintText: 'e.g., Extra spicy, no onions, well done...',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 15,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF5F7FA),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: Colors.deepPurple,
+                        width: 2,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: Colors.grey[300]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          onNoteUpdate(itemId, noteController.text.trim());
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Save Note',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
@@ -398,7 +377,7 @@ class _CartItemsWithNotes extends StatelessWidget {
       itemBuilder: (context, index) {
         final item = items[index];
         final itemId = item.item.id;
-        final hasNote = itemNotes.containsKey(itemId);
+        final hasNote = item.note != null && item.note!.isNotEmpty;
         final imageSize = isMobile ? 70.0 : 80.0;
 
         return Container(
@@ -649,7 +628,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          itemNotes[itemId]!,
+                          item.note!,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.amber[900],
@@ -723,7 +702,6 @@ class _OrderSummary extends StatelessWidget {
   final double subtotal;
   final String tenantId;
   final CartController cartController;
-  final Map<String, String> itemNotes;
   final bool isMobile;
   final bool isTablet;
   final bool isDesktop;
@@ -733,7 +711,6 @@ class _OrderSummary extends StatelessWidget {
     required this.subtotal,
     required this.tenantId,
     required this.cartController,
-    required this.itemNotes,
     this.isMobile = false,
     this.isTablet = false,
     this.isDesktop = false,
@@ -904,7 +881,6 @@ class _OrderSummary extends StatelessWidget {
                                 'tableId':
                                     orderController.currentSession?.tableId,
                                 'requirePayment': true,
-                                'itemNotes': itemNotes,
                               },
                             );
                           },
@@ -928,7 +904,6 @@ class _OrderSummary extends StatelessWidget {
                           'orderType': orderController.currentOrderType,
                           'tableId': null,
                           'requirePayment': true,
-                          'itemNotes': itemNotes,
                         },
                       );
                     },
@@ -966,9 +941,10 @@ class _OrderSummary extends StatelessWidget {
   }
 
   String _buildNotesString() {
-    if (itemNotes.isEmpty) return 'Sent to kitchen - payment pending';
-    final notesText = itemNotes.entries
-        .map((e) => 'Item ${e.key}: ${e.value}')
+    final itemsWithNotes = cartController.items.where((i) => i.note != null && i.note!.isNotEmpty);
+    if (itemsWithNotes.isEmpty) return 'Sent to kitchen - payment pending';
+    final notesText = itemsWithNotes
+        .map((i) => 'Item ${i.item.name}: ${i.note}')
         .join('; ');
     return 'Sent to kitchen - payment pending. Chef notes: $notesText';
   }

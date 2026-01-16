@@ -72,20 +72,22 @@ class BillRequest {
   /// Create from Firestore map
   factory BillRequest.fromMap(Map<String, dynamic> map) {
     return BillRequest(
-      requestId: map['requestId'] as String,
-      tenantId: map['tenantId'] as String,
-      tableId: map['tableId'] as String?,
-      tableName: map['tableName'] as String?,
-      guestId: map['guestId'] as String,
-      customerName: map['customerName'] as String,
-      customerPhone: map['customerPhone'] as String?,
-      requestedAt: (map['requestedAt'] as Timestamp).toDate(),
+      requestId: map['requestId']?.toString() ?? '',
+      tenantId: map['tenantId']?.toString() ?? '',
+      tableId: map['tableId']?.toString(),
+      tableName: map['tableName']?.toString(),
+      guestId: map['guestId']?.toString() ?? '',
+      customerName: map['customerName']?.toString() ?? 'Guest',
+      customerPhone: map['customerPhone']?.toString(),
+      requestedAt: (map['requestedAt'] is Timestamp) 
+          ? (map['requestedAt'] as Timestamp).toDate() 
+          : DateTime.now(),
       status: BillRequestStatus.values.firstWhere(
         (e) => e.name == map['status'],
         orElse: () => BillRequestStatus.pending,
       ),
-      orderIds: List<String>.from(map['orderIds'] ?? []),
-      notes: map['notes'] as String?,
+      orderIds: map['orderIds'] != null ? List<String>.from(map['orderIds']) : [],
+      notes: map['notes']?.toString(),
     );
   }
 

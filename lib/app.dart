@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:scan_serve/views/checkout_page.dart';
 import 'package:provider/provider.dart';
 import 'package:scan_serve/controllers/cart_controller.dart';
 import 'package:scan_serve/controllers/menu_controller.dart' as app_controller;
 import 'package:scan_serve/controllers/order_controller.dart';
-import 'package:scan_serve/utils/qr_url_parser.dart';
+import 'package:scan_serve/config/app_config.dart';
 import 'package:scan_serve/views/home_page.dart';
 import 'package:scan_serve/models/order_model.dart';
 import 'controllers/auth_controller.dart';
@@ -12,7 +13,9 @@ import 'services/offline_service.dart';
 import 'services/tenant_service.dart';
 
 class App extends StatelessWidget {
-  const App({Key? key}) : super(key: key);
+  final AppConfig config;
+
+  const App({Key? key, required this.config}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -79,20 +82,38 @@ class App extends StatelessWidget {
             ),
           ),
         ),
-        home: const Initializer(),
+        home: Initializer(config: config),
+        onGenerateRoute: (settings) {
+          if (settings.name == '/checkout') {
+            final args = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (context) => CheckoutPage(
+                tenantId: args['tenantId'],
+                orderType: args['orderType'],
+                tableId: args['tableId'],
+              ),
+            );
+          }
+          return null;
+        },
       ),
     );
   }
 }
 
 class Initializer extends StatefulWidget {
-  const Initializer({Key? key}) : super(key: key);
+  final AppConfig config;
+
+  const Initializer({Key? key, required this.config}) : super(key: key);
 
   @override
   State<Initializer> createState() => _InitializerState();
 }
 
 class _InitializerState extends State<Initializer> {
+  bool _hasError = false;
+  String _errorMessage = '';
+
   @override
   void initState() {
     super.initState();
@@ -100,90 +121,120 @@ class _InitializerState extends State<Initializer> {
   }
 
   Future<void> _initialize() async {
-    print('Starting app initialization');
+    final tenantId = widget.config.tenantId;
+    final tableId = widget.config.tableId;
+    final orderType = widget.config.orderType ?? 
+        (tableId != null && tableId.isNotEmpty ? OrderType.dineIn : OrderType.parcel);
 
-    // Get the actual URL from the window location in web
-    String url = Uri.base.toString();
-    print('Current URL: $url');
+    print('🚀 Starting Init - Tenant: $tenantId, Table: $tableId, Type: $orderType');
 
-    // Parse parameters using robust parser (handles hash routing)
-    final params = QrUrlParser.parseUrl(url);
-    print('Parsed URL parameters: $params');
+    try {
+      final tenantService = TenantService();
+      final guestSession = GuestSessionService();
+      
+      // 1. Initialize Session (Guest ID)
+      final guestId = await guestSession.getOrCreateGuestId();
 
-    // Use parsed values OR fallback to defaults/demo ONLY if missing
-    // This allows testing in IDE without params, but respects actual QR codes.
-    final tenantId = params['tenantId'] ?? 'demo_tenant';
-    String? tableId = params['tableId']; // tableId is optional (e.g. for parcel)
+      // 2. Validate Tenant
+      final tenant = await tenantService.getTenantInfo(tenantId);
+      if (tenant == null) {
+        _showError('Invalid Store. Please contact staff.');
+        return;
+      }
 
-    // Verify Is Table Valid?
-    if (tableId != null && tableId.isNotEmpty) {
-       final tenantService = TenantService(); // Assuming TenantService is available or imported
-       final isValidTable = await tenantService.verifyTableExists(tenantId, tableId);
-       
-       if (!isValidTable) {
-         print('⚠️ Invalid Table ID: $tableId - Fallback to Parcel Mode');
-         tableId = null; // Reset invalid table ID
-         
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(
-               content: Text('Invalid QR: Table not found. Switching to takeaway mode.'),
-               backgroundColor: Colors.orange,
-               duration: Duration(seconds: 5),
-             ),
-           );
-         }
-       }
-    }
+      // 3. Strict Logic for Dine-in
+      if (orderType == OrderType.dineIn) {
+        if (tableId == null || tableId.isEmpty) {
+          _showError('Table number is required for Dine-in.');
+          return;
+        }
 
-    print('🚀 Initializing session - Tenant: $tenantId, Table: $tableId');
+        // Validate Table Exists
+        final tableExists = await tenantService.verifyTableExists(tenantId, tableId);
+        if (!tableExists) {
+          _showError('Invalid Table. Please contact staff.');
+          return;
+        }
 
-    final guestSession = GuestSessionService();
-    await guestSession.getOrCreateGuestId();
-    await guestSession.startSession(
-      tenantId: tenantId,
-      tableId: tableId,
-    );
+        // Lock Table / Check Active Session
+        final isLocked = await tenantService.lockTable(tenantId, tableId, guestId);
+        if (!isLocked) {
+          _showError('This table already has an active order.');
+          return;
+        }
+      }
 
-    if (tenantId != null) {
-      // Automatically determine order type based on tableId presence
-      final orderType = tableId != null && tableId.isNotEmpty 
-          ? OrderType.dineIn 
-          : OrderType.parcel;
+      // 4. Start Session
+      await guestSession.startSession(
+        tenantId: tenantId,
+        tableId: tableId,
+      );
+
+      // 5. Setup Controllers
+      if (!mounted) return;
       
       final orderController = context.read<OrderController>();
-      // Set order type first
       await orderController.setOrderType(orderType);
-      // Then set session with the tableId
       orderController.setSession(tenantId, tableId);
 
-      // Load menu items for the tenant
+      // Initialize Cart Persistence
+      final cartController = context.read<CartController>();
+      await cartController.initialize(tenantId, tableId);
+
       final menuController = context.read<app_controller.MenuController>();
       await menuController.loadMenuItems(tenantId);
+      menuController.startInventoryListener(tenantId);
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => HomePage(tenantId: tenantId)),
-      );
-    } else {
-      // Handle invalid QR code
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid QR Code'),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(
-            top: 20,
-            left: 16,
-            right: 16,
-          ),
-        ),
-      );
+      // 6. Navigate
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => HomePage(tenantId: tenantId)),
+        );
+      }
+    } catch (e) {
+      print('Initialization Error: $e');
+      _showError('Something went wrong. Please try again.');
+    }
+  }
+
+  void _showError(String message) {
+    if (mounted) {
+      setState(() {
+        _hasError = true;
+        _errorMessage = message;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_hasError) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+                const SizedBox(height: 24),
+                Text(
+                  _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Please scan a valid QR code.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

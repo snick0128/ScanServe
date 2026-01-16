@@ -96,7 +96,6 @@ class BillRequestService {
         .doc(tenantId)
         .collection('billRequests')
         .where('status', isEqualTo: BillRequestStatus.pending.name)
-        .orderBy('requestedAt', descending: false)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs

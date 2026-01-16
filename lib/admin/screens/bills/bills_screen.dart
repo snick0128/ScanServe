@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../services/bill_service.dart';
 
 class BillsScreen extends StatelessWidget {
@@ -135,21 +136,106 @@ class BillsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: () => _generateAndDownloadPdf(context, bill),
-                  icon: const Icon(Icons.download, size: 16),
-                  label: const Text('Download PDF'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    textStyle: const TextStyle(fontSize: 12),
-                  ),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => _generateAndDownloadPdf(context, bill),
+                      icon: const Icon(Icons.print, size: 16),
+                      label: const Text('Print / PDF'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => _shareToWhatsApp(context, bill),
+                      icon: const Icon(Icons.share, color: Colors.green),
+                      tooltip: 'Share on WhatsApp',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        padding: const EdgeInsets.all(8),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _shareToWhatsApp(BuildContext context, Map<String, dynamic> bill) async {
+    final phone = bill['customerPhone'];
+    final billId = bill['billId'] ?? 'Unknown';
+    final total = (bill['finalTotal'] ?? 0).toDouble();
+    final tableId = bill['tableId'] ?? 'Unknown';
+
+    String message = "Hello! Here is your bill summary from ScanServe:\n\n"
+        "Bill ID: #$billId\n"
+        "Table: $tableId\n"
+        "Total Amount: ₹${total.toStringAsFixed(2)}\n\n"
+        "Thank you for dining with us!";
+
+    if (phone == null || phone.toString().isEmpty) {
+      // Prompt for phone number if not available
+      final result = await _showPhonePrompt(context);
+      if (result != null && result.isNotEmpty) {
+        _launchWhatsApp(result, message);
+      }
+    } else {
+      _launchWhatsApp(phone.toString(), message);
+    }
+  }
+
+  Future<void> _launchWhatsApp(String phone, String message) async {
+    // Clean phone number: remove non-numeric except +
+    String cleanedPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (!cleanedPhone.startsWith('+')) {
+      // Default to India prefix if no prefix (assuming common target)
+      // You can adjust this or make it configurable
+      if (cleanedPhone.length == 10) {
+        cleanedPhone = '91$cleanedPhone';
+      }
+    }
+
+    final url = "https://wa.me/$cleanedPhone?text=${Uri.encodeComponent(message)}";
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      debugPrint('Could not launch $url');
+    }
+  }
+
+  Future<String?> _showPhonePrompt(BuildContext context) async {
+    String phoneNumber = '';
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter WhatsApp Number'),
+        content: TextField(
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(
+            hintText: 'e.g., 919876543210',
+            labelText: 'Phone Number with country code',
+          ),
+          onChanged: (value) => phoneNumber = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, phoneNumber),
+            child: const Text('Share'),
+          ),
+        ],
       ),
     );
   }
@@ -291,7 +377,10 @@ class BillsScreen extends StatelessWidget {
         ),
       );
 
-      await Printing.sharePdf(bytes: await pdf.save(), filename: 'bill_$billId.pdf');
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'bill_$billId',
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

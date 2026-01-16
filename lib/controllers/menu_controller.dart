@@ -1,15 +1,21 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/tenant_model.dart';
+import '../models/inventory_item.dart';
 import '../services/menu_service.dart';
+import '../services/inventory_service.dart';
 
 class MenuController extends ChangeNotifier {
   final MenuService _menuService = MenuService();
+  final InventoryService _inventoryService = InventoryService();
+  StreamSubscription? _inventorySub;
 
   String _selectedMealTime = ''; // Start with no filter
   String? _selectedSubcategory;
   String _searchQuery = '';
-  bool _showNonVeg = false; // Default to veg-only mode
+  bool _showNonVeg = true; 
   final List<MenuItem> _items = [];
+  List<InventoryItem> _inventory = [];
   bool _isLoading = false;
 
   String get selectedMealTime => _selectedMealTime;
@@ -17,80 +23,49 @@ class MenuController extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   int get searchResultsCount => filteredItems.length;
   bool get isSearching => _searchQuery.isNotEmpty;
+  
   List<MenuItem> get filteredItems {
-    print(
-      '🔍 FILTERING: Total items: ${_items.length}, Selected meal time: "$_selectedMealTime", Search query: "$_searchQuery"',
-    );
+    var filtered = _items.where((item) {
+      // Search filter
+      final matchesSearch = item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          item.description.toLowerCase().contains(_searchQuery.toLowerCase());
+      if (!matchesSearch) return false;
 
-    var filtered = _items.where(
-      (item) =>
-          item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          item.description.toLowerCase().contains(_searchQuery.toLowerCase()),
-    );
+      // Category (Meal Time) filter
+      if (_selectedMealTime.isNotEmpty && item.category != _selectedMealTime) return false;
 
-    print('🔍 AFTER SEARCH: ${filtered.length} items');
+      // Subcategory filter
+      if (_selectedSubcategory != null && item.subcategory != _selectedSubcategory) return false;
 
-    // Debug: Print all available categories
-    if (_selectedMealTime.isEmpty) {
-      final categories = <String>{};
-      for (var item in _items) {
-        categories.add(item.category ?? 'NULL');
-      }
-      print('🔍 AVAILABLE CATEGORIES: $categories');
-    }
+      // Veg/Non-Veg filter
+      if (!_showNonVeg && !item.isVeg) return false;
 
-    filtered = filtered.where((item) {
-      // Filter by meal time (category) if selected
-      if (_selectedMealTime.isNotEmpty && item.category != null) {
-        if (item.category != _selectedMealTime) {
-          print(
-            'FILTERING OUT: "${item.name}" (category: "${item.category}") - looking for "$_selectedMealTime"',
-          );
-          return false;
-        }
-      }
-
-      // Filter by subcategory
-      if (_selectedSubcategory != null &&
-          item.subcategory != _selectedSubcategory) {
+      // NEW: Dynamic Availability filter (Recipe based)
+      if (!item.isAvailable(_inventory)) {
         return false;
       }
-
-      // Filter by veg/non-veg
-      // If _showNonVeg is false (default), show ALL items
-      // If _showNonVeg is true, show ALL items
-      // Only filter if explicitly needed
-      // Note: Commenting out veg filter for now as it's filtering everything
-      // if (!_showNonVeg && !(item.isVeg ?? false)) {
-      //   return false;
-      // }
-
-      // Filter by search query (already done above, skip duplicate)
-      // if (_searchQuery.isNotEmpty &&
-      //     !(item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      //         item.description.toLowerCase().contains(_searchQuery.toLowerCase()))) {
-      //   return false;
-      // }
-      
-      // Filter out of stock items if they are tracked
-      // Note: We might want to show them as "Sold Out" instead of hiding them completely
-      // For now, let's keep them but the UI should handle the disabled state
-      // if (item.isOutOfStock == true) {
-      //   return false;
-      // }
       
       return true;
     });
 
-    final result = filtered.toList();
-    print('🔍 FINAL RESULT: ${result.length} items');
-    return result;
+    return filtered.toList();
   }
 
   bool get isLoading => _isLoading;
 
+  void updateInventory(List<InventoryItem> inventory) {
+    _inventory = inventory;
+    notifyListeners();
+  }
+
+  void startInventoryListener(String tenantId) {
+    _inventorySub?.cancel();
+    _inventorySub = _inventoryService.getInventoryStream(tenantId).listen((inventory) {
+      updateInventory(inventory);
+    });
+  }
+
   void setMealTime(String mealTime) {
-    print('🍽️ SETTING MEAL TIME: "$_selectedMealTime" → "$mealTime"');
     _selectedMealTime = mealTime;
     notifyListeners();
   }
@@ -167,4 +142,11 @@ class MenuController extends ChangeNotifier {
       stopLoading();
     }
   }
+
+  @override
+  void dispose() {
+    _inventorySub?.cancel();
+    super.dispose();
+  }
 }
+

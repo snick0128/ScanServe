@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../providers/orders_provider.dart';
+import '../../models/order.dart';
 
 class OrderListItem extends StatelessWidget {
   final Order order;

@@ -234,6 +234,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
       final orderIds = orderController.activeOrders
           .map((order) => order.orderId)
           .toList();
+      
+      final tableName = orderController.activeOrders.isNotEmpty 
+          ? orderController.activeOrders.first.tableName 
+          : (tableId != null ? 'Table $tableId' : null);
 
       await _billRequestService.createBillRequest(
         tenantId: tenantId,
@@ -241,6 +245,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
         customerName: customerDetails.name,
         customerPhone: customerDetails.phone,
         tableId: tableId,
+        tableName: tableName,
         orderIds: orderIds,
       );
 
