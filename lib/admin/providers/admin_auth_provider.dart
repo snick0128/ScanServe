@@ -14,10 +14,12 @@ class AdminAuthProvider with ChangeNotifier {
   String? _tenantId;
   String? _tenantName;
   String? _name;
+  String? _kitchenStationId;
   bool _isSwitching = false;
   
   String? get displayName => _name;
   String? get userName => _name;
+  String? get kitchenStationId => _kitchenStationId;
 
   bool get isLoading => _isLoading;
   bool get isAdmin => _role == 'admin' || _role == 'superadmin';
@@ -62,6 +64,7 @@ class AdminAuthProvider with ChangeNotifier {
       _role = prefs.getString('admin_role');
       _tenantId = prefs.getString('admin_tenantId');
       _tenantName = prefs.getString('admin_tenantName');
+      _kitchenStationId = prefs.getString('admin_kitchenStationId');
       
       if (_role != null) {
         _isAdmin = _role == 'admin' || _role == 'superadmin';
@@ -79,6 +82,7 @@ class AdminAuthProvider with ChangeNotifier {
         await prefs.setString('admin_role', _role!);
         if (_tenantId != null) await prefs.setString('admin_tenantId', _tenantId!);
         if (_tenantName != null) await prefs.setString('admin_tenantName', _tenantName!);
+        if (_kitchenStationId != null) await prefs.setString('admin_kitchenStationId', _kitchenStationId!);
       }
     } catch (e) {
       print('🔥 Auth: Error persisting session: $e');
@@ -96,6 +100,7 @@ class AdminAuthProvider with ChangeNotifier {
         _tenantId = userDoc['tenantId'];
         _tenantName = userDoc['tenantName'];
         _name = userDoc.data()?['name'] ?? userDoc.data()?['displayName'];
+        _kitchenStationId = userDoc.data()?['kitchenStationId'];
         
         if (_role == 'captain') {
           final tables = userDoc.data()?['assignedTables'];

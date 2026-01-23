@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import '../../../theme/admin_theme.dart';
 import '../../../../models/tenant_model.dart';
 import '../../../../models/inventory_item.dart';
 import '../../../providers/inventory_provider.dart';
@@ -25,7 +26,7 @@ class MenuItemDialog extends StatefulWidget {
 class _MenuItemDialogState extends State<MenuItemDialog> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
-  final _expansionTileKey = GlobalKey();
+  
   late TextEditingController _nameController;
   late TextEditingController _descController;
   late TextEditingController _priceController;
@@ -35,10 +36,13 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   String _itemType = 'veg';
   String? _imagePreviewUrl;
   bool _isManualAvailable = true;
+  bool _isBestseller = false;
+  bool _isSaving = false;
 
   // Inventory Usage state
   late InventoryTrackingType _trackingType;
-  late Map<String, double> _ingredients; // itemId -> qty
+  late Map<String, double> _ingredients; // itemId -> qty (ALWAYS in base units: kg, Liter, etc.)
+  final Map<String, String> _displayUnits = {}; // itemId -> displayed unit in UI (grams, ml, etc.)
 
   @override
   void initState() {
@@ -50,6 +54,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     _itemType = widget.item?.itemType ?? 'veg';
     _imagePreviewUrl = widget.item?.imageUrl;
     _isManualAvailable = widget.item?.isManualAvailable ?? true;
+    _isBestseller = widget.item?.isBestseller ?? false;
 
     _trackingType = widget.item?.inventoryTrackingType ?? InventoryTrackingType.none;
     _ingredients = Map.from(widget.item?.inventoryIngredients ?? {});
@@ -62,15 +67,38 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
           break;
         }
       }
-    } else if (widget.categories.isNotEmpty) {
-      _selectedCategoryId = widget.categories.first.id;
+    } 
+    
+    // Safety check: if _selectedCategoryId is not in categories, reset it
+    if (_selectedCategoryId != null && !widget.categories.any((c) => c.id == _selectedCategoryId)) {
+      _selectedCategoryId = null;
     }
 
+    if (_selectedCategoryId == null && widget.categories.isNotEmpty) {
+      _selectedCategoryId = widget.categories.first.id;
+    }
     _imageController.addListener(() {
       setState(() {
         _imagePreviewUrl = _imageController.text.isNotEmpty ? _imageController.text : null;
       });
     });
+
+    _initializeDisplayUnits();
+  }
+
+  void _initializeDisplayUnits() {
+    final inventoryItems = context.read<InventoryProvider>().items;
+    for (var entry in _ingredients.entries) {
+      final item = inventoryItems.firstWhere((i) => i.id == entry.key, orElse: () => InventoryItem(id: '', tenantId: '', name: '', category: '', unit: '', currentStock: 0, lastUpdated: DateTime.now()));
+      
+      if (item.unit == 'kg' && entry.value < 1.0 && entry.value > 0) {
+        _displayUnits[entry.key] = 'grams';
+      } else if (item.unit == 'Liter' && entry.value < 1.0 && entry.value > 0) {
+        _displayUnits[entry.key] = 'ml';
+      } else {
+        _displayUnits[entry.key] = item.unit;
+      }
+    }
   }
 
   @override
@@ -83,527 +111,278 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     super.dispose();
   }
 
-  void _scrollToInventory() {
-    Future.delayed(const Duration(milliseconds: 300), () {
-      final context = _expansionTileKey.currentContext;
-      if (context != null) {
-        Scrollable.ensureVisible(
-          context,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
-
-  Widget _buildFormFields() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextFormField(
-          controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Item Name',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Ionicons.restaurant_outline),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter item name';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _descController,
-          decoration: const InputDecoration(
-            labelText: 'Description',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Ionicons.document_text_outline),
-            alignLabelWithHint: true,
-          ),
-          maxLines: 2,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Price',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Ionicons.cash_outline),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Required';
-                  if (double.tryParse(value) == null) return 'Invalid price';
-                  return null;
-                },
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _selectedCategoryId,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-                isExpanded: true,
-                items: widget.categories.map((c) => DropdownMenuItem(
-                  value: c.id,
-                  child: Text(c.name),
-                )).toList(),
-                onChanged: (val) => setState(() => _selectedCategoryId = val),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const Text('Item Type', style: TextStyle(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildTypeOption('veg', 'Veg', Colors.green),
-            const SizedBox(width: 16),
-            _buildTypeOption('nonveg', 'Non-Veg', Colors.red),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text('Display Status', style: TextStyle(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildStatusOption(true, 'In Stock', Colors.blue),
-            const SizedBox(width: 16),
-            _buildStatusOption(false, 'Sold Out', Colors.orange),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildInventorySection(),
-      ],
-    );
-  }
-
-  Widget _buildStatusOption(bool value, String label, Color color) {
-    final isSelected = _isManualAvailable == value;
-    return InkWell(
-      onTap: () => setState(() => _isManualAvailable = value),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
-          border: Border.all(color: isSelected ? color : Colors.grey[300]!, width: isSelected ? 2 : 1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(isSelected ? Icons.check_circle : Icons.radio_button_off, size: 16, color: color),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: isSelected ? color : Colors.grey[700], fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInventorySection() {
-    final inventoryItems = context.watch<InventoryProvider>().items;
-
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        key: _expansionTileKey,
-        title: const Text('Inventory Usage', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-        subtitle: const Text('Link to stock and recipes (Optional)', style: TextStyle(fontSize: 12)),
-        tilePadding: EdgeInsets.zero,
-        initiallyExpanded: _trackingType != InventoryTrackingType.none,
-        onExpansionChanged: (expanded) {
-          if (expanded) _scrollToInventory();
-        },
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('How should this item affect inventory?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                _buildTrackingOption(
-                  InventoryTrackingType.none, 
-                  'Do Not Track', 
-                  'No stock deduction (Default)',
-                  Icons.block,
-                ),
-                _buildTrackingOption(
-                  InventoryTrackingType.simple, 
-                  'Simple Stock Item', 
-                  'Link to 1 inventory item',
-                  Icons.link,
-                ),
-                _buildTrackingOption(
-                  InventoryTrackingType.recipe, 
-                  'Uses Ingredients (Recipe)', 
-                  'Deduct multiple ingredients',
-                  Icons.layers,
-                ),
-                if (_trackingType == InventoryTrackingType.simple) ...[
-                  const Divider(height: 32),
-                  const Text('Link to Inventory Item:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  _buildIngredientSelector(inventoryItems, isRecipe: false),
-                ],
-                if (_trackingType == InventoryTrackingType.recipe) ...[
-                  const Divider(height: 32),
-                  const Text('Add Ingredients:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  _buildRecipeIngredients(inventoryItems),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrackingOption(InventoryTrackingType type, String title, String subtitle, IconData icon) {
-    final isSelected = _trackingType == type;
-    return RadioListTile<InventoryTrackingType>(
-      value: type,
-      groupValue: _trackingType,
-      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-      secondary: Icon(icon, color: isSelected ? Colors.blue : Colors.grey, size: 20),
-      contentPadding: EdgeInsets.zero,
-      onChanged: (val) {
-        setState(() {
-          _trackingType = val!;
-          if (_trackingType == InventoryTrackingType.none) {
-            _ingredients.clear();
-          } else if (_trackingType == InventoryTrackingType.simple && _ingredients.length > 1) {
-            // Keep only the first ingredient if switching from recipe
-            final firstKey = _ingredients.keys.first;
-            final firstVal = _ingredients[firstKey]!;
-            _ingredients.clear();
-            _ingredients[firstKey] = firstVal;
-          }
-        });
-        if (_trackingType != InventoryTrackingType.none) {
-          _scrollToInventory();
-        }
-      },
-    );
-  }
-
-  Widget _buildIngredientSelector(List<InventoryItem> items, {required bool isRecipe}) {
-    if (items.isEmpty) return const Text('No inventory items found. Add some in Inventory screen.');
-
-    final currentId = _ingredients.keys.firstOrNull;
-    
-    return Column(
-      children: [
-        DropdownButtonFormField<String>(
-          value: items.any((i) => i.id == currentId) ? currentId : null,
-          decoration: const InputDecoration(
-            labelText: 'Inventory Item',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.search),
-          ),
-          items: items.map((i) => DropdownMenuItem(value: i.id, child: Text('${i.name} (${i.unit})'))).toList(),
-          onChanged: (val) {
-            if (val != null) {
-              setState(() {
-                _ingredients.clear();
-                _ingredients[val] = 1.0;
-              });
-            }
-          },
-        ),
-        if (currentId != null) ...[
-          const SizedBox(height: 12),
-          TextFormField(
-            key: ValueKey(currentId),
-            initialValue: _ingredients[currentId]?.toString(),
-            decoration: InputDecoration(
-              labelText: 'Quantity per sale',
-              helperText: 'How many ${items.firstWhere((i) => i.id == currentId).unit} per serving?',
-              border: const OutlineInputBorder(),
-              suffixText: items.firstWhere((i) => i.id == currentId).unit,
-              prefixIcon: const Icon(Icons.calculate_outlined),
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (val) {
-              final d = double.tryParse(val) ?? 0;
-              if (d > 0) _ingredients[currentId!] = d;
-            },
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildRecipeIngredients(List<InventoryItem> items) {
-    return Column(
-      children: [
-        ..._ingredients.entries.map((entry) {
-          final item = items.firstWhere((i) => i.id == entry.key, orElse: () => InventoryItem(id: '', tenantId: '', name: 'Unknown', unit: '', currentStock: 0, lastUpdated: DateTime.now()));
-          return Card(
-            elevation: 0,
-            color: Colors.white,
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8), 
-              side: BorderSide(color: Colors.grey[200]!),
-            ),
-            child: ListTile(
-              title: Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              subtitle: Text('${entry.value} ${item.unit} per sale', style: const TextStyle(fontSize: 11, color: Colors.blue)),
-              trailing: IconButton(
-                iconSize: 20, 
-                icon: const Icon(Icons.delete_outline, color: Colors.redAccent), 
-                onPressed: () => setState(() => _ingredients.remove(entry.key)),
-              ),
-            ),
-          );
-        }),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _showAddIngredientDialog(items),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.blue.withOpacity(0.3), style: BorderStyle.none),
-              color: Colors.blue.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_circle_outline, size: 20, color: Colors.blue),
-                SizedBox(width: 8),
-                Text('Add Ingredient to Recipe', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showAddIngredientDialog(List<InventoryItem> items) {
-    if (items.isEmpty) return;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        String? selectedId;
-        String inventoryUnit = '';
-        String selectedUsageUnit = '';
-        final qtyController = TextEditingController(text: '1');
-        
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            List<String> availableUnits = [inventoryUnit];
-            if (inventoryUnit == 'kg') availableUnits = ['kg', 'grams'];
-            if (inventoryUnit == 'Liter') availableUnits = ['Liter', 'ml'];
-            if (selectedUsageUnit.isEmpty && inventoryUnit.isNotEmpty) selectedUsageUnit = inventoryUnit;
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Add Recipe Ingredient'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    items: items
-                        .where((i) => !_ingredients.containsKey(i.id))
-                        .map((i) => DropdownMenuItem(
-                              value: i.id,
-                              child: Text('${i.name} (${i.unit})'),
-                            ))
-                        .toList(),
-                    decoration: const InputDecoration(
-                      labelText: 'Select Ingredient', 
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.inventory_2),
-                    ),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        selectedId = val;
-                        inventoryUnit = items.firstWhere((i) => i.id == val).unit;
-                        selectedUsageUnit = inventoryUnit;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: qtyController,
-                          decoration: const InputDecoration(
-                            labelText: 'Qty', 
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => setDialogState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: DropdownButtonFormField<String>(
-                          value: selectedUsageUnit.isEmpty ? null : selectedUsageUnit,
-                          items: availableUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                          decoration: const InputDecoration(border: OutlineInputBorder()),
-                          onChanged: (val) => setDialogState(() => selectedUsageUnit = val!),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (selectedId != null) ...[
-                    const SizedBox(height: 8),
-                    Builder(builder: (context) {
-                      double qty = double.tryParse(qtyController.text) ?? 0;
-                      double factor = 1.0;
-                      if (selectedUsageUnit == 'grams' || selectedUsageUnit == 'ml') factor = 0.001;
-                      double finalQty = qty * factor;
-                      
-                      return Text('Usage: $finalQty $inventoryUnit will be deducted from stock.', 
-                        style: const TextStyle(fontSize: 11, color: Colors.blue, fontStyle: FontStyle.italic));
-                    }),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                ElevatedButton(
-                  onPressed: () {
-                    if (selectedId != null) {
-                      double qty = double.tryParse(qtyController.text) ?? 1.0;
-                      double factor = 1.0;
-                      if (selectedUsageUnit == 'grams' || selectedUsageUnit == 'ml') factor = 0.001;
-                      setState(() => _ingredients[selectedId!] = qty * factor);
-                      Navigator.pop(context);
-                    }
-                  }, 
-                  child: const Text('Add to Recipe'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildTypeOption(String value, String label, Color color) {
-    final isSelected = _itemType == value;
-    return InkWell(
-      onTap: () => setState(() => _itemType = value),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
-          border: Border.all(color: isSelected ? color : Colors.grey[300]!, width: isSelected ? 2 : 1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.circle, size: 16, color: color),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: isSelected ? color : Colors.grey[700], fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagePreview() {
-    return Column(
-      children: [
-        const Text('Image URL (Optional)', style: TextStyle(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _imageController,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Ionicons.image_outline),
-            hintText: 'https://...',
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          height: 160, width: double.infinity,
-          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[300]!)),
-          child: _imagePreviewUrl != null && _imagePreviewUrl!.isNotEmpty
-              ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(_imagePreviewUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 40)))
-              : const Center(child: Icon(Icons.image_outlined, size: 40, color: Colors.grey)),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.item != null;
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: 700,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(isEditing ? 'Edit Menu Item' : 'Add New Menu Item', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                ],
-              ),
-              const Divider(height: 32),
-              Flexible(
+        width: 1100,
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          children: [
+            _buildStickyHeader(isEditing),
+            Expanded(
+              child: Form(
+                key: _formKey,
                 child: SingleChildScrollView(
                   controller: _scrollController,
+                  padding: const EdgeInsets.all(40),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 3, child: _buildFormFields()),
-                      const SizedBox(width: 32),
-                      Expanded(flex: 2, child: _buildImagePreview()),
+                      // LEFT COLUMN: Primary Work
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildGeneralInfoSection(),
+                            const SizedBox(height: 32),
+                            _buildPricingAndCategorySection(),
+                            const SizedBox(height: 32),
+                            _buildRecipeBuilderSection(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 48),
+                      // RIGHT COLUMN: Meta & Controls
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildImageSection(),
+                            const SizedBox(height: 32),
+                            _buildStatusSettingsSection(),
+                            const SizedBox(height: 32),
+                            _buildPrepTimeSection(),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: _saveItem,
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16)),
-                    child: Text(isEditing ? 'Save Changes' : 'Create Item'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStickyHeader(bool isEditing) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isEditing ? 'Edit Menu Item' : 'Add New Menu Item',
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                ),
+                Text(
+                  isEditing ? 'Update details, price and ingredients' : 'Configure your new dish for the digital menu',
+                  style: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: _isSaving ? null : () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              side: const BorderSide(color: AdminTheme.dividerColor),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 16),
+          ElevatedButton(
+            onPressed: _isSaving ? null : _saveItem,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isSaving 
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : Text(isEditing ? 'Save Changes' : 'Create Item', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneralInfoSection() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AdminTheme.dividerColor, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('General Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _nameController,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: 'Item Name',
+                hintText: 'e.g. Traditional Paneer Tikka',
+                labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                floatingLabelBehavior: FloatingLabelBehavior.auto,
+                contentPadding: const EdgeInsets.all(20),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                prefixIcon: const Icon(Ionicons.restaurant_outline, color: AdminTheme.primaryColor),
+              ),
+              validator: (v) => v?.isEmpty == true ? 'Name is required' : null,
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _descController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Description (Optional)',
+                hintText: 'Describe ingredients, taste, or portion size...',
+                alignLabelWithHint: true,
+                labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                contentPadding: const EdgeInsets.all(20),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPricingAndCategorySection() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AdminTheme.dividerColor, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Pricing & Categorization', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: widget.categories.any((c) => c.id == _selectedCategoryId) ? _selectedCategoryId : null,
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                      contentPadding: const EdgeInsets.all(20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                    ),
+                    items: widget.categories
+                        .fold<List<Category>>([], (list, cat) => list.any((c) => c.id == cat.id) ? list : [...list, cat])
+                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedCategoryId = v),
                   ),
-                ],
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: TextFormField(
+                    controller: _priceController,
+                    decoration: InputDecoration(
+                      labelText: 'Standard Price',
+                      prefixText: '₹ ',
+                      labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                      contentPadding: const EdgeInsets.all(20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (v) => v?.isEmpty == true ? 'Price required' : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Text('Diet Preference', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+            const SizedBox(height: 12),
+            _buildDietSegmentedControl(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDietSegmentedControl() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F3F4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _buildDietOption('veg', 'Vegetarian', Colors.green),
+          _buildDietOption('nonveg', 'Non-Vegetarian', Colors.red),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDietOption(String type, String label, Color color) {
+    final isSelected = _itemType == type;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _itemType = type),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildDietDot(type == 'veg'),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
+                ),
               ),
             ],
           ),
@@ -612,9 +391,418 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     );
   }
 
-  void _saveItem() {
+  Widget _buildRecipeBuilderSection() {
+    final inventoryItems = context.watch<InventoryProvider>().items;
+    
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AdminTheme.dividerColor, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Recipe & Ingredients', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: AdminTheme.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                      child: const Text('AUTO-DEDUCT STOCK ON SALE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.primaryColor)),
+                    ),
+                  ],
+                ),
+                _buildTrackingTypeToggle(),
+              ],
+            ),
+            if (_trackingType != InventoryTrackingType.none) ...[
+              const SizedBox(height: 32),
+              _buildIngredientSearchBar(inventoryItems),
+              const SizedBox(height: 24),
+              _buildModernIngredientList(inventoryItems),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackingTypeToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: const Color(0xFFF1F3F4), borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildTrackingTab(InventoryTrackingType.none, 'None'),
+          _buildTrackingTab(InventoryTrackingType.simple, 'Simple'),
+          _buildTrackingTab(InventoryTrackingType.recipe, 'Recipe'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrackingTab(InventoryTrackingType type, String label) {
+    final isSelected = _trackingType == type;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _trackingType = type;
+        if (type == InventoryTrackingType.none) _ingredients.clear();
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : null,
+        ),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText)),
+      ),
+    );
+  }
+
+  Widget _buildIngredientSearchBar(List<InventoryItem> items) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          key: ValueKey('ingredient_search_${_ingredients.length}'),
+          hint: const Text('Search or select ingredient...', style: TextStyle(fontSize: 14, color: AdminTheme.secondaryText)),
+          isExpanded: true,
+          value: null,
+          icon: const Icon(Ionicons.search_outline, size: 20, color: AdminTheme.secondaryText),
+          items: items
+              .where((i) => !_ingredients.containsKey(i.id))
+              .fold<List<InventoryItem>>([], (list, item) => list.any((i) => i.id == item.id) ? list : [...list, item])
+              .map((i) => DropdownMenuItem(value: i.id, child: Text('${i.name} (${i.unit})')))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                final item = items.firstWhere((i) => i.id == val);
+                _ingredients[val] = 1.0;
+                _displayUnits[val] = item.unit; // Default to inventory base unit
+
+                if (_trackingType == InventoryTrackingType.simple) {
+                  final currentVal = _ingredients[val];
+                  final currentUnit = _displayUnits[val];
+                  _ingredients.clear();
+                  _displayUnits.clear();
+                  _ingredients[val] = currentVal!;
+                  _displayUnits[val] = currentUnit!;
+                }
+              });
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernIngredientList(List<InventoryItem> allItems) {
+    if (_ingredients.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        ..._ingredients.entries.map((entry) {
+          final item = allItems.firstWhere((i) => i.id == entry.key, orElse: () => InventoryItem(id: '', tenantId: '', name: 'Unknown', category: '', unit: 'unit', currentStock: 0, lastUpdated: DateTime.now()));
+          
+          final displayUnit = _displayUnits[entry.key] ?? item.unit;
+          final isKg = item.unit == 'kg';
+          final isLiter = item.unit == 'Liter';
+          
+          double factor = 1.0;
+          if (displayUnit == 'grams' || displayUnit == 'ml') factor = 1000.0;
+          
+          final displayValue = (entry.value * factor);
+          final displayValueStr = displayValue == displayValue.toInt() ? displayValue.toInt().toString() : displayValue.toStringAsFixed(2);
+
+          List<String> availableUnits = [item.unit];
+          if (isKg) availableUnits = ['kg', 'grams'];
+          if (isLiter) availableUnits = ['Liter', 'ml'];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AdminTheme.dividerColor),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                      Text('Stock: ${item.currentStock} ${item.unit} left', style: const TextStyle(fontSize: 11, color: AdminTheme.secondaryText)),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 80,
+                  margin: const EdgeInsets.only(right: 8),
+                  child: TextFormField(
+                    key: ValueKey('qty_${entry.key}_$displayUnit'),
+                    initialValue: displayValueStr,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    decoration: const InputDecoration(
+                      isDense: true, 
+                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8), 
+                      border: UnderlineInputBorder()
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (v) {
+                      final parsed = double.tryParse(v) ?? 0.0;
+                      setState(() {
+                        _ingredients[entry.key] = parsed / factor;
+                      });
+                    },
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: displayUnit,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.arrow_drop_down, size: 16),
+                  style: const TextStyle(fontSize: 12, color: AdminTheme.primaryColor, fontWeight: FontWeight.bold),
+                  items: availableUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                  onChanged: (newUnit) {
+                    if (newUnit != null) {
+                      setState(() {
+                        _displayUnits[entry.key] = newUnit;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () => setState(() {
+                    _ingredients.remove(entry.key);
+                    _displayUnits.remove(entry.key);
+                  }),
+                  icon: const Icon(Ionicons.trash_outline, color: AdminTheme.critical, size: 20),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildImageSection() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AdminTheme.dividerColor, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Item Highlight Image', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const SizedBox(height: 24),
+            Container(
+              height: 240,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F9FA),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AdminTheme.dividerColor),
+              ),
+              child: Stack(
+                children: [
+                  _imagePreviewUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(_imagePreviewUrl!, width: double.infinity, height: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Ionicons.cloud_upload_outline, size: 48, color: AdminTheme.secondaryText))),
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Ionicons.image_outline, size: 48, color: AdminTheme.secondaryText),
+                              const SizedBox(height: 12),
+                              const Text('No Image Selected', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
+                              Text('Click to set URL', style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText.withOpacity(0.6))),
+                            ],
+                          ),
+                        ),
+                  Positioned.fill(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showImageURLDialog,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(),
+                      ),
+                    ),
+                  ),
+                  if (_imagePreviewUrl != null)
+                    Positioned(
+                      top: 12, right: 12,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white,
+                        radius: 18,
+                        child: IconButton(icon: const Icon(Ionicons.close, size: 16, color: AdminTheme.critical), onPressed: () => setState(() => _imagePreviewUrl = null)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Center(child: Text('Recommended size: 800x600px', style: TextStyle(fontSize: 11, color: AdminTheme.secondaryText))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImageURLDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Image URL'),
+        content: TextField(
+          controller: _imageController,
+          decoration: const InputDecoration(hintText: 'https://example.com/image.jpg', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () { _imagePreviewUrl = _imageController.text; Navigator.pop(context); setState(() {}); }, child: const Text('Update')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusSettingsSection() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AdminTheme.dividerColor, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Availability & Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const SizedBox(height: 24),
+            _buildSettingsToggle(
+              'Active Visibility',
+              'Show/Hide this item from the public digital menu.',
+              _isManualAvailable,
+              (v) => setState(() => _isManualAvailable = v),
+            ),
+            const SizedBox(height: 16),
+            _buildSettingsToggle(
+              'Mark as Bestseller',
+              'Adds a special badge and boosts visibility.',
+              _isBestseller,
+              (v) => setState(() => _isBestseller = v),
+            ),
+            const SizedBox(height: 16),
+            _buildSettingsToggle(
+              'Out of Stock',
+              'Maintain visibility but disable ordering.',
+              !_isManualAvailable,
+              (v) => setState(() => _isManualAvailable = !v),
+              isDanger: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsToggle(String title, String subtitle, bool value, Function(bool) onChanged, {bool isDanger = false}) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(subtitle, style: const TextStyle(fontSize: 11, color: AdminTheme.secondaryText)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Switch.adaptive(
+          value: value,
+          onChanged: onChanged,
+          activeColor: isDanger ? AdminTheme.critical : AdminTheme.primaryColor,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrepTimeSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AdminTheme.primaryColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.1)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Ionicons.time_outline, color: AdminTheme.primaryColor, size: 24),
+          SizedBox(width: 12),
+          Expanded(child: Text('Avg. Preparation Time', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryColor, fontSize: 14))),
+          Text('25 mins', style: TextStyle(fontWeight: FontWeight.w900, color: AdminTheme.primaryColor, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDietDot(bool isVeg) {
+    return Container(
+      width: 12, height: 12,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: isVeg ? Colors.green : Colors.red, width: 1.5),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      padding: const EdgeInsets.all(1.5),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isVeg ? Colors.green : Colors.red,
+          shape: isVeg ? BoxShape.circle : BoxShape.rectangle,
+        ),
+      ),
+    );
+  }
+
+  void _saveItem() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCategoryId == null) return;
+      
+      setState(() => _isSaving = true);
+      
+      // Simulate network latency for UX satisfaction
+      await Future.delayed(const Duration(milliseconds: 600));
+
       final newItem = MenuItem(
         id: widget.item?.id ?? const Uuid().v4(),
         name: _nameController.text,
@@ -627,10 +815,25 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         stockCount: widget.item?.stockCount ?? 100,
         isTracked: widget.item?.isTracked ?? true,
         isManualAvailable: _isManualAvailable,
+        isBestseller: _isBestseller,
         inventoryTrackingType: _trackingType,
         inventoryIngredients: _ingredients,
       );
-      Navigator.pop(context, {'item': newItem, 'categoryId': _selectedCategoryId});
+
+      if (mounted) {
+        setState(() => _isSaving = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${newItem.name} saved successfully'),
+            backgroundColor: AdminTheme.success,
+            behavior: SnackBarBehavior.floating,
+            width: 400,
+          )
+        );
+        
+        Navigator.pop(context, {'item': newItem, 'categoryId': _selectedCategoryId});
+      }
     }
   }
 }

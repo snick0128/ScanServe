@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_log.dart';
 import '../models/tenant_model.dart';
+import 'menu_service.dart';
 
 class InventoryService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -187,9 +188,25 @@ class InventoryService {
             performedBy: performedBy,
             sourceId: 'Order: ${orderId.substring(0, 8)}',
           );
+
+          // Check if stock is now zero and update menu availability
+          final updatedItem = await getItem(tenantId, itemId);
+          if (updatedItem != null && updatedItem.currentStock <= 0) {
+             _markLinkedMenuItemsUnavailable(tenantId, itemId, menuDefinitions);
+          }
         } catch (e) {
           print('Failed to deduct stock for $itemId: $e');
         }
+      }
+    }
+  }
+
+  Future<void> _markLinkedMenuItemsUnavailable(String tenantId, String ingredientId, List<MenuItem> menuDefinitions) async {
+    final menuService = MenuService();
+    for (var menuItem in menuDefinitions) {
+      if (menuItem.inventoryIngredients.containsKey(ingredientId) && menuItem.isManualAvailable) {
+        final updatedMenuItem = menuItem.copyWith(isManualAvailable: false);
+        await menuService.updateMenuItem(tenantId, menuItem.category!.toLowerCase(), updatedMenuItem);
       }
     }
   }

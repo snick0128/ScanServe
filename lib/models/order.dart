@@ -109,6 +109,12 @@ class OrderItem {
   }) : this.timestamp = timestamp ?? DateTime.now();
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
+    DateTime parseTime(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.now();
+    }
+
     return OrderItem(
       id: data['id'] ?? '',
       name: data['name'] ?? 'Unknown Item',
@@ -118,8 +124,8 @@ class OrderItem {
       addons: data['addons'] != null ? List<String>.from(data['addons']) : null,
       imageUrl: data['imageUrl'],
       status: OrderItemStatus.fromString(data['status']),
-      servedAt: data['servedAt'] != null ? (data['servedAt'] as Timestamp).toDate() : null,
-      timestamp: data['timestamp'] != null ? (data['timestamp'] as Timestamp).toDate() : (data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : DateTime.now()),
+      servedAt: data['servedAt'] != null ? parseTime(data['servedAt']) : null,
+      timestamp: parseTime(data['timestamp'] ?? data['createdAt']),
       isAddon: data['isAddon'] ?? false,
       chefNote: data['chefNote'],
       captainName: data['captainName'],
@@ -247,6 +253,9 @@ class Order {
       if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
       return DateTime.now();
     }
+    
+    // Improved timestamp detection
+    final createdAt = data['createdAt'] ?? data['timestamp'] ?? data['paymentTimestamp'] ?? data['updatedAt'];
 
     return Order(
       id: doc.id,
@@ -265,7 +274,7 @@ class Order {
           ? OrderStatus.fromString(data['status'])
           : OrderStatus.pending,
       paymentStatus: PaymentStatus.fromString(data['paymentStatus']),
-      createdAt: parseDateTime(data['createdAt']),
+      createdAt: parseDateTime(createdAt),
       updatedAt: data['updatedAt'] != null ? parseDateTime(data['updatedAt']) : null,
       paymentMethod: data['paymentMethod'],
       paymentId: data['paymentId'],
@@ -381,24 +390,24 @@ class Order {
     }
   }
 
+  bool get isUrgent {
+    if (status == OrderStatus.completed || status == OrderStatus.cancelled || status == OrderStatus.served) return false;
+    return DateTime.now().difference(createdAt).inMinutes >= 15;
+  }
+
   // 2️⃣ Elapsed Time – Simple English (P0)
   String get elapsedText {
-    if (status == OrderStatus.completed) return 'Paid';
-    if (status == OrderStatus.cancelled) return 'Cancelled';
-
-    // If all items served, show served time
-    bool allServed = items.every((i) => i.status == OrderItemStatus.served);
-    if (allServed && items.isNotEmpty) {
-      final latestServed = items.map((e) => e.servedAt ?? e.timestamp).reduce((a, b) => a.isAfter(b) ? a : b);
-      return 'Served at ${DateFormat('h:mm a').format(latestServed)}';
+    final now = DateTime.now();
+    final diff = now.difference(createdAt);
+    
+    // If completed/cancelled or older than today, show formatted date
+    if (status == OrderStatus.completed || status == OrderStatus.cancelled || status == OrderStatus.served || diff.inHours > 12) {
+      return DateFormat('MMM d, h:mm a').format(createdAt);
     }
 
-    final diff = DateTime.now().difference(createdAt);
     final mins = diff.inMinutes;
-
-    if (mins < 5) return 'Just ordered';
-    if (mins <= 15) return 'Cooking for $mins mins';
-    return 'Late – please check';
+    if (mins < 1) return 'JUST NOW';
+    return '$mins MINS AGO';
   }
 
   // Derived status from items

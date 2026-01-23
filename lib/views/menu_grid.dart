@@ -25,42 +25,39 @@ class MenuGrid extends StatelessWidget {
     if (screenWidth < 480) {
       // Mobile - very small screens
       crossAxisCount = 2;
-      childAspectRatio =
-          0.68; // Decreased from 0.75 to increase height by ~15px
+      childAspectRatio = 0.66; // Updated for 250px height
       crossAxisSpacing = 12;
-      mainAxisSpacing = 8;
+      mainAxisSpacing = 16;
     } else if (screenWidth < 600) {
       // Mobile
       crossAxisCount = 2;
-      childAspectRatio = 0.63; // Decreased from 0.7 to increase height by ~15px
+      childAspectRatio = 0.66; 
       crossAxisSpacing = 16;
-      mainAxisSpacing = 12;
+      mainAxisSpacing = 16;
     } else if (screenWidth < 900) {
       // Tablet - portrait
-      crossAxisCount = 2;
-      childAspectRatio = 0.81; // Decreased from 0.9 to increase height by ~15px
+      crossAxisCount = 3;
+      childAspectRatio = 0.66; 
       crossAxisSpacing = 20;
-      mainAxisSpacing = 16;
+      mainAxisSpacing = 20;
     } else if (screenWidth < 1200) {
       // Tablet - landscape
-      crossAxisCount = 2;
-      childAspectRatio =
-          0.76; // Decreased from 0.85 to increase height by ~15px
+      crossAxisCount = 4;
+      childAspectRatio = 0.66; 
       crossAxisSpacing = 24;
-      mainAxisSpacing = 20;
+      mainAxisSpacing = 24;
     } else if (screenWidth < 1600) {
       // Desktop - medium
-      crossAxisCount = 3;
-      childAspectRatio = 0.71; // Decreased from 0.8 to increase height by ~15px
+      crossAxisCount = 5;
+      childAspectRatio = 0.66; 
       crossAxisSpacing = 28;
-      mainAxisSpacing = 24;
+      mainAxisSpacing = 28;
     } else {
       // Desktop - large
-      crossAxisCount = 4;
-      childAspectRatio =
-          0.67; // Decreased from 0.75 to increase height by ~15px
+      crossAxisCount = 6;
+      childAspectRatio = 0.66; 
       crossAxisSpacing = 32;
-      mainAxisSpacing = 28;
+      mainAxisSpacing = 32;
     }
 
     if (isLoading) {
@@ -81,7 +78,7 @@ class MenuGrid extends StatelessWidget {
         width: double.infinity,
         height: 200,
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Center(
@@ -93,7 +90,7 @@ class MenuGrid extends StatelessWidget {
                     ? Icons.search_off
                     : Icons.restaurant_menu,
                 size: 48,
-                color: Colors.grey[400],
+                color: Colors.grey[700],
               ),
               const SizedBox(height: 12),
               Text(
@@ -101,7 +98,7 @@ class MenuGrid extends StatelessWidget {
                     ? 'No search results found'
                     : 'No items found',
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: Colors.grey[500],
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -111,7 +108,7 @@ class MenuGrid extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Try searching with different keywords',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ),
             ],

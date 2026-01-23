@@ -15,6 +15,7 @@ import '../providers/admin_auth_provider.dart';
 import '../providers/orders_provider.dart';
 import '../providers/tables_provider.dart';
 import 'menu_selector_dialog.dart';
+import '../theme/admin_theme.dart';
 
 class TableOrdersDialog extends StatefulWidget {
   final String tenantId;
@@ -148,9 +149,9 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                 // Header
                 Row(
                   children: [
-                    Icon(
+                      Icon(
                       Icons.table_restaurant, 
-                      color: isVacant ? Colors.green : Colors.deepPurple, 
+                      color: isVacant ? AdminTheme.success : AdminTheme.primaryColor, 
                       size: 32
                     ),
                     const SizedBox(width: 12),
@@ -165,11 +166,11 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
+                            Text(
                             isVacant ? 'Vacant' : 'Occupied • Active Orders',
                             style: TextStyle(
                               fontSize: 14,
-                              color: isVacant ? Colors.green : Colors.orange,
+                              color: isVacant ? AdminTheme.success : AdminTheme.warning,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -188,7 +189,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                                 TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
                                 TextButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  style: TextButton.styleFrom(foregroundColor: AdminTheme.critical),
                                   child: const Text('RELEASE'),
                                 ),
                               ],
@@ -237,7 +238,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                               _buildActionCard(
                                 icon: Icons.print,
                                 label: 'Print Bill',
-                                color: Colors.deepPurple,
+                                color: AdminTheme.primaryColor,
                                 onTap: () => _printBill(context, _generatedBill!),
                               ),
                               const SizedBox(width: 20),
@@ -251,7 +252,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                               _buildActionCard(
                                 icon: Icons.payments,
                                 label: 'Mark as Paid (Cash)',
-                                color: Colors.blue,
+                                color: AdminTheme.success,
                                  onTap: () async {
                                    final provider = context.read<OrdersProvider>();
                                    
@@ -301,9 +302,9 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                           ElevatedButton.icon(
                             onPressed: _startNewOrder,
                             icon: const Icon(Icons.add_shopping_cart),
-                            label: const Text('START NEW ORDER'),
+                            label: const Text('START NEW ORDER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
+                              backgroundColor: AdminTheme.success,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                             ),
@@ -372,8 +373,8 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                                     ElevatedButton.icon(
                                       onPressed: () => _addItemsToOrder(activeOrderId!),
                                       icon: const Icon(Icons.add),
-                                      label: const Text('ADD ITEMS'),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                                      label: const Text('ADD ITEMS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
                                     ),
                                 ],
                               ),
@@ -737,10 +738,10 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
               ),
               Text(
                 '₹${finalTotal.toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
+                  color: AdminTheme.primaryColor,
                 ),
               ),
             ],
@@ -766,9 +767,12 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                 ),
               )
             : const Icon(Icons.receipt_long),
-        label: Text(_isGeneratingBill ? 'Generating Bill...' : 'Generate Bill'),
+        label: Text(
+          _isGeneratingBill ? 'Generating Bill...' : 'Generate Bill',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.deepPurple,
+          backgroundColor: AdminTheme.primaryColor,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

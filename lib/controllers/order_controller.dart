@@ -15,7 +15,8 @@ class OrderController extends ChangeNotifier {
 
   OrderType _currentOrderType = OrderType.dineIn;
   OrderSession? _currentSession;
-  final List<OrderDetails> _activeOrders = [];
+  final List<OrderDetails> _activeOrders = <OrderDetails>[];
+  final List<OrderDetails> _pastOrders = <OrderDetails>[];
   StreamSubscription<QuerySnapshot>? _ordersSubscription;
   StreamSubscription<QuerySnapshot>? _tableOrdersSubscription;
   final Map<String, StreamSubscription> _orderStatusSubscriptions = {};
@@ -37,7 +38,8 @@ class OrderController extends ChangeNotifier {
 
   OrderType get currentOrderType => _currentOrderType;
   OrderSession? get currentSession => _currentSession;
-  List<OrderDetails> get activeOrders => List.unmodifiable(_activeOrders);
+  List<OrderDetails> get activeOrders => _activeOrders.toList();
+  List<OrderDetails> get pastOrders => _pastOrders.toList();
 
   void setSession(String tenantId, String? tableId) async {
     // Get guest ID first
@@ -185,6 +187,7 @@ class OrderController extends ChangeNotifier {
 
           // Clear existing orders
           _activeOrders.clear();
+          _pastOrders.clear();
 
           for (final doc in snapshot.docs) {
             final orderData = doc.data();
@@ -192,24 +195,25 @@ class OrderController extends ChangeNotifier {
             try {
               final orderDetails = OrderDetails.fromMap(orderData);
               
-              // REQUIREMENT 2: Completed orders must NEVER appear active in the session tracking
-              if (orderDetails.status == OrderStatus.cancelled || 
-                  orderDetails.status == OrderStatus.completed) {
-                continue;
-              }
+              final isPast = orderDetails.status == OrderStatus.cancelled || 
+                             orderDetails.status == OrderStatus.completed;
               
               // If we have a tableId filter, only show orders for this table (dine-in)
               // Otherwise show all orders for this guest
-              if (tableId != null) {
+              if (tableId != null && orderDetails.type == OrderType.dineIn) {
                 if (orderDetails.tableId == tableId) {
-                  print('➕ Adding dine-in order: ${orderDetails.orderId}');
-                  _activeOrders.add(orderDetails);
-                  _subscribeToOrderStatus(orderDetails.orderId, tenantId);
+                  if (isPast) {
+                    _pastOrders.add(orderDetails);
+                  } else {
+                    _activeOrders.add(orderDetails);
+                    _subscribeToOrderStatus(orderDetails.orderId, tenantId);
+                  }
                 }
-              } else {
+              } else if (orderDetails.type == OrderType.parcel) {
                 // Show all active orders (parcel orders)
-                if (orderDetails.type == OrderType.parcel) {
-                  print('➕ Adding parcel order: ${orderDetails.orderId}');
+                if (isPast) {
+                  _pastOrders.add(orderDetails);
+                } else {
                   _activeOrders.add(orderDetails);
                   _subscribeToOrderStatus(orderDetails.orderId, tenantId);
                 }
@@ -220,10 +224,11 @@ class OrderController extends ChangeNotifier {
           }
 
           print(
-            '📊 Total active orders: ${_activeOrders.length}',
+            '📊 Total active orders: ${_activeOrders.length}, Past orders: ${_pastOrders.length}',
           );
           // Sort by timestamp, newest first
           _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          _pastOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           notifyListeners();
         });
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:scan_serve/models/order_model.dart';
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
@@ -8,11 +9,16 @@ import '../services/order_service.dart';
 import '../services/guest_session_service.dart';
 import 'previous_orders_list.dart';
 import '../utils/snackbar_helper.dart';
+import '../theme/app_theme.dart';
+import '../utils/haptic_helper.dart';
+import 'payment_page.dart';
 
 class CartPage extends StatefulWidget {
   final String tenantId;
+  final VoidCallback? onBack;
+  final VoidCallback? onOrderPlaced;
 
-  const CartPage({Key? key, required this.tenantId}) : super(key: key);
+  const CartPage({Key? key, required this.tenantId, this.onBack, this.onOrderPlaced}) : super(key: key);
 
   @override
   State<CartPage> createState() => _CartPageState();
@@ -27,47 +33,31 @@ class _CartPageState extends State<CartPage> {
     final orderService = OrderService();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: AppTheme.backgroundColor,
       resizeToAvoidBottomInset: false, // Prevent the main screen from jumping when keyboard opens
       appBar: AppBar(
-        title: const Text(
-          'Your Order',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
+        title: FutureBuilder<Map<String, dynamic>>(
+          future: orderService.getTenantSettings(widget.tenantId),
+          builder: (context, snapshot) {
+            final name = snapshot.data?['name'] ?? 'Restaurant';
+            return Text(
+              name,
+              style: GoogleFonts.outfit(
+                color: Colors.black,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            );
+          },
         ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1A1A),
-        centerTitle: false,
-        actions: [
-          if (cartController.itemCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${cartController.itemCount} items',
-                    style: const TextStyle(
-                      color: Colors.deepPurple,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.black,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
+          onPressed: widget.onBack ?? () => Navigator.of(context).pop(),
+        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -83,64 +73,78 @@ class _CartPageState extends State<CartPage> {
               ),
               child: Column(
                 children: [
-                  if (orderController.currentOrderType == OrderType.dineIn) ...[
-                    StreamBuilder<List<OrderDetails>>(
-                      stream: orderService.getTableOrders(
-                        widget.tenantId,
-                        orderController.currentSession?.tableId ?? '',
-                      ),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return Container(
-                            height: 100,
-                            alignment: Alignment.center,
-                            child: const CircularProgressIndicator(),
-                          );
-                        }
-                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-
-                        final orders = snapshot.data!;
-                        return PreviousOrdersList(
-                          orders: orders,
-                          isMobile: isMobile,
-                          isTablet: isTablet,
-                        );
-                      },
-                    ),
-                    Container(height: 8, color: const Color(0xFFF5F7FA)),
-                  ],
                   Expanded(
-                    child: _CartItemsWithNotes(
-                      key: ValueKey(cartController.items.length),
-                      items: cartController.items,
-                      onUpdateQuantity: (item, newQuantity) {
-                        if (newQuantity <= 0) {
-                          cartController.removeItem(item.item.id);
-                        } else {
-                          cartController.updateQuantity(
-                            item.item.id,
-                            newQuantity,
-                          );
-                        }
-                      },
-                      onNoteUpdate: (itemId, note) {
-                        cartController.updateNote(itemId, note);
-                      },
-                      isMobile: isMobile,
-                      isTablet: isTablet,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          if (cartController.items.isNotEmpty && orderController.currentOrderType == OrderType.dineIn) ...[
+                            StreamBuilder<List<OrderDetails>>(
+                              stream: orderService.getTableOrders(
+                                widget.tenantId,
+                                orderController.currentSession?.tableId ?? '',
+                              ),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Container(
+                                    height: 100,
+                                    alignment: Alignment.center,
+                                    child: const CircularProgressIndicator(),
+                                  );
+                                }
+                                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                final orders = snapshot.data!;
+                                return PreviousOrdersList(
+                                  orders: orders,
+                                  isMobile: isMobile,
+                                  isTablet: isTablet,
+                                );
+                              },
+                            ),
+                            const Divider(height: 1, color: AppTheme.borderColor),
+                          ],
+                          _CartItemsWithNotes(
+                            key: ValueKey(cartController.items.length),
+                            items: cartController.items,
+                            onUpdateQuantity: (item, newQuantity) {
+                              HapticHelper.light();
+                              if (newQuantity <= 0) {
+                                cartController.removeItem(item.item.id);
+                              } else {
+                                cartController.updateQuantity(
+                                  item.item.id,
+                                  newQuantity,
+                                );
+                              }
+                            },
+                            onNoteUpdate: (itemId, note) {
+                              cartController.updateNote(itemId, note);
+                            },
+                            isMobile: isMobile,
+                            isTablet: isTablet,
+                          ),
+                          if (cartController.items.isNotEmpty)
+                            _BillDetails(
+                              subtotal: cartController.totalAmount,
+                              tenantId: widget.tenantId,
+                              isMobile: isMobile,
+                              isTablet: isTablet,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                  _OrderSummary(
-                    subtotal: cartController.totalAmount,
-                    tenantId: widget.tenantId,
-                    cartController: cartController,
-                    isMobile: isMobile,
-                    isTablet: isTablet,
-                    isDesktop: isDesktop,
-                  ),
+                  if (cartController.items.isNotEmpty)
+                    _CartActionFooter(
+                      subtotal: cartController.totalAmount,
+                      tenantId: widget.tenantId,
+                      cartController: cartController,
+                      onOrderPlaced: widget.onOrderPlaced,
+                      isMobile: isMobile,
+                    ),
                 ],
               ),
             ),
@@ -176,17 +180,17 @@ class _CartItemsWithNotes extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
+      builder: (context) => Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -197,7 +201,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 24),
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: AppTheme.borderColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -207,12 +211,12 @@ class _CartItemsWithNotes extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.deepPurple.withOpacity(0.1),
+                        color: AppTheme.primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.restaurant_menu,
-                        color: Colors.deepPurple,
+                        color: AppTheme.primaryColor,
                         size: 24,
                       ),
                     ),
@@ -221,12 +225,12 @@ class _CartItemsWithNotes extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Add Chef Note',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A),
+                              color: AppTheme.primaryText,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -234,7 +238,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                             item.item.name,
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.grey[600],
+                              color: AppTheme.secondaryText,
                             ),
                           ),
                         ],
@@ -248,14 +252,15 @@ class _CartItemsWithNotes extends StatelessWidget {
                   autofocus: true,
                   maxLines: 3,
                   maxLength: 150,
+                  style: TextStyle(color: AppTheme.primaryText),
                   decoration: InputDecoration(
                     hintText: 'e.g., Extra spicy, no onions, well done...',
                     hintStyle: TextStyle(
-                      color: Colors.grey[400],
+                      color: AppTheme.secondaryText.withOpacity(0.5),
                       fontSize: 15,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFF5F7FA),
+                    fillColor: AppTheme.searchBarBackground,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
@@ -266,8 +271,8 @@ class _CartItemsWithNotes extends StatelessWidget {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: Colors.deepPurple,
+                      borderSide: BorderSide(
+                        color: AppTheme.primaryColor,
                         width: 2,
                       ),
                     ),
@@ -282,17 +287,17 @@ class _CartItemsWithNotes extends StatelessWidget {
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(color: Colors.grey[300]!),
+                          side: BorderSide(color: AppTheme.borderColor),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Cancel',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
+                            color: AppTheme.primaryText,
                           ),
                         ),
                       ),
@@ -307,7 +312,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                         },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: AppTheme.primaryColor,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -343,49 +348,50 @@ class _CartItemsWithNotes extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: AppTheme.searchBarBackground,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.shopping_cart_outlined,
                 size: 80,
-                color: Colors.grey[400],
+                color: AppTheme.secondaryText.withOpacity(0.2),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Your cart is empty',
               style: TextStyle(
-                fontSize: 20,
-                color: Color(0xFF1A1A1A),
-                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                color: AppTheme.primaryText,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Add items from the menu to get started',
-              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: AppTheme.secondaryText),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: items.map((item) {
         final itemId = item.item.id;
         final hasNote = item.note != null && item.note!.isNotEmpty;
         final imageSize = isMobile ? 70.0 : 80.0;
 
         return Container(
-          margin: EdgeInsets.only(bottom: isMobile ? 12 : 14),
+          margin: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20,
+            vertical: isMobile ? 6 : 7,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            border: Border.all(color: AppTheme.borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -396,6 +402,8 @@ class _CartItemsWithNotes extends StatelessWidget {
           ),
           child: Column(
             children: [
+              // ... rest of the existing item card logic ...
+              // (I will just copy the content correctly in the final tool call)
               Padding(
                 padding: EdgeInsets.all(isMobile ? 12 : 14),
                 child: Row(
@@ -410,7 +418,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: const Color(0xFFE5E7EB),
+                            color: Colors.white.withOpacity(0.05),
                             width: 1,
                           ),
                         ),
@@ -430,7 +438,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                         if (loadingProgress == null)
                                           return child;
                                         return Container(
-                                          color: const Color(0xFFF5F7FA),
+                                          color: Colors.white.withOpacity(0.05),
                                           child: Center(
                                             child: CircularProgressIndicator(
                                               value:
@@ -443,7 +451,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                                             .expectedTotalBytes!
                                                   : null,
                                               strokeWidth: 2,
-                                              color: Colors.deepPurple,
+                                              color: AppTheme.primaryColor,
                                             ),
                                           ),
                                         );
@@ -469,7 +477,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: isMobile ? 15 : 16,
                                     fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1A1A1A),
+                                    color: AppTheme.primaryText,
                                     height: 1.3,
                                   ),
                                   maxLines: 2,
@@ -481,10 +489,10 @@ class _CartItemsWithNotes extends StatelessWidget {
                               Container(
                                 height: 36, // Increased height
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF5F7FA),
+                                  color: AppTheme.searchBarBackground,
                                   borderRadius: BorderRadius.circular(12), // Smoother radius
                                   border: Border.all(
-                                    color: const Color(0xFFE5E7EB),
+                                    color: AppTheme.borderColor,
                                     width: 1,
                                   ),
                                 ),
@@ -514,7 +522,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                                 : Icons.delete_outline,
                                             size: 18,
                                             color: item.quantity > 1
-                                                ? Colors.deepPurple
+                                                ? AppTheme.primaryColor
                                                 : Colors.red[400],
                                           ),
                                         ),
@@ -523,7 +531,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                     Container(
                                       width: 1,
                                       height: 20, // Smaller separator height
-                                      color: const Color(0xFFE5E7EB),
+                                      color: AppTheme.borderColor,
                                     ),
                                     Container(
                                       constraints: const BoxConstraints(
@@ -536,17 +544,17 @@ class _CartItemsWithNotes extends StatelessWidget {
                                       alignment: Alignment.center,
                                       child: Text(
                                         '${item.quantity}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
-                                          color: Color(0xFF1A1A1A),
+                                          color: AppTheme.primaryText,
                                         ),
                                       ),
                                     ),
                                     Container(
                                       width: 1,
                                       height: 20,
-                                      color: const Color(0xFFE5E7EB),
+                                      color: AppTheme.borderColor,
                                     ),
                                     Material(
                                       color: Colors.transparent,
@@ -565,10 +573,10 @@ class _CartItemsWithNotes extends StatelessWidget {
                                           width: 36, // Larger width
                                           height: 36,
                                           alignment: Alignment.center,
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.add,
                                             size: 18,
-                                            color: Colors.deepPurple,
+                                            color: AppTheme.primaryColor,
                                           ),
                                         ),
                                       ),
@@ -584,21 +592,42 @@ class _CartItemsWithNotes extends StatelessWidget {
                             Text(
                               item.item.description!,
                               style: TextStyle(
-                                fontSize: isMobile ? 12 : 13,
-                                color: Colors.grey[600],
-                                height: 1.3,
-                              ),
+                                  fontSize: isMobile ? 12 : 13,
+                                  color: AppTheme.secondaryText,
+                                  height: 1.3,
+                                ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
                           const SizedBox(height: 8),
-                          Text(
-                            '₹${(item.item.price * item.quantity).toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.deepPurple,
+                          // Price breakdown: ₹80 × 2 = ₹160
+                          RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primaryText,
+                              ),
+                              children: [
+                                TextSpan(text: '₹${item.item.price.toStringAsFixed(2)}'),
+                                TextSpan(
+                                  text: ' × ${item.quantity}',
+                                  style: const TextStyle(
+                                    color: AppTheme.secondaryText,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const TextSpan(text: ' = '),
+                                TextSpan(
+                                  text: '₹${(item.item.price * item.quantity).toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -613,7 +642,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.amber[50],
+                    color: Colors.amber.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.amber[200]!, width: 1),
                   ),
@@ -631,7 +660,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                           item.note!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.amber[900],
+                            color: Colors.amber[800],
                             height: 1.3,
                           ),
                         ),
@@ -643,7 +672,7 @@ class _CartItemsWithNotes extends StatelessWidget {
               Container(
                 decoration: BoxDecoration(
                   border: Border(
-                    top: BorderSide(color: const Color(0xFFE5E7EB), width: 1),
+                    top: BorderSide(color: AppTheme.borderColor, width: 1),
                   ),
                 ),
                 child: Material(
@@ -664,15 +693,15 @@ class _CartItemsWithNotes extends StatelessWidget {
                           Icon(
                             hasNote ? Icons.edit_note : Icons.note_add_outlined,
                             size: 16,
-                            color: Colors.deepPurple,
+                            color: AppTheme.primaryColor,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             hasNote ? 'Edit Note' : 'Add Note for Chef',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Colors.deepPurple,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                         ],
@@ -684,295 +713,291 @@ class _CartItemsWithNotes extends StatelessWidget {
             ],
           ),
         );
-      },
+      }).toList(),
     );
   }
 
   Widget _buildPlaceholder() {
     return Container(
-      color: const Color(0xFFF5F7FA),
+      color: Colors.white.withOpacity(0.05),
       child: Center(
-        child: Icon(Icons.restaurant, size: 40, color: Colors.grey[400]),
+        child: Icon(Icons.restaurant, size: 40, color: Colors.white10),
       ),
     );
   }
 }
 
-class _OrderSummary extends StatelessWidget {
+class _BillDetails extends StatelessWidget {
   final double subtotal;
   final String tenantId;
-  final CartController cartController;
   final bool isMobile;
   final bool isTablet;
-  final bool isDesktop;
 
-  const _OrderSummary({
+  const _BillDetails({
     Key? key,
     required this.subtotal,
     required this.tenantId,
-    required this.cartController,
     this.isMobile = false,
     this.isTablet = false,
-    this.isDesktop = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final orderService = OrderService();
-    final orderController = context.read<OrderController>();
-    final guestSession = GuestSessionService();
 
     return FutureBuilder<Map<String, dynamic>>(
       future: orderService.getTenantSettings(tenantId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            height: 140,
-            alignment: Alignment.center,
-            color: Colors.white,
-            child: const CircularProgressIndicator(),
-          );
+          return const SizedBox.shrink();
         }
 
         final settings = snapshot.data ?? {};
-        final taxRate = settings['taxRate'] as double? ?? 0.18;
+        final taxRate = (settings['taxRate'] as num?)?.toDouble() ?? 0.05;
         final tax = subtotal * taxRate;
         final total = subtotal + tax;
 
         return Container(
-          padding: EdgeInsets.fromLTRB(
-            isMobile ? 20 : 24,
-            isMobile ? 20 : 24,
-            isMobile ? 20 : 24,
-            isMobile ? 20 : 24,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 24,
+            vertical: 24,
           ),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'BILL DETAILS',
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryText,
+                  letterSpacing: 0.5,
+                ),
               ),
+              const SizedBox(height: 12),
+              _buildSummaryRow('Subtotal', '₹${subtotal.toStringAsFixed(2)}', false),
+              const SizedBox(height: 8),
+              _buildSummaryRow('GST', '₹${tax.toStringAsFixed(2)}', false, isGST: true),
+              const SizedBox(height: 12),
+              const Divider(color: Color(0xFFE5E5EA), thickness: 1),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Grand Total',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryText,
+                    ),
+                  ),
+                  Text(
+                    '₹${total.toStringAsFixed(1)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryText,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Color(0xFF8E8E93)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Orders once placed cannot be cancelled and are non-refundable.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: const Color(0xFF8E8E93),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40), // Extra space at bottom of scroll
             ],
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Price Breakdown',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        Text(
-                          'Tap to view',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.deepPurple,
-                          ),
-                        ),
-                      ],
-                    ),
-                    tilePadding: EdgeInsets.zero,
-                    children: [
-                      _buildSummaryRow(
-                        'Subtotal',
-                        '₹${subtotal.toStringAsFixed(2)}',
-                        false,
-                      ),
-                      const SizedBox(height: 8),
-                      _buildSummaryRow(
-                        'Tax (${(taxRate * 100).toStringAsFixed(0)}%)',
-                        '₹${tax.toStringAsFixed(2)}',
-                        false,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 0),
-                  child: Container(
-                    height: 1,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.grey[200]!,
-                          Colors.grey[300]!,
-                          Colors.grey[200]!,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                _buildSummaryRow('Total', '₹${total.toStringAsFixed(2)}', true),
-                const SizedBox(height: 20),
-                if (orderController.currentOrderType == OrderType.dineIn)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildButton(
-                          context: context,
-                          text: 'Send to Kitchen',
-                          colors: [Colors.orange[600]!, Colors.orange[400]!],
-                          isEnabled: cartController.itemCount > 0,
-                          isMobile: isMobile,
-                          onPressed: () async {
-                            if (!context.mounted) return;
-                            try {
-                              final guestId = await guestSession.getGuestId();
-                              await orderService.createOrder(
-                                tenantId: tenantId,
-                                guestId: guestId,
-                                orderType: orderController.currentOrderType,
-                                tableId:
-                                    orderController.currentSession?.tableId,
-                                cartItems: cartController.items,
-                                chefNote: _buildNotesString(),
-                              );
-                              cartController.clear();
-                              if (!context.mounted) return;
-                              SnackbarHelper.showTopSnackBar(
-                                context,
-                                'Order sent to kitchen!',
-                              );
-                              Navigator.of(context).pop();
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              SnackbarHelper.showTopSnackBar(
-                                context,
-                                'Error: $e',
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildButton(
-                          context: context,
-                          text: 'Pay Now',
-                          colors: [
-                            Colors.deepPurple[700]!,
-                            Colors.deepPurple[500]!,
-                          ],
-                          isEnabled: subtotal > 0,
-                          isMobile: isMobile,
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/checkout',
-                              arguments: {
-                                'tenantId': tenantId,
-                                'orderType': orderController.currentOrderType,
-                                'tableId':
-                                    orderController.currentSession?.tableId,
-                                'requirePayment': true,
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  _buildButton(
-                    context: context,
-                    text: 'Pay & Place Order',
-                    colors: [Colors.deepPurple[700]!, Colors.deepPurple[500]!],
-                    isEnabled: subtotal > 0,
-                    isMobile: isMobile,
-                    onPressed: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/checkout',
-                        arguments: {
-                          'tenantId': tenantId,
-                          'orderType': orderController.currentOrderType,
-                          'tableId': null,
-                          'requirePayment': true,
-                        },
-                      );
-                    },
-                  ),
-              ],
-            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, bool isBold) {
+  Widget _buildSummaryRow(String label, String value, bool isBold, {bool isGST = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isBold ? 18 : 15,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: isBold ? const Color(0xFF1A1A1A) : Colors.grey[600],
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                color: const Color(0xFF1C1C1E),
+              ),
+            ),
+            if (isGST) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.info_outline, size: 14, color: Color(0xFF8E8E93)),
+            ],
+          ],
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: isBold ? 20 : 16,
-            fontWeight: FontWeight.w700,
-            color: isBold ? Colors.deepPurple : const Color(0xFF1A1A1A),
+          style: GoogleFonts.outfit(
+            fontSize: 14,
+            color: const Color(0xFF1C1C1E),
           ),
         ),
       ],
     );
   }
+}
 
-  String _buildNotesString() {
-    final itemsWithNotes = cartController.items.where((i) => i.note != null && i.note!.isNotEmpty);
+class _CartActionFooter extends StatelessWidget {
+  final double subtotal;
+  final String tenantId;
+  final CartController cartController;
+  final VoidCallback? onOrderPlaced;
+  final bool isMobile;
+
+  const _CartActionFooter({
+    Key? key,
+    required this.subtotal,
+    required this.tenantId,
+    required this.cartController,
+    this.onOrderPlaced,
+    this.isMobile = false,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final orderController = context.read<OrderController>();
+    final orderService = OrderService();
+    final guestSession = GuestSessionService();
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: orderService.getTenantSettings(tenantId),
+      builder: (context, snapshot) {
+        final settings = snapshot.data ?? {};
+        final taxRate = (settings['taxRate'] as num?)?.toDouble() ?? 0.05;
+        final total = subtotal * (1 + taxRate);
+
+        return Container(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: orderController.currentOrderType == OrderType.dineIn
+              ? Row(
+                  children: [
+                    Expanded(
+                      flex: 40,
+                      child: _buildButton(
+                        text: 'Pay',
+                        isPrimary: false,
+                        onPressed: () {
+                          HapticHelper.medium();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PaymentPage(tenantId: tenantId),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 60,
+                      child: _buildButton(
+                        text: 'Place Order',
+                        isPrimary: true,
+                        total: total,
+                        onPressed: () async {
+                          HapticHelper.medium();
+                          final guestId = await guestSession.getGuestId();
+                          await orderService.createOrder(
+                            tenantId: tenantId,
+                            guestId: guestId,
+                            orderType: OrderType.dineIn,
+                            tableId: orderController.currentSession?.tableId,
+                            cartItems: cartController.items,
+                            chefNote: _buildNotesString(cartController),
+                          );
+                          cartController.clear();
+                          if (onOrderPlaced != null) {
+                            onOrderPlaced!();
+                          } else if (context.mounted) {
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                )
+              : _buildButton(
+                  text: 'Pay Securely',
+                  isPrimary: true,
+                  total: total,
+                  onPressed: () {
+                    HapticHelper.medium();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PaymentPage(tenantId: tenantId),
+                      ),
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
+
+  String _buildNotesString(CartController cart) {
+    final itemsWithNotes = cart.items.where((i) => i.note != null && i.note!.isNotEmpty);
     if (itemsWithNotes.isEmpty) return 'Sent to kitchen - payment pending';
-    final notesText = itemsWithNotes
-        .map((i) => 'Item ${i.item.name}: ${i.note}')
-        .join('; ');
-    return 'Sent to kitchen - payment pending. Chef notes: $notesText';
+    return 'Sent to kitchen - payment pending. Chef notes: ' +
+        itemsWithNotes.map((i) => 'Item ${i.item.name}: ${i.note}').join('; ');
   }
 
   Widget _buildButton({
-    required BuildContext context,
     required String text,
-    required List<Color> colors,
-    required bool isEnabled,
-    required bool isMobile,
+    required bool isPrimary,
+    double? total,
     required VoidCallback onPressed,
   }) {
     return Container(
+      height: 54,
       decoration: BoxDecoration(
-        gradient: isEnabled
-            ? LinearGradient(
-                colors: colors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+        color: isPrimary ? null : Colors.white,
+        gradient: isPrimary
+            ? const LinearGradient(
+                colors: [Color(0xFF0F6D3F), Color(0xFF0B522F)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               )
             : null,
-        color: isEnabled ? null : Colors.grey[300],
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isEnabled
+        border: isPrimary ? null : Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: isPrimary
             ? [
                 BoxShadow(
-                  color: colors[0].withOpacity(0.4),
-                  blurRadius: 12,
+                  color: const Color(0xFF0F6D3F).withOpacity(0.3),
+                  blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
               ]
@@ -981,22 +1006,42 @@ class _OrderSummary extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isEnabled ? onPressed : null,
+          onTap: onPressed,
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: EdgeInsets.symmetric(vertical: isMobile ? 16 : 18),
-            child: Center(
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: isMobile ? 15 : 16,
-                  fontWeight: FontWeight.bold,
-                  color: isEnabled ? Colors.white : Colors.grey[500],
-                  letterSpacing: 0.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
+          child: Center(
+            child: total != null
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          text,
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          ' • ₹${total.toStringAsFixed(2)}',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(
+                    text,
+                    style: GoogleFonts.outfit(
+                      color: isPrimary ? Colors.white : const Color(0xFF1C1C1E),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
         ),
       ),

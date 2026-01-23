@@ -5,6 +5,8 @@ import '../models/inventory_item.dart';
 import '../services/menu_service.dart';
 import '../services/inventory_service.dart';
 
+enum SortOrder { none, priceLowToHigh, priceHighToLow }
+
 class MenuController extends ChangeNotifier {
   final MenuService _menuService = MenuService();
   final InventoryService _inventoryService = InventoryService();
@@ -13,7 +15,10 @@ class MenuController extends ChangeNotifier {
   String _selectedMealTime = ''; // Start with no filter
   String? _selectedSubcategory;
   String _searchQuery = '';
-  bool _showNonVeg = true; 
+  bool _isVegOnly = false;
+  bool _isNonVegOnly = false;
+  bool _isBestsellerOnly = false;
+  SortOrder _sortOrder = SortOrder.none;
   final List<MenuItem> _items = [];
   List<InventoryItem> _inventory = [];
   bool _isLoading = false;
@@ -23,6 +28,19 @@ class MenuController extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   int get searchResultsCount => filteredItems.length;
   bool get isSearching => _searchQuery.isNotEmpty;
+  bool get isVegOnly => _isVegOnly;
+  bool get isNonVegOnly => _isNonVegOnly;
+  bool get isBestsellerOnly => _isBestsellerOnly;
+  SortOrder get sortOrder => _sortOrder;
+
+  int get activeFiltersCount {
+    int count = 0;
+    if (_isVegOnly) count++;
+    if (_isNonVegOnly) count++;
+    if (_isBestsellerOnly) count++;
+    if (_sortOrder != SortOrder.none) count++;
+    return count;
+  }
   
   List<MenuItem> get filteredItems {
     var filtered = _items.where((item) {
@@ -37,8 +55,14 @@ class MenuController extends ChangeNotifier {
       // Subcategory filter
       if (_selectedSubcategory != null && item.subcategory != _selectedSubcategory) return false;
 
-      // Veg/Non-Veg filter
-      if (!_showNonVeg && !item.isVeg) return false;
+      // Veg filter
+      if (_isVegOnly && !item.isVeg) return false;
+
+      // Non-Veg filter
+      if (_isNonVegOnly && item.isVeg) return false;
+
+      // Bestseller filter
+      if (_isBestsellerOnly && !item.isBestseller) return false;
 
       // NEW: Dynamic Availability filter (Recipe based)
       if (!item.isAvailable(_inventory)) {
@@ -46,9 +70,16 @@ class MenuController extends ChangeNotifier {
       }
       
       return true;
-    });
+    }).toList();
 
-    return filtered.toList();
+    // Apply Sorting
+    if (_sortOrder == SortOrder.priceLowToHigh) {
+      filtered.sort((a, b) => a.price.compareTo(b.price));
+    } else if (_sortOrder == SortOrder.priceHighToLow) {
+      filtered.sort((a, b) => b.price.compareTo(a.price));
+    }
+
+    return filtered;
   }
 
   bool get isLoading => _isLoading;
@@ -91,9 +122,46 @@ class MenuController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setVegFilter(bool showNonVeg) {
-    print('🥬 SETTING VEG FILTER: $_showNonVeg → $showNonVeg');
-    _showNonVeg = showNonVeg;
+  void setSortOrder(SortOrder order) {
+    _sortOrder = order;
+    notifyListeners();
+  }
+
+  void applyFilters({
+    required bool isVegOnly,
+    required bool isNonVegOnly,
+    required bool isBestsellerOnly,
+    required SortOrder sortOrder,
+  }) {
+    _isVegOnly = isVegOnly;
+    _isNonVegOnly = isNonVegOnly;
+    _isBestsellerOnly = isBestsellerOnly;
+    _sortOrder = sortOrder;
+    notifyListeners();
+  }
+
+  void clearAllFilters() {
+    _isVegOnly = false;
+    _isNonVegOnly = false;
+    _isBestsellerOnly = false;
+    _sortOrder = SortOrder.none;
+    notifyListeners();
+  }
+
+  void toggleVegOnly() {
+    _isVegOnly = !_isVegOnly;
+    if (_isVegOnly) _isNonVegOnly = false;
+    notifyListeners();
+  }
+
+  void toggleNonVegOnly() {
+    _isNonVegOnly = !_isNonVegOnly;
+    if (_isNonVegOnly) _isVegOnly = false;
+    notifyListeners();
+  }
+
+  void toggleBestsellerOnly() {
+    _isBestsellerOnly = !_isBestsellerOnly;
     notifyListeners();
   }
 

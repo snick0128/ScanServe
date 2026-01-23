@@ -14,6 +14,7 @@ class InventoryItem {
   final String id;
   final String tenantId;
   final String name;
+  final String category; // Meat, Produce, Dairy, Spices, etc.
   final String unit; // kg, gm, litre, pcs
   final double currentStock;
   final double lowStockLevel;
@@ -23,6 +24,7 @@ class InventoryItem {
     required this.id,
     required this.tenantId,
     required this.name,
+    required this.category,
     required this.unit,
     required this.currentStock,
     this.lowStockLevel = 0,
@@ -40,6 +42,7 @@ class InventoryItem {
       id: docId,
       tenantId: data['tenantId'] ?? '',
       name: data['name'] ?? '',
+      category: data['category'] ?? 'General',
       unit: data['unit'] ?? 'pcs',
       currentStock: (data['currentStock'] ?? 0).toDouble(),
       lowStockLevel: (data['lowStockLevel'] ?? 0).toDouble(),
@@ -53,6 +56,7 @@ class InventoryItem {
     return {
       'tenantId': tenantId,
       'name': name,
+      'category': category,
       'unit': unit,
       'currentStock': currentStock,
       'lowStockLevel': lowStockLevel,

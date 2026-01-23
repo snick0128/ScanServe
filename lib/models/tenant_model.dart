@@ -76,6 +76,8 @@ class MenuItem {
   final InventoryTrackingType inventoryTrackingType;
   final Map<String, double> inventoryIngredients; // Map of itemId to quantity per sale
 
+  final bool isBestseller;
+  
   bool get isVeg {
     if (itemType == null) return true; // Default to veg if not specified
     final type = itemType!.toLowerCase().replaceAll('-', '').replaceAll(' ', '').trim();
@@ -126,6 +128,7 @@ class MenuItem {
     this.isManualAvailable = true,
     this.inventoryTrackingType = InventoryTrackingType.none,
     this.inventoryIngredients = const {},
+    this.isBestseller = false,
   }) {
     this.itemType = itemType;
   }
@@ -164,6 +167,7 @@ class MenuItem {
       isManualAvailable: data['isManualAvailable'] ?? true,
       inventoryTrackingType: trackingType,
       inventoryIngredients: ingredients,
+      isBestseller: data['isBestseller'] ?? false,
     );
   }
 
@@ -182,7 +186,42 @@ class MenuItem {
       'isManualAvailable': isManualAvailable,
       'inventoryTrackingType': inventoryTrackingType.name,
       'inventoryIngredients': inventoryIngredients,
+      'isBestseller': isBestseller,
     };
+  }
+
+  MenuItem copyWith({
+    String? id,
+    String? name,
+    String? description,
+    double? price,
+    String? imageUrl,
+    String? category,
+    String? subcategory,
+    String? itemType,
+    int? stockCount,
+    bool? isTracked,
+    bool? isManualAvailable,
+    InventoryTrackingType? inventoryTrackingType,
+    Map<String, double>? inventoryIngredients,
+    bool? isBestseller,
+  }) {
+    return MenuItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      imageUrl: imageUrl ?? this.imageUrl,
+      category: category ?? this.category,
+      subcategory: subcategory ?? this.subcategory,
+      itemType: itemType ?? this.itemType,
+      stockCount: stockCount ?? this.stockCount,
+      isTracked: isTracked ?? this.isTracked,
+      isManualAvailable: isManualAvailable ?? this.isManualAvailable,
+      inventoryTrackingType: inventoryTrackingType ?? this.inventoryTrackingType,
+      inventoryIngredients: inventoryIngredients ?? this.inventoryIngredients,
+      isBestseller: isBestseller ?? this.isBestseller,
+    );
   }
 }
 

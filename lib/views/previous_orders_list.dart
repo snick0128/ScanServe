@@ -3,6 +3,7 @@ import '../models/order_details.dart';
 import 'package:intl/intl.dart';
 import 'shimmer_loading.dart';
 import '../services/wait_time_service.dart';
+import '../theme/app_theme.dart';
 
 class PreviousOrdersList extends StatefulWidget {
   final List<OrderDetails> orders;
@@ -56,7 +57,7 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Live Total wait time summary with real-time updates
+        // Live Total wait time summary
         StreamBuilder<int>(
           stream: _waitTimeService.getTotalWaitTimeStream(
             widget.orders.isNotEmpty ? widget.orders.first.tenantId : '',
@@ -71,12 +72,11 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
                 vertical: 8,
               ),
               child: Card(
-                color: Colors.grey[50],
-                elevation: 6,
-                shadowColor: Colors.black.withOpacity(0.12),
+                color: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey[200]!),
+                  side: const BorderSide(color: AppTheme.borderColor),
                 ),
                 child: Padding(
                   padding: EdgeInsets.all(widget.isMobile ? 12 : 16),
@@ -85,34 +85,31 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
                       Icon(
                         Icons.access_time,
                         size: widget.isMobile ? 20 : 24,
-                        color: _waitTimeService.getWaitTimeColor(currentWaitTime),
+                        color: AppTheme.primaryColor,
                       ),
-                      SizedBox(width: widget.isMobile ? 6 : 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Total wait time: ${_waitTimeService.formatWaitTime(currentWaitTime)}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: widget.isMobile ? 14 : 16,
-                            color: _waitTimeService.getWaitTimeColor(currentWaitTime),
+                            color: AppTheme.primaryText,
                           ),
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: widget.isMobile ? 8 : 12,
-                          vertical: widget.isMobile ? 4 : 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _waitTimeService.getWaitTimeColor(currentWaitTime).withAlpha(25),
+                          color: AppTheme.primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           'LIVE',
                           style: TextStyle(
-                            fontSize: widget.isMobile ? 10 : 12,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: _waitTimeService.getWaitTimeColor(currentWaitTime),
+                            color: AppTheme.primaryColor,
                           ),
                         ),
                       ),
@@ -135,59 +132,48 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
             final isExpanded = order.orderId == expandedOrderId;
 
             return Card(
-              color: Colors.grey[50],
-              elevation: 6,
-              shadowColor: Colors.black.withOpacity(0.12),
-              margin: EdgeInsets.symmetric(
-                horizontal: widget.isMobile ? 4 : 8,
-                vertical: widget.isMobile ? 4 : 6,
-              ),
+              color: Colors.white,
+              elevation: 0,
+              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey[200]!),
+                side: const BorderSide(color: AppTheme.borderColor),
               ),
               child: Column(
                 children: [
-                  // Order header
                   ListTile(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: widget.isMobile ? 12 : 16,
-                      vertical: widget.isMobile ? 8 : 12,
-                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     title: Text(
-                      'Order #${order.orderId.substring(0, 8)}',
+                      'Order #${order.orderId.substring(0, 8).toUpperCase()}',
                       style: TextStyle(
-                        fontSize: widget.isMobile ? 14 : 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryText,
                       ),
                     ),
                     subtitle: Text(
                       '${DateFormat.jm().format(order.timestamp)} - ${order.status.displayName}',
-                      style: TextStyle(
-                        fontSize: widget.isMobile ? 12 : 14,
-                      ),
+                      style: TextStyle(color: AppTheme.secondaryText, fontSize: 12),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '₹${order.total.toStringAsFixed(2)}',
+                          '₹${order.total.toInt()}',
                           style: TextStyle(
-                            fontSize: widget.isMobile ? 14 : 16,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).primaryColor,
+                            color: AppTheme.primaryColor,
                           ),
                         ),
                         IconButton(
-                          iconSize: widget.isMobile ? 20 : 24,
                           icon: Icon(
                             isExpanded ? Icons.expand_less : Icons.expand_more,
+                            color: AppTheme.secondaryText,
                           ),
                           onPressed: () {
                             setState(() {
-                              expandedOrderId = isExpanded
-                                  ? null
-                                  : order.orderId;
+                              expandedOrderId = isExpanded ? null : order.orderId;
                             });
                           },
                         ),
@@ -195,133 +181,42 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
                     ),
                   ),
 
-                  // Expanded order details
                   if (isExpanded)
                     Padding(
-                      padding: EdgeInsets.all(widget.isMobile ? 12 : 16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Items list
                           ...order.items.map(
                             (item) => Padding(
-                              padding: EdgeInsets.symmetric(vertical: widget.isMobile ? 2 : 4),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     '${item.quantity}x ${item.name}',
-                                    style: TextStyle(
-                                      fontSize: widget.isMobile ? 14 : 16,
-                                    ),
+                                    style: TextStyle(color: AppTheme.primaryText, fontSize: 13),
                                   ),
                                   Text(
-                                    '₹${item.total.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      fontSize: widget.isMobile ? 14 : 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                    '₹${item.total.toInt()}',
+                                    style: TextStyle(color: AppTheme.primaryText, fontWeight: FontWeight.w500),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          Divider(
-                            height: 16,
-                            thickness: 1,
-                            color: Colors.grey[300],
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider(color: AppTheme.borderColor),
                           ),
-                          // Order summary
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Subtotal',
-                                style: TextStyle(
-                                  fontSize: widget.isMobile ? 14 : 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              Text(
-                                '₹${order.subtotal.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: widget.isMobile ? 14 : 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                          _buildPriceRow('Subtotal', order.subtotal),
+                          _buildPriceRow('Tax', order.tax),
+                          const Divider(color: AppTheme.borderColor),
+                          _buildPriceRow(
+                            'Total',
+                            order.total,
+                            isTotal: true,
                           ),
-                          SizedBox(height: widget.isMobile ? 2 : 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Tax',
-                                style: TextStyle(
-                                  fontSize: widget.isMobile ? 14 : 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              Text(
-                                '₹${order.tax.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: widget.isMobile ? 14 : 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Divider(
-                            height: 16,
-                            thickness: 1,
-                            color: Colors.grey[300],
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Total',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: widget.isMobile ? 14 : 16,
-                                ),
-                              ),
-                              Text(
-                                '₹${order.total.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: widget.isMobile ? 14 : 16,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (order.status == OrderStatus.pending ||
-                              order.status == OrderStatus.preparing) ...[
-                            Divider(
-                              height: 16,
-                              thickness: 1,
-                              color: Colors.grey[300],
-                            ),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  size: widget.isMobile ? 16 : 18,
-                                  color: Colors.orange,
-                                ),
-                                SizedBox(width: widget.isMobile ? 4 : 6),
-                                Text(
-                                  'Ready by ${DateFormat.jm().format(order.estimatedReadyTime)}',
-                                  style: TextStyle(
-                                    fontSize: widget.isMobile ? 12 : 14,
-                                    color: Colors.orange,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -331,6 +226,33 @@ class _PreviousOrdersListState extends State<PreviousOrdersList> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildPriceRow(String label, double amount, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: isTotal ? 14 : 12,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: isTotal ? AppTheme.primaryText : AppTheme.secondaryText,
+            ),
+          ),
+          Text(
+            '₹${amount.toInt()}',
+            style: TextStyle(
+              fontSize: isTotal ? 16 : 12,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
+              color: isTotal ? AppTheme.primaryColor : AppTheme.primaryText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

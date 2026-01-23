@@ -15,30 +15,30 @@ class OrderStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colorScheme = Theme.of(context).colorScheme;
-    final _OrderStatusStyle style = _OrderStatusStyle.fromStatus(
-      status,
-      colorScheme,
-    );
+    final _OrderStatusStyle style = _OrderStatusStyle.fromStatus(status);
 
     final Color bg = backgroundColor ?? style.background;
     final Color fg = textColor ?? style.foreground;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        style.label,
-        style: TextStyle(color: fg, fontSize: 13, fontWeight: FontWeight.w600),
+        style.label.toUpperCase(),
+        style: TextStyle(
+          color: fg,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
 }
 
-// Helper class for status color/label mapping
 class _OrderStatusStyle {
   final String label;
   final Color background;
@@ -50,40 +50,37 @@ class _OrderStatusStyle {
     required this.foreground,
   });
 
-  static _OrderStatusStyle fromStatus(
-    OrderStatus status,
-    ColorScheme colorScheme,
-  ) {
+  static _OrderStatusStyle fromStatus(OrderStatus status) {
     switch (status) {
       case OrderStatus.pending:
         return _OrderStatusStyle(
           label: "Pending",
-          background: Colors.grey.shade300,
-          foreground: Colors.grey.shade900,
+          background: Colors.grey.withOpacity(0.1),
+          foreground: Colors.grey[400]!,
         );
       case OrderStatus.preparing:
         return _OrderStatusStyle(
           label: "Preparing",
-          background: Colors.orange.shade100,
-          foreground: Colors.orange.shade800,
+          background: Colors.orange.withOpacity(0.1),
+          foreground: Colors.orange[400]!,
         );
       case OrderStatus.served:
         return _OrderStatusStyle(
           label: "Served",
-          background: Colors.green.shade100,
-          foreground: Colors.green.shade800,
+          background: Colors.green.withOpacity(0.1),
+          foreground: Colors.green[400]!,
         );
       case OrderStatus.cancelled:
         return _OrderStatusStyle(
           label: "Cancelled",
-          background: Colors.red.shade100,
-          foreground: Colors.red.shade800,
+          background: Colors.red.withOpacity(0.1),
+          foreground: Colors.red[400]!,
         );
       default:
         return _OrderStatusStyle(
-          label: status.toString(),
-          background: Colors.grey.shade200,
-          foreground: Colors.grey.shade800,
+          label: status.displayName,
+          background: Colors.blue.withOpacity(0.1),
+          foreground: Colors.blue[400]!,
         );
     }
   }

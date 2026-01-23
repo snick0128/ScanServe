@@ -41,21 +41,36 @@ class OrdersProvider with ChangeNotifier {
   }
 
   // Getters
-  List<model.Order> get orders {
-    // Return only active orders based on strict flow: ORDERED, PREPARING, READY, SERVED
-    var filtered = _orders.where((o) => 
-      o.status == model.OrderStatus.pending ||
-      o.status == model.OrderStatus.preparing ||
-      o.status == model.OrderStatus.ready ||
-      o.status == model.OrderStatus.served
-    ).toList();
+  List<model.Order> get orders => _orders;
 
-    if (_auth?.isCaptain == true) {
-      if (_auth!.assignedTables.isNotEmpty) {
-        filtered = filtered.where((o) => _auth!.assignedTables.contains(o.tableId)).toList();
-      }
-    }
-    return filtered;
+  List<model.Order> get currentOrders => _orders.where((o) => 
+    o.status == model.OrderStatus.pending ||
+    o.status == model.OrderStatus.preparing ||
+    o.status == model.OrderStatus.ready
+  ).toList();
+
+  List<model.Order> get pastOrders => _orders.where((o) => 
+    o.status == model.OrderStatus.served ||
+    o.status == model.OrderStatus.completed ||
+    o.status == model.OrderStatus.cancelled
+  ).toList();
+
+  List<model.Order> get pendingPaymentOrders => _orders.where((o) => 
+    o.status == model.OrderStatus.served && o.paymentStatus == model.PaymentStatus.pending
+  ).toList();
+
+  int get currentOrdersCount => currentOrders.length;
+  int get pastOrdersCount => pastOrders.length;
+  int get pendingPaymentOrdersCount => pendingPaymentOrders.length; 
+
+  List<model.Order> searchOrders(String query) {
+    if (query.isEmpty) return _orders;
+    final q = query.toLowerCase();
+    return _orders.where((o) => 
+      (o.tableName ?? '').toLowerCase().contains(q) ||
+      o.id.toLowerCase().contains(q) ||
+      o.items.any((i) => i.name.toLowerCase().contains(q))
+    ).toList();
   }
 
   List<model.Order> get allOrders => _orders;
@@ -110,15 +125,23 @@ class OrdersProvider with ChangeNotifier {
         return;
       }
       
-      debugPrint('🔥 OrdersProvider: Setting up stream for tenant: $_tenantId');
+      print('🔥 OrdersProvider: STARTING LISTENER for tenant: $_tenantId');
 
-      // REMOVED orderBy('createdAt') to avoid silent failure if index is missing
-      _ordersSubscription = _tenantOrdersCollection
-          .snapshots(includeMetadataChanges: true)
+      final Query query;
+      if (_tenantId == 'global') {
+        print('🌍 OrdersProvider: Using GLOBAL CollectionGroup orders');
+        query = _firestore.collectionGroup('orders').limit(500); // Increased limit
+      } else {
+        print('🏢 OrdersProvider: Using TENANT collection: tenants/$_tenantId/orders');
+        query = _tenantOrdersCollection;
+      }
+
+      _ordersSubscription = query
+          .snapshots()
           .listen(
         (snapshot) async {
+          print('📊 OrdersProvider: Snapshot Received! Docs count: ${snapshot.docs.length}');
           try {
-            debugPrint('📊 OrdersProvider: Received ${snapshot.docs.length} order documents');
             final orders = <model.Order>[];
             bool shouldAlert = false;
 
@@ -224,6 +247,8 @@ class OrdersProvider with ChangeNotifier {
   }
 
   Future<void> _playNotificationSound() async {
+    // Disable sound on web to prevent LegacyJavaScriptObject Duration error
+    if (kIsWeb) return;
     try {
       // Premium notification sound
       await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
@@ -266,8 +291,8 @@ class OrdersProvider with ChangeNotifier {
         }
       }
 
-      // 3. Auto-deduct inventory if status becomes PREPARING (Fired to kitchen)
-      if (newStatus == model.OrderStatus.preparing) {
+      // 3. Auto-deduct inventory if status becomes SERVED
+      if (newStatus == model.OrderStatus.served) {
         _deductInventoryForOrder(orderId);
       }
 
@@ -334,19 +359,21 @@ class OrdersProvider with ChangeNotifier {
             .doc(_tenantId)
             .collection('orders')
             .where('tableId', isEqualTo: tableId)
-            .where('status', whereNotIn: [
-              model.OrderStatus.completed.name,
-              model.OrderStatus.cancelled.name
-            ])
             .get();
 
         for (var doc in ordersQuery.docs) {
-          transaction.update(doc.reference, {
-            'status': model.OrderStatus.completed.name,
-            'paymentStatus': model.PaymentStatus.paid.name,
-            'updatedAt': FieldValue.serverTimestamp(),
-            'closedAt': FieldValue.serverTimestamp(),
-          });
+          final data = doc.data() as Map<String, dynamic>;
+          final status = data['status'];
+          
+          if (status != model.OrderStatus.completed.name && 
+              status != model.OrderStatus.cancelled.name) {
+            transaction.update(doc.reference, {
+              'status': model.OrderStatus.completed.name,
+              'paymentStatus': model.PaymentStatus.paid.name,
+              'updatedAt': FieldValue.serverTimestamp(),
+              'closedAt': FieldValue.serverTimestamp(),
+            });
+          }
         }
 
         final tableRef = _firestore

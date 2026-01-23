@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:scan_serve/models/order_model.dart';
 import 'package:scan_serve/utils/snackbar_helper.dart';
 import '../controllers/order_controller.dart';
@@ -9,6 +10,7 @@ import '../services/bill_request_service.dart';
 import '../services/guest_session_service.dart';
 import '../widgets/customer_details_bottom_sheet.dart';
 import 'components/order_status_badge.dart';
+import '../theme/app_theme.dart';
 
 class OrderListScreen extends StatefulWidget {
   const OrderListScreen({Key? key}) : super(key: key);
@@ -21,50 +23,39 @@ class _OrderListScreenState extends State<OrderListScreen> {
   final _billRequestService = BillRequestService();
   final _guestSession = GuestSessionService();
   bool _isRequestingBill = false;
+  int _selectedTabIndex = 0; // 0 for Current, 1 for Past
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text('My Orders')),
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        title: Text('MY ORDERS', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        backgroundColor: AppTheme.backgroundColor,
+        titleTextStyle: TextStyle(
+          color: AppTheme.primaryText,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
       body: Consumer<OrderController>(
         builder: (context, orderController, child) {
-          // Debug: Print current state
-          print('OrderListScreen rebuild - Orders count: ${orderController.activeOrders.length}');
-
-          // Check if there are no orders at all
-          final hasNoOrders = orderController.activeOrders.isEmpty;
-
-          if (hasNoOrders) {
+          final isDineIn = orderController.currentOrderType == OrderType.dineIn;
+          
+          if (orderController.activeOrders.isEmpty && orderController.pastOrders.isEmpty) {
             return _buildEmptyState(context);
           }
 
           return Column(
             children: [
-              _buildTotalWaitTime(orderController),
+              if (isDineIn) _buildSegmentedFilter(),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildOrderSection(
-                      'Dine-in Orders',
-                      orderController.activeOrders
-                          .where((order) => order.type == OrderType.dineIn)
-                          .toList(),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildOrderSection(
-                      'Parcel Orders',
-                      orderController.activeOrders
-                          .where((order) => order.type == OrderType.parcel)
-                          .toList(),
-                    ),
-                  ],
-                ),
+                child: isDineIn 
+                    ? _buildDineInContent(orderController)
+                    : _buildParcelContent(orderController),
               ),
-              // Request Bill Button
-              if (orderController.activeOrders.isNotEmpty)
-                _buildRequestBillButton(orderController),
             ],
           );
         },
@@ -72,7 +63,130 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  /// Request Bill Button
+  Widget _buildSegmentedFilter() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _buildTabButton(0, 'Current Orders'),
+          _buildTabButton(1, 'Past Orders'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(int index, String label) {
+    final isSelected = _selectedTabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedTabIndex = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? AppTheme.primaryColor : const Color(0xFF8E8E93),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDineInContent(OrderController orderController) {
+    final orders = _selectedTabIndex == 0 
+        ? orderController.activeOrders 
+        : orderController.pastOrders;
+    
+    final filteredOrders = orders.where((o) => o.type == OrderType.dineIn).toList();
+
+    if (filteredOrders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _selectedTabIndex == 0 ? Icons.restaurant_outlined : Icons.history_rounded,
+              size: 64,
+              color: const Color(0xFFE5E5EA),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _selectedTabIndex == 0 ? 'No active orders' : 'No past orders yet',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                color: const Color(0xFF8E8E93),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 0),
+      children: [
+        if (_selectedTabIndex == 0) _buildTotalWaitTime(orderController),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: _buildOrderSection(
+            _selectedTabIndex == 0 ? 'ACTIVE PREPARATIONS' : 'COMPLETED ORDERS',
+            filteredOrders,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildParcelContent(OrderController orderController) {
+    // For parcel, combine both active and past, or just show past as per requirement
+    // "for parcel only one section orders all past orders will appear there"
+    // We'll show all parcel orders in one list
+    final allParcelOrders = [
+      ...orderController.activeOrders.where((o) => o.type == OrderType.parcel),
+      ...orderController.pastOrders.where((o) => o.type == OrderType.parcel),
+    ];
+    
+    // Sort combined list by date
+    allParcelOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    if (allParcelOrders.isEmpty) {
+      return _buildEmptyState(context);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildOrderSection('MY PARCEL ORDERS', allParcelOrders),
+      ],
+    );
+  }
   Widget _buildRequestBillButton(OrderController orderController) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -80,17 +194,16 @@ class _OrderListScreenState extends State<OrderListScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
         ],
       ),
-      child: SafeArea( // SafeArea for bottom padding
+      child: SafeArea(
         top: false,
         child: Row(
           children: [
-            // Pay at Counter Button
             Expanded(
               child: SizedBox(
                 height: 50,
@@ -99,38 +212,39 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('Pay at Counter'),
-                        content: const Text(
+                        backgroundColor: Colors.white,
+                        title: Text('Pay at Counter', style: TextStyle(color: AppTheme.primaryText)),
+                        content: Text(
                           'Please proceed to the billing counter to complete your payment.',
+                          style: TextStyle(color: AppTheme.secondaryText),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('OK'),
+                            child: Text('OK', style: TextStyle(color: AppTheme.primaryColor)),
                           ),
                         ],
                       ),
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.deepPurple, width: 1.5),
+                    side: BorderSide(color: AppTheme.primaryColor, width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Pay at Counter',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.deepPurple,
+                      color: AppTheme.primaryColor,
                     ),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 16),
-            // Request Bill Button
             Expanded(
               child: SizedBox(
                 height: 50,
@@ -139,43 +253,28 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       ? null
                       : () => _handleRequestBill(orderController),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
+                    backgroundColor: AppTheme.primaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    padding: EdgeInsets.zero, // Important for Gradient
                   ),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Container(
-                      alignment: Alignment.center,
-                      child: _isRequestingBill
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'Request Bill',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ),
+                  child: _isRequestingBill
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Request Bill',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -185,10 +284,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  /// Handle Request Bill button tap
   Future<void> _handleRequestBill(OrderController orderController) async {
     try {
-      // Get guest profile
       final profile = await _guestSession.getGuestProfile();
       final session = await _guestSession.getCurrentSession();
       final tenantId = session['tenantId'];
@@ -202,7 +299,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
         return;
       }
 
-      // Check if already has pending bill request
       final guestId = await _guestSession.getGuestId();
       final hasPending = await _billRequestService.hasPendingBillRequest(
         tenantId: tenantId,
@@ -217,7 +313,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
         return;
       }
 
-      // Show customer details bottom sheet
       final customerDetails = await CustomerDetailsBottomSheet.show(
         context: context,
         existingProfile: profile,
@@ -230,7 +325,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
       setState(() => _isRequestingBill = true);
 
-      // Create bill request
       final orderIds = orderController.activeOrders
           .map((order) => order.orderId)
           .toList();
@@ -249,7 +343,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
         orderIds: orderIds,
       );
 
-      // Update guest profile
       await _guestSession.updateGuestProfile(
         name: customerDetails.name,
         phone: customerDetails.phone,
@@ -284,7 +377,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           Icon(
             Icons.receipt_long_outlined,
             size: 80,
-            color: Colors.grey.shade400,
+            color: Colors.grey[800],
           ),
           const SizedBox(height: 16),
           Text(
@@ -292,7 +385,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
+              color: AppTheme.primaryText,
             ),
           ),
           const SizedBox(height: 8),
@@ -301,7 +394,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: AppTheme.secondaryText,
             ),
           ),
           const SizedBox(height: 24),
@@ -310,7 +403,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             icon: const Icon(Icons.restaurant_menu),
             label: const Text('Browse Menu'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
+              backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -333,17 +426,17 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.blue.shade50,
+      color: AppTheme.primaryColor.withOpacity(0.1),
       child: Row(
         children: [
-          const Icon(Icons.timer_outlined, color: Colors.blue),
+          Icon(Icons.timer_outlined, color: AppTheme.primaryColor),
           const SizedBox(width: 8),
           Text(
             'Expected wait time: $totalWaitMinutes minutes',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: Colors.blue,
+              color: AppTheme.primaryColor,
             ),
           ),
         ],
@@ -359,7 +452,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.secondaryText,
+            letterSpacing: 1.1,
+          ),
         ),
         const SizedBox(height: 8),
         ...orders.map((order) => _OrderCard(order: order)).toList(),
@@ -389,12 +487,12 @@ class _OrderCardState extends State<_OrderCard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppTheme.borderColor),
       ),
       child: Material(
         color: Colors.transparent,
@@ -410,12 +508,12 @@ class _OrderCardState extends State<_OrderCard> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.deepPurple.withOpacity(0.05),
+                        color: AppTheme.primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.receipt_long_rounded,
-                        color: Colors.deepPurple,
+                        color: AppTheme.primaryColor,
                         size: 24,
                       ),
                     ),
@@ -424,25 +522,21 @@ class _OrderCardState extends State<_OrderCard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Order #${widget.order.orderId.substring(0, 8)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Order #${widget.order.orderId.substring(0, 8).toUpperCase()}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppTheme.primaryText,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Placed at ${_formatTime(widget.order.timestamp)}',
                             style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                              color: AppTheme.secondaryText,
+                              fontSize: 12,
                             ),
                           ),
                         ],
@@ -458,7 +552,7 @@ class _OrderCardState extends State<_OrderCard> {
                               ? Icons.keyboard_arrow_up
                               : Icons.keyboard_arrow_down,
                           size: 20,
-                          color: Colors.grey[400],
+                          color: AppTheme.secondaryText,
                         ),
                       ],
                     ),
@@ -466,7 +560,7 @@ class _OrderCardState extends State<_OrderCard> {
                 ),
               ),
               if (_isExpanded) ...[
-                const Divider(height: 1),
+                Divider(height: 1, color: AppTheme.borderColor),
                 _buildOrderDetails(),
               ],
             ],
@@ -489,34 +583,34 @@ class _OrderCardState extends State<_OrderCard> {
                 children: [
                   Text(
                     '${item.quantity}x',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(item.name)),
+                  Expanded(child: Text(item.name, style: TextStyle(color: AppTheme.primaryText))),
                   Text(
-                    '₹${item.total.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    '₹${item.total.toStringAsFixed(0)}',
+                    style: TextStyle(color: AppTheme.primaryText, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             ),
           ),
-          const Divider(),
+          Divider(color: AppTheme.borderColor),
           _buildPriceRow('Subtotal', widget.order.subtotal),
           _buildPriceRow('Tax', widget.order.tax),
           _buildPriceRow(
             'Total',
             widget.order.total,
-            textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            textStyle: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryText, fontSize: 16),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.timer_outlined, size: 16),
+              Icon(Icons.timer_outlined, size: 16, color: AppTheme.secondaryText),
               const SizedBox(width: 4),
               Text(
                 'Expected by ${_formatTime(widget.order.estimatedReadyTime)}',
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: TextStyle(color: AppTheme.secondaryText, fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -531,8 +625,8 @@ class _OrderCardState extends State<_OrderCard> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
-          Text('₹${amount.toStringAsFixed(2)}', style: textStyle),
+          Text(label, style: TextStyle(color: AppTheme.secondaryText)),
+          Text('₹${amount.toStringAsFixed(0)}', style: textStyle ?? TextStyle(color: AppTheme.primaryText)),
         ],
       ),
     );

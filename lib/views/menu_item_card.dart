@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/tenant_model.dart';
 import '../controllers/cart_controller.dart';
-import 'menu_item_preview.dart';
+import 'item_preview_sheet.dart';
+import '../theme/app_theme.dart';
+import '../utils/haptic_helper.dart';
 
 class MenuItemCard extends StatefulWidget {
   final MenuItem item;
@@ -40,6 +43,7 @@ class _MenuItemCardState extends State<MenuItemCard>
   }
 
   void _onAddPressed() {
+    HapticHelper.medium();
     _scaleController.forward().then((_) {
       _scaleController.reverse();
     });
@@ -47,188 +51,200 @@ class _MenuItemCardState extends State<MenuItemCard>
   }
 
   void _showItemPreview() {
-    MenuItemPreview.show(context: context, item: widget.item);
-  }
-
-  Widget _buildAddButton() {
-    return Container(
-      height: 28,
-      width: 70,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF914D), Color(0xFFFF6E40)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(10), // Slightly smaller radius
-        boxShadow: _isHovered
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFFF6E40).withAlpha(80),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _onAddPressed,
-          borderRadius: BorderRadius.circular(10),
-          child: const Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add_shopping_cart, size: 12, color: Colors.white),
-                SizedBox(width: 4),
-                Text(
-                  'Add',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ItemPreviewSheet(
+        item: widget.item,
+        onAdd: widget.onAddPressed,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<CartController>(
-      builder: (context, cartController, _) {
-        final isInCart = cartController.isItemInCart(widget.item.id);
-        final quantity = cartController.getItemQuantity(widget.item.id);
+    final cartController = context.watch<CartController>();
+    final quantity = cartController.getItemQuantity(widget.item.id);
+    final isInCart = quantity > 0;
 
-        return GestureDetector(
-          onTap: _showItemPreview,
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true),
-            onExit: (_) => setState(() => _isHovered = false),
-            child: AnimatedBuilder(
-              animation: _scaleAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: Card(
-                    elevation: _isHovered ? 12 : 6,
-                    shadowColor: Colors.black.withAlpha(80),
-                    color: Colors.white,
-                    surfaceTintColor: Colors.transparent,
-                    clipBehavior: Clip.antiAlias,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      side: BorderSide(color: Colors.grey.shade200, width: 1.0),
+    return InkWell(
+      onTap: _showItemPreview,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 165,
+        height: 250, // Total height remains 250
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E5EA)),
+          boxShadow: [
+            const BoxShadow(
+              color: Color.fromRGBO(0, 0, 0, 0.08),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Section with 10px Top, Left, Right padding
+            Stack(
+              children: [
+                Container(
+                  height: 150, // 140 image height + 10 top padding
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: widget.item.imageUrl != null
+                        ? Image.network(
+                            widget.item.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(color: const Color(0xFFF2F2F7)),
+                          )
+                        : Container(color: const Color(0xFFF2F2F7)),
+                  ),
+                ),
+                // Veg/Non-veg indicator overlay
+                Positioned(
+                  top: 18, // Adjusted for 10px top padding
+                  left: 18, // Adjusted for 10px left padding
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
+                        width: 1,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      // Use spaceBetween to pin bottom row, and Expanded for middle text block.
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Optional image
-                        if (widget.item.imageUrl != null)
-                          AspectRatio(
-                            aspectRatio: MediaQuery.of(context).size.width < 600
-                                ? 4 / 3
-                                : 16 / 9,
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(24),
-                              ),
-                              child: Image.network(
-                                widget.item.imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[100],
-                                    child: const Icon(
-                                      Icons.broken_image,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-
-                        // Middle content (title + description). Expanded ensures the bottom row stays pinned.
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.item.name,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  widget.item.description,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: Colors.grey[600]),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Price + Add/Quantity row — pinned to bottom with explicit bottom padding
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '₹${widget.item.price.toStringAsFixed(2)}',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFFFF6E40),
-                                      fontSize: 12,
-                                    ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (isInCart)
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 100,
-                                  ),
-                                  child: _QuantityControls(
-                                    itemId: widget.item.id,
-                                    quantity: quantity,
-                                    onUpdateQuantity:
-                                        cartController.updateQuantity,
-                                    isHovered: _isHovered,
-                                  ),
-                                )
-                              else
-                                _buildAddButton(),
-                            ],
-                          ),
-                        ),
-                      ],
+                    child: Icon(
+                      Icons.fiber_manual_record,
+                      color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
+                      size: 8,
                     ),
                   ),
-                );
-              },
+                ),
+              ],
+            ),
+  
+            // Content Section
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10), // Uniform 10px padding
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tags
+                    Row(
+                      children: [
+                        if (widget.item.isBestseller)
+                          _buildTag('Bestseller', AppTheme.lightGreen, AppTheme.starGreen)
+                        else if (widget.item.isVeg)
+                          _buildTag('Veg', AppTheme.lightGreen, AppTheme.primaryColor)
+                        else
+                          _buildTag('Non-Veg', AppTheme.lightOrange, Colors.red),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      widget.item.name,
+                      style: GoogleFonts.outfit(
+                        color: AppTheme.primaryText,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.item.description,
+                      style: GoogleFonts.outfit(
+                        color: AppTheme.secondaryText,
+                        fontSize: 12,
+                        height: 1.1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '₹${widget.item.price.toInt()}',
+                          style: GoogleFonts.outfit(
+                            color: AppTheme.primaryText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (isInCart)
+                          _QuantityControls(
+                            itemId: widget.item.id,
+                            quantity: quantity,
+                            onUpdateQuantity: (id, q) => cartController.updateQuantity(id, q),
+                          )
+                        else
+                          _buildAddButton(),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTag(String label, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(
+          color: textColor,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddButton() {
+    return Container(
+      height: 35, // Updated height
+      width: 85,  // Updated width
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1C1C1E), width: 1.5),
+      ),
+      child: InkWell(
+        onTap: _onAddPressed,
+        child: Center(
+          child: Text(
+            'ADD',
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1C1C1E),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -237,87 +253,49 @@ class _QuantityControls extends StatelessWidget {
   final String itemId;
   final int quantity;
   final Function(String, int) onUpdateQuantity;
-  final bool isHovered;
 
   const _QuantityControls({
-    Key? key,
     required this.itemId,
     required this.quantity,
     required this.onUpdateQuantity,
-    required this.isHovered,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    // If quantity is 0, return nothing (Add button will be shown by parent)
-    if (quantity <= 0) {
-      // Post-frame callback to ensure safe update; the parent CartController should handle removal.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        onUpdateQuantity(itemId, 0);
-      });
-      return const SizedBox.shrink();
-    }
-
     return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      height: 35, // Match ADD button height
+      width: 85,  // Match ADD button width
       decoration: BoxDecoration(
-        color: isHovered
-            ? const Color(0xFFFF6E40).withAlpha(15)
-            : Colors.grey[50],
-        border: Border.all(color: const Color(0xFFFF6E40).withAlpha(50)),
+        color: AppTheme.primaryColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          GestureDetector(
-            onTap: () {
-              if (quantity > 1) {
-                onUpdateQuantity(itemId, quantity - 1);
-              } else {
-                onUpdateQuantity(itemId, 0);
-              }
-            },
-            child: Container(
-              width: 24,
-              height: 24,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.remove,
-                color: quantity > 0
-                    ? const Color(0xFFFF6E40)
-                    : Colors.grey[400],
-                size: 16,
-              ),
+          _buildBtn(Icons.remove, () => onUpdateQuantity(itemId, quantity - 1)),
+          Text(
+            '$quantity',
+            style: GoogleFonts.outfit(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(width: 4),
-          Container(
-            constraints: const BoxConstraints(minWidth: 16),
-            alignment: Alignment.center,
-            child: Text(
-              quantity.toString(),
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFFF6E40),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () => onUpdateQuantity(itemId, quantity + 1),
-            child: Container(
-              width: 24,
-              height: 24,
-              alignment: Alignment.center,
-              child: const Icon(Icons.add, color: Color(0xFFFF6E40), size: 16),
-            ),
-          ),
+          _buildBtn(Icons.add, () => onUpdateQuantity(itemId, quantity + 1)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBtn(IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: () {
+        HapticHelper.light();
+        onTap();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Icon(icon, color: Colors.white, size: 16),
       ),
     );
   }

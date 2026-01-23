@@ -1,1009 +1,658 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../../models/order.dart' as order_model;
+import 'package:flutter_vector_icons/flutter_vector_icons.dart';
+import '../../../models/order.dart' as model;
 import '../../providers/orders_provider.dart';
-import '../../providers/admin_auth_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import '../../widgets/staff_order_dialog.dart';
+import '../../widgets/table_orders_dialog.dart';
+import '../../widgets/order_details_dialog.dart';
+import '../../theme/admin_theme.dart';
 
 class OrdersScreen extends StatefulWidget {
   final String tenantId;
-
   const OrdersScreen({super.key, required this.tenantId});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
-  final _searchController = TextEditingController();
+class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  order_model.OrderStatus? _selectedStatus;
-  OrdersProvider? _ordersProvider;
-  bool _showFlash = false;
+  String? _selectedTableId;
+  model.OrderStatus? _selectedStatus;
+  bool _filterUrgentOnly = false;
+  
+  // Strict today boundaries
+  late DateTimeRange _dateRange;
+  String _dateFilterType = 'Today'; // ALL, Today, Range
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _ordersProvider = context.read<OrdersProvider>();
-      _ordersProvider?.initialize(widget.tenantId);
-      _ordersProvider?.addListener(_onOrdersChanged);
-      _ordersProvider?.addListener(_handleOrderEvents);
+    final now = DateTime.now();
+    _dateRange = DateTimeRange(
+      start: DateTime(now.year, now.month, now.day),
+      end: DateTime(now.year, now.month, now.day, 23, 59, 59, 999),
+    );
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
-    _ordersProvider?.removeListener(_onOrdersChanged);
-    _ordersProvider?.removeListener(_handleOrderEvents);
+    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onOrdersChanged() {
-    if (!mounted) return;
-    setState(() {});
-  }
-
-  void _handleOrderEvents() {
-    final provider = context.read<OrdersProvider>();
-    if (provider.latestNewOrder != null && mounted) {
-      final newOrder = provider.latestNewOrder!;
-      _showNewOrderNotification(newOrder);
-      _triggerFlash();
-      provider.clearLatestNewOrder();
-    }
-  }
-
-  void _triggerFlash() async {
-    setState(() => _showFlash = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _showFlash = false);
-  }
-
-  void _showNewOrderNotification(order_model.Order order) {
-    final bool isCustomerOrder = order.customerName != null && order.customerName!.isNotEmpty;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Consumer<OrdersProvider>(
+        builder: (context, provider, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.restaurant, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
+              _buildHeader(provider),
+              _buildTabSection(provider),
               Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: TabBarView(
+                  controller: _tabController,
                   children: [
-                    Text(
-                      'NEW ORDER: Table ${order.tableName ?? order.tableId ?? "N/A"}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    Text(
-                      'Order #${order.id.substring(0, 8)} • ${isCustomerOrder ? "Customer" : "Captain"}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
+                    _buildOrderList(provider, provider.currentOrders),
+                    _buildOrderList(provider, provider.pastOrders),
+                    _buildOrderList(provider, provider.pendingPaymentOrders),
                   ],
                 ),
               ),
             ],
-          ),
-        ),
-        backgroundColor: Colors.blue[800],
-        duration: const Duration(seconds: 10),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        action: SnackBarAction(
-          label: 'VIEW',
-          textColor: Colors.white,
-          onPressed: () {
-            setState(() {
-               _searchQuery = order.id.substring(0, 8).toLowerCase();
-               _searchController.text = _searchQuery;
-            });
-          },
-        ),
+          );
+        },
       ),
     );
   }
 
-  List<order_model.Order> _filterOrders(List<order_model.Order> orders, {order_model.OrderStatus? status}) {
-    var filtered = orders;
-    final auth = context.read<AdminAuthProvider>();
-
-    // Role-based filtering: Captains only see assigned tables
-    // if (auth.isCaptain && auth.assignedTables.isNotEmpty) {
-    //   filtered = filtered.where((order) => auth.assignedTables.contains(order.tableId)).toList();
-    // }
-
-    // Filter by search query
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered
-          .where(
-            (order) =>
-                order.id.toLowerCase().contains(_searchQuery) ||
-                (order.customerName ?? '').toLowerCase().contains(
-                  _searchQuery,
-                ) ||
-                (order.tableName ?? '').toLowerCase().contains(_searchQuery),
-          )
-          .toList();
-    }
-
-    // Filter by status
-    if (status != null) {
-      filtered = filtered.where((order) => order.status == status).toList();
-    }
-
-    return filtered;
-  }
-
-  Future<void> _updateOrderStatus(OrdersProvider provider, String orderId, order_model.OrderStatus status) async {
-    try {
-      await provider.updateOrderStatus(orderId, status);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Order status updated to ${status.displayName}',
-            ),
-            backgroundColor: _getStatusColor(status),
-            duration: const Duration(seconds: 2),
+  Widget _buildHeader(OrdersProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Order Management',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Manage and track ${provider.currentOrdersCount} active table orders',
+                style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
+              ),
+            ],
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update status: $e')),
-        );
-      }
-    }
+          Row(
+            children: [
+              _buildActionCircle(Ionicons.refresh_outline, 'Refresh Feed', () => provider.initialize(widget.tenantId)),
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (context) => StaffOrderDialog(tenantId: widget.tenantId),
+                ),
+                icon: const Icon(Ionicons.add_outline, size: 20),
+                label: const Text('New Order'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AdminTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  Future<void> _printKOT(order_model.Order order) async {
-    try {
-      final pdf = pw.Document();
-      final font = await PdfGoogleFonts.notoSansDevanagariRegular();
-      final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.roll80, // Standard KOT width
-          theme: pw.ThemeData.withFont(base: font, bold: boldFont),
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Center(
-                  child: pw.Text('KITCHEN ORDER TICKET',
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                ),
-                pw.Divider(),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Order ID: #${order.id.substring(0, 8)}'),
-                    pw.Text('Table: ${order.tableName ?? order.tableId ?? "N/A"}'),
-                  ],
-                ),
-                pw.Text('Time: ${DateFormat('hh:mm a').format(order.createdAt)}'),
-                pw.Divider(),
-                pw.SizedBox(height: 10),
-                pw.Table.fromTextArray(
-                  border: null,
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                  cellAlignment: pw.Alignment.centerLeft,
-                  headers: ['Item', 'Qty', 'Note'],
-                  data: order.items.map((item) => [
-                    item.name,
-                    item.quantity.toString(),
-                    item.notes ?? '',
-                  ]).toList(),
-                ),
-                pw.Divider(),
-                if (order.notes != null && order.notes!.isNotEmpty) ...[
-                  pw.SizedBox(height: 10),
-                  pw.Text('KITCHEN NOTES:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text(order.notes!),
-                ],
-                pw.SizedBox(height: 20),
-                pw.Center(child: pw.Text('---------------------')),
-              ],
-            );
-          },
-        ),
-      );
-
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'KOT_${order.id.substring(0, 8)}',
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to print KOT: $e')),
-        );
-      }
-    }
+  Widget _buildActionCircle(IconData icon, String label, VoidCallback onTap) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AdminTheme.primaryText,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        side: BorderSide(color: Colors.grey[200]!),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
-  Future<void> _showCancelDialog(order_model.Order order, OrdersProvider provider) async {
-    final reasonController = TextEditingController();
+  Widget _buildTabSection(OrdersProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelColor: AdminTheme.primaryColor,
+            unselectedLabelColor: AdminTheme.secondaryText,
+            indicatorColor: AdminTheme.primaryColor,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            dividerColor: Colors.grey[100],
+            tabs: [
+              Tab(text: 'Current Orders (${provider.currentOrdersCount})'),
+              Tab(text: 'Past Orders (${provider.pastOrdersCount})'),
+              Tab(text: 'Pending Payment (${provider.pendingPaymentOrdersCount})'),
+            ],
+          ),
+          const SizedBox(height: 24),
+          IntrinsicHeight(
+            child: _buildFilters(),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Order'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Are you sure you want to cancel this order?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
+  Widget _buildFilters() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F3F4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v),
               decoration: const InputDecoration(
-                hintText: 'Reason for cancellation (optional)',
-                border: OutlineInputBorder(),
+                hintText: 'Search by table, ID or item...',
+                prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
               ),
-              maxLines: 3,
             ),
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('NO'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                await provider.cancelOrder(order.id, reasonController.text);
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Order has been cancelled'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to cancel order: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text(
-              'YES, CANCEL',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getStatusColor(order_model.OrderStatus status) {
-    switch (status) {
-      case order_model.OrderStatus.pending:
-        return Colors.orange;
-      case order_model.OrderStatus.preparing:
-        return Colors.blue;
-      case order_model.OrderStatus.ready:
-        return Colors.green;
-      case order_model.OrderStatus.served:
-      case order_model.OrderStatus.completed:
-        return Colors.teal;
-      case order_model.OrderStatus.cancelled:
-        return Colors.red;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<OrdersProvider>(
-      builder: (context, provider, _) {
-        final allOrders = provider.allOrders;
-        final activeOrders = allOrders.where((o) =>
-          o.status == order_model.OrderStatus.pending ||
-          o.status == order_model.OrderStatus.preparing ||
-          o.status == order_model.OrderStatus.ready ||
-          o.status == order_model.OrderStatus.served
-        ).toList();
-
-        activeOrders.sort((a, b) {
-          if (a.urgencyScore != b.urgencyScore) {
-            return b.urgencyScore.compareTo(a.urgencyScore);
-          }
-          return a.createdAt.compareTo(b.createdAt);
-        });
-
-        final historyOrders = allOrders.where((o) =>
-          o.status == order_model.OrderStatus.completed ||
-          o.status == order_model.OrderStatus.cancelled
-        ).toList();
-        historyOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-        return Stack(
-          children: [
-            Scaffold(
-              backgroundColor: Colors.grey[50],
-              appBar: AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                title: const Text(
-                  'Orders Flow',
-                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                ),
-                actions: [
-                  Container(
-                    margin: const EdgeInsets.only(right: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.autorenew, size: 16, color: Colors.blue),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Auto Flow: ON',
-                          style: TextStyle(
-                            color: Colors.blue[700],
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              body: provider.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(child: _buildStatsBar(activeOrders)),
-                      SliverToBoxAdapter(child: _buildSearchBar()),
-                      SliverToBoxAdapter(child: _buildFilterChips()),
-                      if (_selectedStatus != null)
-                        _buildSliverOrderList('FILTERED: ${_selectedStatus!.displayName.toUpperCase()}', _filterOrders(allOrders, status: _selectedStatus), provider)
-                      else ...[
-                        _buildSliverOrderList('LIVE ORDERS (${_filterOrders(activeOrders).length})', _filterOrders(activeOrders), provider),
-                        _buildSliverOrderList('RECENT HISTORY', _filterOrders(historyOrders), provider, isHistory: true),
-                      ]
-                    ],
-                  ),
-            ),
-            if (_showFlash) _buildFlashOverlay(),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildStatsBar(List<order_model.Order> activeOrders) {
-    if (context.read<AdminAuthProvider>().isCaptain) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          _buildStatCard('PREPARING', activeOrders.where((o) => o.status != order_model.OrderStatus.ready).length, Colors.blue),
+        const SizedBox(width: 16),
+        _buildFilterChip(Ionicons.restaurant_outline, 'All Tables', _selectedTableId != null, () {}),
+        const SizedBox(width: 12),
+        _buildFilterChip(Ionicons.time_outline, 'Preparing', _selectedStatus == model.OrderStatus.preparing, () {
+          setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.preparing ? null : model.OrderStatus.preparing);
+        }),
+        const SizedBox(width: 12),
+        _buildFilterChip(Ionicons.checkmark_done_outline, 'Ready', _selectedStatus == model.OrderStatus.ready, () {
+          setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.ready ? null : model.OrderStatus.ready);
+        }),
+        const SizedBox(width: 12),
+        _buildFilterChip(Ionicons.alert_outline, 'Priority', _filterUrgentOnly, () {
+          setState(() => _filterUrgentOnly = !_filterUrgentOnly);
+        }),
+        if (_tabController.index == 1 || _tabController.index == 2) ...[
+          const SizedBox(width: 24),
+          const VerticalDivider(width: 1, color: Color(0xFFE0E0E0)),
+          const SizedBox(width: 24),
+          _buildDateChip('ALL', _dateFilterType == 'ALL'),
           const SizedBox(width: 12),
-          _buildStatCard('READY', activeOrders.where((o) => o.status == order_model.OrderStatus.ready).length, Colors.green),
+          _buildDateChip('Today', _dateFilterType == 'Today'),
+          const SizedBox(width: 12),
+          _buildDateChip(
+            _dateFilterType != 'Range' ? 'Date range' : '${DateFormat('MMM dd').format(_dateRange.start)} - ${DateFormat('MMM dd').format(_dateRange.end)}',
+            _dateFilterType == 'Range',
+            isRange: true,
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String label, int count, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              count.toString(),
-              style: TextStyle(
-                color: color,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search table or order #...',
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-        ),
-        onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
-        children: [
-          FilterChip(
-            label: const Text('All Orders'),
-            selected: _selectedStatus == null,
-            onSelected: (selected) {
-              setState(() => _selectedStatus = null);
-            },
-            selectedColor: Colors.blue.withOpacity(0.2),
-            checkmarkColor: Colors.blue,
-          ),
-          const SizedBox(width: 8),
-          ...order_model.OrderStatus.values.map((status) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(status.displayName),
-                selected: _selectedStatus == status,
-                onSelected: (selected) {
-                  setState(() => _selectedStatus = selected ? status : null);
-                },
-                selectedColor: _getStatusColor(status).withOpacity(0.2),
-                checkmarkColor: _getStatusColor(status),
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSliverOrderList(String title, List<order_model.Order> orders, OrdersProvider provider, {bool isHistory = false}) {
-    if (orders.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-    return SliverMainAxisGroup(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: isHistory ? Colors.grey[600] : (_selectedStatus != null ? _getStatusColor(_selectedStatus!) : Colors.grey[600]),
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => Opacity(
-              opacity: isHistory ? 0.7 : 1.0,
-              child: AnimatedOrderCard(
-                key: ValueKey(orders[index].id),
-                child: _buildCompactOrderCard(orders[index], provider),
-              ),
-            ),
-            childCount: orders.length,
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildCompactOrderCard(order_model.Order order, OrdersProvider provider) {
-    // 2️⃣ Simple English time (P0)
-    final elapsedText = order.elapsedText;
-    final isLate = elapsedText.contains('Late');
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      elevation: 4,
-      shadowColor: isLate ? Colors.red.withOpacity(0.4) : Colors.black26,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: isLate ? Colors.red : _getStatusColor(order.status).withOpacity(0.5),
-          width: 2,
+  Widget _buildDateChip(String label, bool isActive, {bool isRange = false}) {
+    return GestureDetector(
+      onTap: () {
+        if (isRange) {
+          _selectDateRange();
+        } else if (label == 'ALL') {
+          setState(() {
+            _dateFilterType = 'ALL';
+          });
+        } else {
+          setState(() {
+            _dateFilterType = 'Today';
+            final now = DateTime.now();
+            _dateRange = DateTimeRange(
+              start: DateTime(now.year, now.month, now.day),
+              end: DateTime(now.year, now.month, now.day, 23, 59, 59, 999),
+            );
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? AdminTheme.primaryColor : Colors.white,
+          border: Border.all(color: isActive ? AdminTheme.primaryColor : Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isRange ? Ionicons.calendar_outline : Ionicons.today_outline, size: 16, color: isActive ? Colors.white : AdminTheme.secondaryText),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isActive ? Colors.white : AdminTheme.primaryText,
+              ),
+            ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header: Big Table Name & Status
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _getStatusColor(order.status).withOpacity(0.1),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      order.tableName ?? 'TAKEAWAY',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    if (order.captainName != null || order.customerName != null)
-                      Text(
-                        'By: ${order.captainName ?? order.customerName}',
-                        style: TextStyle(fontSize: 16, color: Colors.indigo[900], fontWeight: FontWeight.w900),
-                      ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      elapsedText,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isLate ? Colors.red : (elapsedText.contains('Just') ? Colors.green : Colors.grey[700]),
-                      ),
-                    ),
-                    Text(
-                      '#${order.id.substring(0, 8)}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+    );
+  }
 
-          // Items List (Expanded by default for kitchen)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              children: order.items.map((item) => _buildOrderItem(item, order.id, provider)).toList(),
-            ),
-          ),
+  Future<void> _selectDateRange() async {
+    // For a "small popup", let's use a standard DatePicker first.
+    // If they want a range, we can show two pickers or a compact custom dialog.
+    final DateTime? start = await showDatePicker(
+      context: context,
+      initialDate: _dateRange.start,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now(),
+      helpText: 'SELECT START DATE',
+    );
 
-          // Global Note
-          if (order.notes != null && order.notes!.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber[100],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber[800]!, width: 2),
+    if (start != null) {
+      final DateTime? end = await showDatePicker(
+        context: context,
+        initialDate: start,
+        firstDate: start,
+        lastDate: DateTime.now(),
+        helpText: 'SELECT END DATE',
+      );
+
+      if (end != null) {
+        setState(() {
+          _dateFilterType = 'Range';
+          _dateRange = DateTimeRange(
+            start: DateTime(start.year, start.month, start.day),
+            end: DateTime(end.year, end.month, end.day, 23, 59, 59, 999),
+          );
+        });
+      }
+    }
+  }
+
+  Widget _buildFilterChip(IconData icon, String label, bool isActive, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? AdminTheme.primaryColor.withOpacity(0.1) : Colors.white,
+          border: Border.all(color: isActive ? AdminTheme.primaryColor : Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isActive ? AdminTheme.primaryColor : AdminTheme.secondaryText),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isActive ? AdminTheme.primaryColor : AdminTheme.primaryText)),
+            const SizedBox(width: 4),
+            const Icon(Ionicons.chevron_down, size: 12, color: AdminTheme.secondaryText),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderList(OrdersProvider provider, List<model.Order> orders) {
+    // Apply local filters/search (Requirement says must query backend, but provider manages the state)
+    var list = _searchQuery.isEmpty ? orders : provider.searchOrders(_searchQuery).where((o) => orders.contains(o)).toList();
+    
+    // Apply Status Filter (for Current Orders)
+    if (_tabController.index == 0) {
+      if (_selectedStatus != null) {
+        list = list.where((o) => o.status == _selectedStatus).toList();
+      }
+      if (_filterUrgentOnly) {
+        list = list.where((o) => o.isUrgent).toList();
+      }
+    }
+
+    // Apply Date Filter for Past Orders and Pending Payments
+    if (_tabController.index == 1 || _tabController.index == 2) {
+      if (_dateFilterType != 'ALL') {
+        list = list.where((o) {
+          // Explicit boundary check
+          final time = o.createdAt;
+          return time.isAfter(_dateRange.start.subtract(const Duration(milliseconds: 1))) && 
+                 time.isBefore(_dateRange.end.add(const Duration(milliseconds: 1)));
+        }).toList();
+      }
+    }
+
+    // Comprehensive Sorting Logic
+    list.sort((a, b) {
+      // 1. If tracking Current Orders, prioritize Urgent
+      if (_tabController.index == 0) {
+        if (a.isUrgent && !b.isUrgent) return -1;
+        if (!a.isUrgent && b.isUrgent) return 1;
+      }
+      
+      // 2. Default to Newest First (Chronological)
+      return b.createdAt.compareTo(a.createdAt);
+    });
+
+    if (list.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Ionicons.receipt_outline, size: 64, color: Colors.grey[200]),
+            const SizedBox(height: 16),
+            const Text('No orders found for this view', style: TextStyle(color: AdminTheme.secondaryText)),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(32),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 420,
+        mainAxisExtent: 340,
+        crossAxisSpacing: 24,
+        mainAxisSpacing: 24,
+      ),
+      itemCount: list.length,
+      itemBuilder: (context, index) => _OrderCard(order: list[index]),
+    );
+  }
+}
+
+class _OrderCard extends StatelessWidget {
+  final model.Order order;
+  const _OrderCard({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _getStatusColor(order.status);
+    final isUrgent = order.isUrgent;
+
+    return InkWell(
+      onTap: () {
+        final isPast = order.status == model.OrderStatus.completed || 
+                       order.status == model.OrderStatus.cancelled;
+        
+        showDialog(
+          context: context,
+          builder: (context) => isPast 
+            ? OrderDetailsDialog(order: order)
+            : TableOrdersDialog(
+                tenantId: order.tenantId, 
+                tableId: order.tableId ?? '', 
+                tableName: order.tableName ?? 'Table'
               ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isUrgent ? AdminTheme.critical : Colors.grey[100]!, width: isUrgent ? 2 : 1),
+          boxShadow: [
+            BoxShadow(
+              color: isUrgent ? AdminTheme.critical.withOpacity(0.05) : Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.amber[900]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'NOTE: ${order.notes}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: Colors.amber[900],
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.tableName ?? 'Table',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Ionicons.time_outline, size: 12, color: isUrgent ? AdminTheme.critical : AdminTheme.secondaryText),
+                          const SizedBox(width: 4),
+                          Text(
+                            order.elapsedText,
+                            style: TextStyle(
+                              fontSize: 12, 
+                              fontWeight: FontWeight.bold, 
+                              color: isUrgent ? AdminTheme.critical : AdminTheme.secondaryText
+                            ),
+                          ),
+                          if (isUrgent) ...[
+                            const SizedBox(width: 8),
+                            const Text('• URGENT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AdminTheme.critical, letterSpacing: 0.5)),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
+                  _buildStatusBadge(order.status),
                 ],
               ),
             ),
-
-          const Divider(height: 1, thickness: 1),
-
-          // LARGE HIGH-CONTRAST BUTTONS
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                if (order.status == order_model.OrderStatus.pending)
-                  Expanded(
-                    child: _buildKitchenButton(
-                      label: 'START PREPARING',
-                      color: Colors.blue[700]!,
-                      icon: Icons.restaurant,
-                      onPressed: () => _updateOrderStatus(provider, order.id, order_model.OrderStatus.preparing),
-                    ),
-                  ),
-                if (order.status == order_model.OrderStatus.preparing)
-                  Expanded(
-                    child: _buildKitchenButton(
-                      label: 'MARK READY',
-                      color: Colors.green[700]!,
-                      icon: Icons.check_circle,
-                      onPressed: () => _updateOrderStatus(provider, order.id, order_model.OrderStatus.ready),
-                    ),
-                  ),
-                if (order.status == order_model.OrderStatus.ready)
-                  Expanded(
-                    child: _buildKitchenButton(
-                      label: 'MARK SERVED',
-                      color: Colors.teal[700]!,
-                      icon: Icons.delivery_dining,
-                      onPressed: () => _updateOrderStatus(provider, order.id, order_model.OrderStatus.served),
-                    ),
-                  ),
-                if (order.status == order_model.OrderStatus.served)
-                   Expanded(
-                    child: _buildKitchenButton(
-                      label: 'COLLECT CASH & CLOSE',
-                      color: Colors.indigo[800]!,
-                      icon: Icons.payments,
-                      onPressed: () => provider.markAsPaid(order.id),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKitchenButton({
-    required String label,
-    required Color color,
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 28),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 8,
-      ),
-    );
-  }
-
-  /// 4️⃣ Item-level status display and control (P0)
-  Widget _buildOrderItem(order_model.OrderItem item, String orderId, OrdersProvider provider) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-        color: item.status == order_model.OrderItemStatus.served ? Colors.green[50] : null,
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${item.quantity}x',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            const Divider(height: 1),
+            // Items
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                itemCount: order.items.length,
+                itemBuilder: (context, idx) {
+                  final item = order.items[idx];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _getItemStatusColor(item.status),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            item.status.displayName,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(4)),
+                          child: Text('${item.quantity}x', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AdminTheme.primaryText)),
+                              if (item.notes != null && item.notes!.isNotEmpty)
+                                Text(item.notes!, style: const TextStyle(fontSize: 12, color: AdminTheme.warning, fontStyle: FontStyle.italic)),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    if (item.notes != null && item.notes!.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.deepOrange[50],
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.deepOrange),
-                        ),
-                        child: Text(
-                          'INSTRUCTION: ${item.notes}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.deepOrange,
-                          ),
-                        ),
-                      ),
-                    if (item.isAddon)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'NEW ADD-ON',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                  );
+                },
               ),
-              const SizedBox(width: 8),
-              Text(
-                '₹${(item.price * item.quantity).toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          // Item-level status buttons
-          if (item.status != order_model.OrderItemStatus.served && item.status != order_model.OrderItemStatus.cancelled)
+            ),
+            const Divider(height: 1),
+            // Actions
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  if (item.status == order_model.OrderItemStatus.pending)
-                    Expanded(
-                      child: _buildItemStatusButton(
-                        'Start Cooking',
-                        Colors.blue,
-                        () => provider.updateOrderItemStatus(orderId, item.id, order_model.OrderItemStatus.preparing),
+                  Expanded(
+                    flex: 3,
+                    child: _buildActionButton(context),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        final isPast = order.status == model.OrderStatus.completed || 
+                                       order.status == model.OrderStatus.cancelled;
+                        
+                        showDialog(
+                          context: context,
+                          builder: (context) => isPast 
+                            ? OrderDetailsDialog(order: order)
+                            : TableOrdersDialog(
+                                tenantId: order.tenantId, 
+                                tableId: order.tableId ?? '', 
+                                tableName: order.tableName ?? 'Table'
+                              ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AdminTheme.secondaryText,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: Colors.grey[200]!),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
+                      child: const Text('Details', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                  if (item.status == order_model.OrderItemStatus.preparing)
-                    Expanded(
-                      child: _buildItemStatusButton(
-                        'Mark Ready',
-                        Colors.green,
-                        () => provider.updateOrderItemStatus(orderId, item.id, order_model.OrderItemStatus.ready),
-                      ),
-                    ),
-                  if (item.status == order_model.OrderItemStatus.ready)
-                    Expanded(
-                      child: _buildItemStatusButton(
-                        'Mark Served',
-                        Colors.teal,
-                        () => provider.updateOrderItemStatus(orderId, item.id, order_model.OrderItemStatus.served),
-                      ),
-                    ),
+                  ),
                 ],
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildItemStatusButton(String label, Color color, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Color _getItemStatusColor(order_model.OrderItemStatus status) {
-    switch (status) {
-      case order_model.OrderItemStatus.pending:
-        return Colors.orange;
-      case order_model.OrderItemStatus.preparing:
-        return Colors.blue;
-      case order_model.OrderItemStatus.ready:
-        return Colors.green;
-      case order_model.OrderItemStatus.served:
-        return Colors.teal;
-      case order_model.OrderItemStatus.cancelled:
-        return Colors.red;
-    }
-  }
-
-  Widget _buildFlashOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.orange.withOpacity(0.3),
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 20, spreadRadius: 5),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.notifications_active, color: Colors.orange, size: 40),
-                SizedBox(width: 20),
-                Text(
-                  'NEW ORDER ALERT!',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.orange[900],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-          ),
-        ],
+  Widget _buildActionButton(BuildContext context) {
+    final provider = context.read<OrdersProvider>();
+    String label = 'Mark Served';
+    Color color = AdminTheme.primaryColor;
+    VoidCallback? action;
+
+    if (order.status == model.OrderStatus.pending) {
+      label = 'Accept Order';
+      color = AdminTheme.info;
+      action = () => provider.updateOrderStatus(order.id, model.OrderStatus.preparing);
+    } else if (order.status == model.OrderStatus.preparing) {
+      label = 'Ready to Serve';
+      color = AdminTheme.warning;
+      action = () => provider.updateOrderStatus(order.id, model.OrderStatus.ready);
+    } else if (order.status == model.OrderStatus.ready) {
+      label = 'Mark Served';
+      color = AdminTheme.success;
+      action = () => _handleMarkServed(context, provider);
+    } else if (order.status == model.OrderStatus.served) {
+      if (order.paymentStatus == model.PaymentStatus.pending) {
+        label = 'Mark as Paid';
+        color = AdminTheme.success;
+        action = () => provider.markAsPaid(order.id);
+      } else {
+        label = 'Already Served';
+        color = AdminTheme.secondaryText;
+        action = null;
+      }
+    }
+
+    return ElevatedButton(
+      onPressed: action,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        elevation: 0,
       ),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
-}
 
-class AnimatedOrderCard extends StatefulWidget {
-  final Widget child;
-
-  const AnimatedOrderCard({super.key, required this.child});
-
-  @override
-  State<AnimatedOrderCard> createState() => _AnimatedOrderCardState();
-}
-
-class _AnimatedOrderCardState extends State<AnimatedOrderCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<Offset> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.05), // Slide down slightly
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
-
-    _controller.forward();
+  void _handleMarkServed(BuildContext context, OrdersProvider provider) async {
+    await provider.updateOrderStatus(order.id, model.OrderStatus.served);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Table ${order.tableName} served. Inventory updated.'),
+          backgroundColor: AdminTheme.success,
+        ),
+      );
+    }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  Widget _buildStatusBadge(model.OrderStatus status) {
+    Color color;
+    String label;
+    switch (status) {
+      case model.OrderStatus.pending:
+        color = AdminTheme.info;
+        label = 'NEW';
+        break;
+      case model.OrderStatus.preparing:
+        color = AdminTheme.warning;
+        label = 'PREPARING';
+        break;
+      case model.OrderStatus.ready:
+        color = AdminTheme.success;
+        label = 'READY';
+        break;
+      case model.OrderStatus.served:
+        color = Colors.blue;
+        label = 'SERVED';
+        break;
+      default:
+        color = AdminTheme.secondaryText;
+        label = status.name.toUpperCase();
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+      child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
-      ),
-    );
+  Color _getStatusColor(model.OrderStatus status) {
+    switch (status) {
+      case model.OrderStatus.pending: return AdminTheme.info;
+      case model.OrderStatus.preparing: return AdminTheme.warning;
+      case model.OrderStatus.ready: return AdminTheme.success;
+      case model.OrderStatus.served: return Colors.blue;
+      default: return AdminTheme.secondaryText;
+    }
   }
 }

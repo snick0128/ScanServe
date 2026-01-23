@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:scan_serve/services/tenant_service.dart';
+import 'package:scan_serve/models/order_model.dart';
 import '../controllers/menu_controller.dart' as app_controller;
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
@@ -15,6 +17,11 @@ import 'view_order_bar.dart';
 import 'order_list_screen.dart';
 import '../utils/snackbar_helper.dart';
 import '../services/offline_service.dart';
+import 'cart_page.dart';
+import '../theme/app_theme.dart';
+import '../utils/haptic_helper.dart';
+import 'filter_bottom_sheet.dart';
+import 'payment_page.dart';
 
 class HomePage extends StatelessWidget {
   final String tenantId;
@@ -40,9 +47,7 @@ class _HomeContentState extends State<HomeContent> {
   String? _tenantName;
   bool _isLoadingTenant = true;
   bool? _isVegOnly;
-  bool _showNonVeg = true;
-  String? _guestId;
-  final ScrollController _mostOrderedScrollController = ScrollController();
+  int _selectedIndex = 1; // Default to Menu
 
   @override
   void initState() {
@@ -50,87 +55,19 @@ class _HomeContentState extends State<HomeContent> {
     _initializeSession();
     _loadTenantInfo();
 
-    // Initialize scroll controller
-    // Initialize scroll controller
-
-    // Load menu items when the home content is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final menuController = context.read<app_controller.MenuController>();
       menuController.loadMenuItems(widget.tenantId);
-      // Set default filter to Show All
-      menuController.setVegFilter(true);
     });
-  }
-
-
-
-  @override
-  void dispose() {
-    _mostOrderedScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _initializeSession() async {
     try {
       final sessionService = SessionService();
-      final orderController = context.read<OrderController>();
-
-      // Create or get guest session
-      if (_guestId == null) {
-        _guestId = await sessionService.createGuestSession(widget.tenantId);
-        // Order type is already set by app.dart based on URL parameters
-        final currentOrderType = orderController.currentOrderType;
-        final currentTableId = orderController.currentSession?.tableId;
-        await sessionService.updateGuestSession(
-          _guestId!,
-          currentOrderType,
-          tableId: currentTableId,
-        );
-      }
-
-      // Show snackbar notification
-      _showOrderTypeNotification();
+      final guestId = await sessionService.createGuestSession(widget.tenantId);
     } catch (e) {
       print('Error initializing session: $e');
     }
-  }
-
-  void _showOrderTypeNotification() {
-    final orderController = context.read<OrderController>();
-    final currentOrderType = orderController.currentOrderType;
-    final tableId = orderController.currentSession?.tableId;
-
-    SnackbarHelper.showTopSnackBar(
-      context,
-      'Order type: ${currentOrderType.toString().split('.').last}${tableId != null ? ' - Table $tableId' : ''}',
-      duration: const Duration(seconds: 2),
-    );
-  }
-
-  /// Format table ID from 'Table_1' or 'table_1' to 'T1'
-  String _formatTableId(String tableId) {
-    // Remove 'table_' or 'Table_' prefix and convert to T{number}
-    final cleaned = tableId.replaceAll(
-      RegExp(r'[Tt]able[_-]?', caseSensitive: false),
-      '',
-    );
-    return 'T$cleaned';
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // TODO: Re-enable offline service when properly configured
-    // final offlineService = Provider.of<OfflineService>(context);
-    // offlineService.connectionStatus.listen((isOnline) {
-    //   if (mounted) {
-    //     if (isOnline) {
-    //       offlineService.showOnlineSnackbar(context);
-    //     } else {
-    //       offlineService.showOfflineSnackbar(context);
-    //     }
-    //   }
-    // });
   }
 
   Future<void> _loadTenantInfo() async {
@@ -138,602 +75,488 @@ class _HomeContentState extends State<HomeContent> {
       final tenantService = TenantService();
       final tenant = await tenantService.getTenantInfo(widget.tenantId);
       if (mounted) {
-        final isVegOnly = tenant?.isVegOnly ?? false;
         setState(() {
           _tenantName = tenant?.name ?? 'Restaurant';
-          _isVegOnly = isVegOnly;
-          if (isVegOnly) {
-            _showNonVeg = false;
-          }
+          _isVegOnly = tenant?.isVegOnly ?? false;
           _isLoadingTenant = false;
         });
-
-        if (isVegOnly) {
-          context.read<app_controller.MenuController>().setVegFilter(false);
-        }
       }
     } catch (e) {
       print('Error loading tenant info: $e');
       if (mounted) {
         setState(() {
           _tenantName = 'Restaurant';
-          _isVegOnly = false;
           _isLoadingTenant = false;
         });
       }
     }
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  Future<void> _callWaiter() async {
+    HapticHelper.medium();
+    try {
+      final waiterCallService = WaiterCallService();
+      final guestSessionService = GuestSessionService();
+      final guestId = await guestSessionService.getGuestId();
+      final session = await guestSessionService.getCurrentSession();
+      final profile = await guestSessionService.getGuestProfile();
+      
+      await waiterCallService.createWaiterCall(
+        tenantId: widget.tenantId,
+        guestId: guestId,
+        tableId: session['tableId'],
+        tableName: session['tableId'] != null ? 'Table ${session['tableId']}' : null,
+        customerName: profile?.name,
+      );
+      
+      if (mounted) {
+        SnackbarHelper.showTopSnackBar(context, 'Waiter called! Someone will be with you shortly.');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarHelper.showTopSnackBar(context, 'Failed to call waiter. Please try again.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: _selectedIndex == 2 ? null : _buildAppBar(),
+      body: _buildBody(),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
 
-    // Enhanced responsive breakpoints for better UX with Material 3
-    double searchBarMaxWidth;
-    EdgeInsets searchPadding;
-    double appBarElevation;
-    double iconSize;
+  PreferredSizeWidget _buildAppBar() {
+    if (_selectedIndex == 2) {
+      return AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
+          style: GoogleFonts.outfit(
+            color: AppTheme.primaryText,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
 
-    if (screenWidth < 480) {
-      // Very small mobile
-      searchBarMaxWidth = double.infinity;
-      searchPadding = const EdgeInsets.fromLTRB(12, 12, 12, 20);
-      appBarElevation = 2;
-      iconSize = 22;
-    } else if (screenWidth < 600) {
-      // Mobile
-      searchBarMaxWidth = double.infinity;
-      searchPadding = const EdgeInsets.fromLTRB(16, 12, 16, 20);
-      appBarElevation = 2;
-      iconSize = 24;
-    } else if (screenWidth < 900) {
-      // Tablet portrait
-      searchBarMaxWidth = 450;
-      searchPadding = const EdgeInsets.fromLTRB(20, 16, 20, 24);
-      appBarElevation = 3;
-      iconSize = 26;
-    } else if (screenWidth < 1200) {
-      // Tablet landscape
-      searchBarMaxWidth = 500;
-      searchPadding = const EdgeInsets.fromLTRB(24, 20, 24, 28);
-      appBarElevation = 4;
-      iconSize = 28;
-    } else {
-      // Desktop
-      searchBarMaxWidth = 550;
-      searchPadding = const EdgeInsets.fromLTRB(28, 24, 28, 32);
-      appBarElevation = 4;
-      iconSize = 30;
+    return AppBar(
+      backgroundColor: AppTheme.backgroundColor,
+      elevation: 0,
+      centerTitle: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+      title: Row(
+        children: [
+          Text(
+            _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
+            style: GoogleFonts.outfit(
+              color: AppTheme.primaryText,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.primaryColor, width: 1),
+            ),
+            child: const Text(
+              'OPEN',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        Consumer<OrderController>(
+          builder: (context, orderController, child) {
+            if (orderController.currentOrderType == OrderType.dineIn &&
+                orderController.currentSession?.tableId != null) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.table_restaurant, size: 14, color: AppTheme.primaryColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Table ${orderController.currentSession!.tableId}',
+                        style: GoogleFonts.outfit(
+                          color: AppTheme.primaryColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_selectedIndex == 2) {
+      return CartPage(
+        tenantId: widget.tenantId,
+        onBack: () => setState(() => _selectedIndex = 1),
+        onOrderPlaced: () => setState(() => _selectedIndex = 0),
+      );
+    }
+    if (_selectedIndex == 0) {
+      return const OrderListScreen();
     }
 
     return Stack(
       children: [
-        Scaffold(
-          backgroundColor: Colors.grey[50],
-          extendBody: true,
-          resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            backgroundColor: Colors.grey[50],
-            surfaceTintColor: Colors.transparent,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                StreamBuilder<bool>(
-                  stream: context.read<OfflineService>().connectionStatus,
-                  initialData: context.read<OfflineService>().isOnline,
-                  builder: (context, snapshot) {
-                    final isOnline = snapshot.data ?? true;
-                    if (isOnline) return const SizedBox.shrink();
-                    return Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      color: Colors.orange,
-                      child: const Center(
-                        child: Text(
-                          'Offline – actions will sync when internet returns',
-                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final orderController = context.watch<OrderController>();
-                    final tableId = orderController.currentSession?.tableId;
+        Column(
+          children: [
+            // Filter chips
+            _buildFilterChips(),
 
-                    return Container(
-                      constraints: BoxConstraints(
-                        maxWidth: constraints.maxWidth * 0.8,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(left: searchPadding.left),
-                              child: Text(
-                                _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                maxLines: 1,
-                              ),
-                            ),
-                            if (tableId != null && tableId.isNotEmpty) ...[
-                              const SizedBox(width: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Colors.deepPurple, Colors.deepPurpleAccent],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.deepPurple.withOpacity(0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  _formatTableId(tableId),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+            // Menu items (Scrollable area)
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildSectionTitle('Browse Menu'),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: MenuGrid(),
+                    ),
+                    // Padding at bottom for floating unit
+                    const SizedBox(height: 100),
+                  ],
                 ),
-              ],
+              ),
             ),
-            elevation: appBarElevation,
-            actions: [
-              // Veg/Non-Veg single dot indicator
-              if (!_isLoadingTenant)
-                Container(
-                  margin: const EdgeInsets.only(
-                    right: 4,
-                  ), // Reduced right margin
-                  child: InkWell(
-                    onTap: (_isVegOnly == true)
-                        ? null
-                        : () {
-                            setState(() {
-                              _showNonVeg = !_showNonVeg;
-                            });
-                            // Update veg filter in menu controller
-                            final menuController = context
-                                .read<app_controller.MenuController>();
-                            menuController.setVegFilter(_showNonVeg);
-                          },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10, // Reduced horizontal padding
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _showNonVeg
-                            ? Colors.red.withAlpha(15)
-                            : Colors.green.withAlpha(25),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _showNonVeg
-                              ? Colors.red.withAlpha(50)
-                              : Colors.green.withAlpha(50),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Single dot indicator
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: _showNonVeg ? Colors.red : Colors.green,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _showNonVeg ? 'Non-Veg' : 'Veg',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: _showNonVeg ? Colors.red : Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
+          ],
+        ),
+
+        // Floating Search & Menu Bar (Visually hovering above View Cart)
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 12, // Gap of 12px from whatever is below (View Cart or Tabs)
+          child: Row(
+            children: [
+              Expanded(
+                child: custom_search.SearchBar(maxWidth: double.infinity),
+              ),
+              const SizedBox(width: 12),
+              _buildCallWaiterButton(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCallWaiterButton() {
+    return InkWell(
+      onTap: _callWaiter,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C1E), // Black background
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.notifications_active_outlined,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Waiter',
+              style: GoogleFonts.outfit(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          _buildChip('Filter', Icons.tune),
+          _buildChip('Veg', null, isVeg: true),
+          _buildChip('Non-Veg', null, isNonVeg: true),
+          _buildChip('Bestseller', null),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(String label, IconData? icon, {bool isVeg = false, bool isNonVeg = false}) {
+    final menuController = context.watch<app_controller.MenuController>();
+    bool isActive = false;
+    
+    if (isVeg) isActive = menuController.isVegOnly;
+    if (isNonVeg) isActive = menuController.isNonVegOnly;
+    if (label == 'Bestseller') isActive = menuController.isBestsellerOnly; 
+    if (label == 'Filter') isActive = menuController.activeFiltersCount > 0;
+
+    return GestureDetector(
+      onTap: () {
+        HapticHelper.light();
+        if (label == 'Filter') {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            useRootNavigator: false, // Ensures it opens relative to this context
+            backgroundColor: Colors.transparent,
+            builder: (context) => const FilterBottomSheet(),
+          );
+        } else if (isVeg) {
+          menuController.toggleVegOnly();
+        } else if (isNonVeg) {
+          menuController.toggleNonVegOnly();
+        } else if (label == 'Bestseller') {
+          menuController.toggleBestsellerOnly();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? AppTheme.lightGreen : AppTheme.backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? AppTheme.primaryColor : AppTheme.borderColor,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (label == 'Filter' && menuController.activeFiltersCount > 0) ...[
+              Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${menuController.activeFiltersCount}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (isVeg || isNonVeg) ...[
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: isVeg ? Colors.green : Colors.red, width: 1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Icon(Icons.fiber_manual_record, size: 8, color: isVeg ? Colors.green : Colors.red),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: AppTheme.primaryText),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                color: AppTheme.primaryText,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              IconButton(
-                iconSize: iconSize,
-                icon: const Icon(Icons.receipt_long),
-                onPressed: () {
+  Widget _buildSectionTitle(String title) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          title.toUpperCase(),
+          style: GoogleFonts.outfit(
+            color: AppTheme.primaryText,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    // REQUIREMENT 3: Hide Bottom Navigation Bar and View Cart bar in Cart context
+    if (_selectedIndex == 2) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Grounded "View Cart" Bar
+        Consumer2<CartController, OrderController>(
+          builder: (context, cart, orderController, child) {
+            final hasCartItems = cart.items.isNotEmpty;
+            final hasActiveOrders = orderController.activeOrders.isNotEmpty;
+
+            if (!hasCartItems && !hasActiveOrders) return const SizedBox.shrink();
+
+            // REQUIREMENT 5: Cart CTA State Logic
+            // Default "View Cart", "Pay" if cart empty but orders pending
+            final bool showPay = !hasCartItems && hasActiveOrders;
+            final String ctaText = showPay ? 'Pay' : 'View Cart';
+            
+            final String amountText = showPay
+                ? 'Total Bill: ₹${orderController.activeOrders.fold<double>(0, (sum, order) => sum + order.total).toStringAsFixed(2)}'
+                : '${cart.itemCount} ${cart.itemCount == 1 ? 'item' : 'items'} • ₹${cart.totalAmount.toStringAsFixed(2)}';
+            
+            return GestureDetector(
+              onTap: () {
+                if (showPay) {
+                  HapticHelper.medium();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const OrderListScreen(),
+                      builder: (context) => PaymentPage(tenantId: widget.tenantId),
                     ),
                   );
-                },
-                tooltip: 'View Orders',
-              ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: Size.fromHeight(screenWidth < 600 ? 48 : 52),
-              child: const MealTimeTabs(),
-            ),
-          ),
-          body: Column(
-            children: [
-              // Fixed Search Bar Section
-              Container(
-                color: Colors.transparent, // Transparent background
-                padding: searchPadding,
-                child: custom_search.SearchBar(maxWidth: searchBarMaxWidth),
-              ),
-
-              // Removed separator for cleaner look
-
-              // Scrollable Content
-              Expanded(
-                child: Container(
-                  color: Colors.transparent, // Transparent to show Scaffold background
-                  padding: const EdgeInsets.fromLTRB(
-                    4,
-                    0,
-                    4,
-                    0,
-                  ), // Fixed 4px leading and trailing
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-
-
-                        // Most Ordered Items Section
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          // No decoration (background/shadow) for section
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFFFF914D),
-                                            Color(0xFFFF6E40),
-                                          ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '🔥 Crowd Favorites',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Consumer<app_controller.MenuController>(
-                                  builder: (context, menuController, child) {
-                                    // For now, show first 5 items as "most ordered"
-                                    // In a real app, this would come from analytics data
-                                    final items = menuController.filteredItems;
-                                    final mostOrderedItems = items.isEmpty
-                                        ? []
-                                        : items.take(5).toList();
-
-                                    if (mostOrderedItems.isEmpty) {
-                                      return Container(
-                                        width: double.infinity,
-                                        height: 120,
-                                        margin: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                        ), // Consistent horizontal padding
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[50],
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.star_outline,
-                                                size: 32,
-                                                color: Colors.grey[400],
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Center(
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: List<Widget>.generate(
-                                                    mostOrderedItems.length,
-                                                    (index) => Container(
-                                                      width: 6,
-                                                      height: 6,
-                                                      margin:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 2,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        color: index == 0
-                                                            ? Theme.of(context)
-                                                                  .colorScheme
-                                                                  .primary
-                                                            : Colors.grey[300],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                'No popular items yet',
-                                                style: TextStyle(
-                                                  color: Colors.grey[600],
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    }
-
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // Scrollable list
-                                        SizedBox(
-                                          height:
-                                              240, // Increased height to accommodate the card
-                                          child: ListView.builder(
-                                            controller:
-                                                _mostOrderedScrollController,
-                                            scrollDirection: Axis.horizontal,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                            ),
-                                            itemCount: mostOrderedItems.length,
-                                            shrinkWrap: true,
-                                            physics:
-                                                const BouncingScrollPhysics(),
-                                            clipBehavior: Clip.hardEdge,
-                                            itemBuilder: (context, index) {
-                                              final item =
-                                                  mostOrderedItems[index];
-                                              return Container(
-                                                width: 160,
-                                                margin: EdgeInsets.only(
-                                                  right:
-                                                      index ==
-                                                          mostOrderedItems
-                                                                  .length -
-                                                              1
-                                                      ? 0
-                                                      : 16,
-                                                ),
-                                                child: MenuItemCard(
-                                                  item: item,
-                                                  onAddPressed: () {
-                                                    context
-                                                        .read<CartController>()
-                                                        .addItem(item);
-                                                    SnackbarHelper.showTopSnackBar(
-                                                      context,
-                                                      '${item.name} added to cart',
-                                                      duration: const Duration(
-                                                        seconds: 1,
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Menu Grid with responsive spacing
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          // No decoration (background/shadow) for section
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              16, // Align with 4px parent padding
-                              20,
-                              20,
-                              20,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.grey[300]!,
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Browse Menu',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                const MenuGrid(),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Bottom spacing to prevent overlap with floating UI
-                        const SizedBox(height: 100),
-
-                      ],
-                    ),
-                  ),
+                } else {
+                  HapticHelper.light();
+                  setState(() {
+                    _selectedIndex = 2; // Switch to Cart tab
+                  });
+                }
+              },
+              child: Container(
+                height: 48, // Slightly taller for better touch target
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: const BoxDecoration(
+                  color: AppTheme.primaryColor,
                 ),
-              ),
-            ],
-          ),
-          bottomNavigationBar: ViewOrderBar(tenantId: widget.tenantId),
-        ),
-        // Custom positioned FAB with tooltip
-        Consumer2<CartController, OrderController>(
-          builder: (context, cartController, orderController, child) {
-            // Determine if ViewOrderBar is visible
-            final hasPendingOrders = orderController.activeOrders.isNotEmpty;
-            final cartIsEmpty = cartController.itemCount == 0;
-            final isBarVisible = !cartIsEmpty || hasPendingOrders;
-
-            return Positioned(
-              right: 20,
-              bottom: isBarVisible ? 85 : 30,
-              child: Tooltip(
-                message: 'Call Waiter',
-                preferBelow: false,
-                verticalOffset: 10,
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple[800],
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      amountText,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          ctaText,
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+                      ],
                     ),
                   ],
-                ),
-                textStyle: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                child: GestureDetector(
-                  onTap: () async {
-                    try {
-                      final waiterCallService = WaiterCallService();
-                      final guestSessionService = GuestSessionService();
-                      
-                      final guestId = await guestSessionService.getGuestId();
-                      final session = await guestSessionService.getCurrentSession();
-                      final profile = await guestSessionService.getGuestProfile();
-                      
-                      await waiterCallService.createWaiterCall(
-                        tenantId: widget.tenantId,
-                        guestId: guestId,
-                        tableId: session['tableId'],
-                        tableName: session['tableId'] != null ? 'Table ${session['tableId']}' : null,
-                        customerName: profile?.name,
-                      );
-                      
-                      if (context.mounted) {
-                        SnackbarHelper.showTopSnackBar(context, 'Waiter called! Someone will be with you shortly.');
-                      }
-                    } catch (e) {
-                      print('Error calling waiter: $e');
-                      if (context.mounted) {
-                        SnackbarHelper.showTopSnackBar(context, 'Failed to call waiter. Please try again.');
-                      }
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.deepPurple,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.deepPurple.withOpacity(0.3),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.person_pin_circle,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
                 ),
               ),
             );
           },
+        ),
+        
+        // 1px Top Divider (Mandatory visual stack cut)
+        Container(
+          height: 1,
+          color: const Color(0xFFE5E5EA),
+        ),
+        
+        // Navigation Tab Bar
+        BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          backgroundColor: Colors.white,
+          selectedItemColor: AppTheme.primaryColor,
+          unselectedItemColor: AppTheme.secondaryText,
+          type: BottomNavigationBarType.fixed,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: 'Orders'),
+            BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Menu'),
+            BottomNavigationBarItem(icon: Icon(Icons.shopping_cart_outlined), label: 'Cart'),
+          ],
         ),
       ],
     );

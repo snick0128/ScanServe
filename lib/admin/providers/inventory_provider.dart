@@ -9,8 +9,12 @@ class InventoryProvider with ChangeNotifier {
   final String tenantId;
   
   List<InventoryItem> _items = [];
+  List<InventoryItem> _filteredItems = [];
   List<InventoryLog> _recentLogs = [];
   bool _isLoading = true;
+  String _searchQuery = '';
+  String? _selectedCategory;
+  StockStatus? _selectedStatus;
   StreamSubscription? _itemsSub;
   StreamSubscription? _logsSub;
 
@@ -18,9 +22,12 @@ class InventoryProvider with ChangeNotifier {
     _init();
   }
 
-  List<InventoryItem> get items => _items;
+  List<InventoryItem> get items => _filteredItems; // Return filtered items
   List<InventoryLog> get recentLogs => _recentLogs;
   bool get isLoading => _isLoading;
+  String get searchQuery => _searchQuery;
+  String? get selectedCategory => _selectedCategory;
+  StockStatus? get selectedStatus => _selectedStatus;
 
   List<InventoryItem> get lowStockItems => 
       _items.where((i) => i.status == StockStatus.low).toList();
@@ -28,16 +35,45 @@ class InventoryProvider with ChangeNotifier {
   List<InventoryItem> get outOfStockItems => 
       _items.where((i) => i.status == StockStatus.out).toList();
 
+  void setSearchQuery(String query) {
+    _searchQuery = query;
+    _applyFilters();
+  }
+
+  void setCategory(String? category) {
+    _selectedCategory = category;
+    _applyFilters();
+  }
+
+  void setStatus(StockStatus? status) {
+    _selectedStatus = status;
+    _applyFilters();
+  }
+
+  void _applyFilters() {
+    _filteredItems = _items.where((item) {
+      final matchesSearch = item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesCategory = _selectedCategory == null || item.category == _selectedCategory;
+      final matchesStatus = _selectedStatus == null || item.status == _selectedStatus;
+      return matchesSearch && matchesCategory && matchesStatus;
+    }).toList();
+    notifyListeners();
+  }
+
   void _init() {
     if (tenantId.isEmpty) {
       _isLoading = false;
       return;
     }
 
+    // Cancel existing subscriptions if any
+    _itemsSub?.cancel();
+    _logsSub?.cancel();
+
     _itemsSub = _service.getInventoryStream(tenantId).listen((data) {
       _items = data;
+      _applyFilters();
       _isLoading = false;
-      notifyListeners();
     }, onError: (e) {
       debugPrint('Error in inventory items stream: $e');
       _isLoading = false;
@@ -50,6 +86,13 @@ class InventoryProvider with ChangeNotifier {
     }, onError: (e) {
       debugPrint('Error in inventory logs stream: $e');
     });
+  }
+
+  /// Manually force a refresh of the inventory data
+  Future<void> refresh() async {
+    _isLoading = true;
+    notifyListeners();
+    _init();
   }
 
   Future<void> addItem(InventoryItem item, String adminName) async {

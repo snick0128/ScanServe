@@ -9,6 +9,10 @@ import 'providers/activity_provider.dart';
 import 'providers/tables_provider.dart';
 import 'providers/notifications_provider.dart';
 import 'providers/inventory_provider.dart';
+import 'providers/bills_provider.dart';
+import 'providers/menu_provider.dart';
+import 'providers/analytics_provider.dart';
+import 'theme/admin_theme.dart';
 import '../theme/app_theme.dart';
 
 class AdminApp extends StatelessWidget {
@@ -62,11 +66,38 @@ class AdminApp extends StatelessWidget {
             return previous ?? InventoryProvider('');
           },
         ),
+        ChangeNotifierProxyProvider2<AdminAuthProvider, OrdersProvider, BillsProvider>(
+          create: (_) => BillsProvider(),
+          update: (_, auth, orders, bills) {
+            if (auth.tenantId != null && bills != null) {
+              bills.initialize(auth.tenantId!, ordersProvider: orders);
+            }
+            return bills ?? BillsProvider();
+          },
+        ),
+        ChangeNotifierProxyProvider<AdminAuthProvider, MenuProvider>(
+          create: (_) => MenuProvider(),
+          update: (_, auth, menu) {
+            if (auth.tenantId != null && menu != null) {
+              menu.initialize(auth.tenantId!);
+            }
+            return menu ?? MenuProvider();
+          },
+        ),
+        ChangeNotifierProxyProvider<AdminAuthProvider, AnalyticsProvider>(
+          create: (_) => AnalyticsProvider(),
+          update: (_, auth, analytics) {
+            if (auth.tenantId != null && analytics != null) {
+              analytics.initialize(auth.tenantId!);
+            }
+            return analytics ?? AnalyticsProvider();
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'ScanServe Admin',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.themeData,
+        theme: AdminTheme.lightTheme,
         home: const AuthWrapper(),
         routes: {
           '/login': (context) => const AdminLoginScreen(),

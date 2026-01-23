@@ -93,7 +93,7 @@ class BillService {
             .doc(order.id);
         
         batch.update(orderRef, {
-          'status': model.OrderStatus.served.toString().split('.').last,
+          'status': model.OrderStatus.completed.toString().split('.').last,
           'updatedAt': FieldValue.serverTimestamp(),
           'billId': billId,
         });

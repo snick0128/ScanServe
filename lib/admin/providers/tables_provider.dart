@@ -18,17 +18,14 @@ class TablesProvider with ChangeNotifier {
 
   List<RestaurantTable> get tables => _tables;
   bool get isLoading => _isLoading;
-  int get activeTablesCount {
-    if (_ordersProvider == null) return 0;
-    final activeTableIds = _ordersProvider!.orders
-        .where((o) =>
-            o.status != order_model.OrderStatus.completed &&
-            o.status != order_model.OrderStatus.cancelled)
-        .map((o) => o.tableId)
-        .where((id) => id != null)
-        .toSet();
-    return activeTableIds.length;
-  }
+
+  int get totalTablesCount => _tables.length;
+  
+  int get activeSessionsCount => _tables.where((t) => t.isOccupied || t.status == 'occupied' || t.status == 'billRequested').length;
+  
+  int get billRequestsCount => _tables.where((t) => t.status == 'billRequested').length;
+  
+  int get vacantTablesCount => _tables.where((t) => !t.isOccupied && t.status == 'vacant').length;
 
   void initialize(String tenantId, {OrdersProvider? ordersProvider}) {
     print('🔥 TablesProvider: Initialize called for tenant: $tenantId');

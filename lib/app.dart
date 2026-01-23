@@ -11,6 +11,8 @@ import 'controllers/auth_controller.dart';
 import 'services/guest_session_service.dart';
 import 'services/offline_service.dart';
 import 'services/tenant_service.dart';
+import 'theme/app_theme.dart';
+import 'views/splash_screen.dart';
 
 class App extends StatelessWidget {
   final AppConfig config;
@@ -32,56 +34,7 @@ class App extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'ScanServe',
-        theme: ThemeData(
-          colorScheme: const ColorScheme.light(
-            primary: Colors.deepPurple,
-            primaryContainer: Colors.deepPurple,
-            secondary: Colors.deepPurpleAccent,
-            secondaryContainer: Colors.deepPurpleAccent,
-            tertiary: Colors.indigoAccent,
-            surface: Colors.white,
-            background: Colors.white,
-            onPrimary: Colors.white,
-            onSecondary: Colors.white,
-            onSurface: Colors.black87,
-            onBackground: Colors.black87,
-          ),
-          useMaterial3: true,
-          // Enhanced Material 3 styling
-          appBarTheme: AppBarTheme(
-            elevation: 2,
-            shadowColor: Colors.deepPurple.withOpacity(0.1),
-            surfaceTintColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(
-                bottom: Radius.circular(16),
-              ),
-            ),
-          ),
-          cardTheme: CardThemeData(
-            elevation: 1,
-            shadowColor: Colors.black.withOpacity(0.1),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            surfaceTintColor: Colors.white,
-          ),
-          floatingActionButtonTheme: FloatingActionButtonThemeData(
-            elevation: 6,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              elevation: 2,
-              shadowColor: Colors.deepPurple.withOpacity(0.2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
+        theme: AppTheme.themeData,
         home: Initializer(config: config),
         onGenerateRoute: (settings) {
           if (settings.name == '/checkout') {
@@ -113,6 +66,8 @@ class Initializer extends StatefulWidget {
 class _InitializerState extends State<Initializer> {
   bool _hasError = false;
   String _errorMessage = '';
+  String? _tenantName;
+  bool _isInitStarted = false;
 
   @override
   void initState() {
@@ -121,6 +76,10 @@ class _InitializerState extends State<Initializer> {
   }
 
   Future<void> _initialize() async {
+    if (_isInitStarted) return;
+    _isInitStarted = true;
+
+    final startTime = DateTime.now();
     final tenantId = widget.config.tenantId;
     final tableId = widget.config.tableId;
     final orderType = widget.config.orderType ?? 
@@ -140,6 +99,12 @@ class _InitializerState extends State<Initializer> {
       if (tenant == null) {
         _showError('Invalid Store. Please contact staff.');
         return;
+      }
+      
+      if (mounted) {
+        setState(() {
+          _tenantName = tenant.name;
+        });
       }
 
       // 3. Strict Logic for Dine-in
@@ -185,10 +150,21 @@ class _InitializerState extends State<Initializer> {
       await menuController.loadMenuItems(tenantId);
       menuController.startInventoryListener(tenantId);
 
-      // 6. Navigate
+      // 6. Finalize Transition
+      final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+      if (elapsed < 300) {
+        await Future.delayed(Duration(milliseconds: 300 - elapsed));
+      }
+
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => HomePage(tenantId: tenantId)),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => HomePage(tenantId: tenantId),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 400),
+          ),
         );
       }
     } catch (e) {
@@ -235,6 +211,6 @@ class _InitializerState extends State<Initializer> {
         ),
       );
     }
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return SplashScreen(restaurantName: _tenantName);
   }
 }

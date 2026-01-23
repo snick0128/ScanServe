@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../controllers/menu_controller.dart' as app_controller;
+import '../theme/app_theme.dart';
+import '../utils/haptic_helper.dart';
 
 class SearchBar extends StatefulWidget {
   final double maxWidth;
@@ -11,166 +14,100 @@ class SearchBar extends StatefulWidget {
   State<SearchBar> createState() => _SearchBarState();
 }
 
-class _SearchBarState extends State<SearchBar>
-    with TickerProviderStateMixin {
-  late AnimationController _focusController;
-  late Animation<double> _elevationAnimation;
+class _SearchBarState extends State<SearchBar> {
+  late final TextEditingController _controller;
 
   @override
   void initState() {
     super.initState();
-    _focusController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _elevationAnimation = Tween<double>(
-      begin: 0,
-      end: 4,
-    ).animate(CurvedAnimation(
-      parent: _focusController,
-      curve: Curves.easeInOut,
-    ));
+    _controller = TextEditingController();
   }
 
   @override
   void dispose() {
-    _focusController.dispose();
+    _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-
-    return AnimatedBuilder(
-      animation: _elevationAnimation,
-      builder: (context, child) {
-        return Container(
-          constraints: BoxConstraints(maxWidth: widget.maxWidth),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(10),
-                blurRadius: _elevationAnimation.value,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      height: 48, // Updated to match Waiter button
+      constraints: BoxConstraints(maxWidth: widget.maxWidth),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD1D1D6), width: 1.5), // More visible border
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: FocusScope(
-            child: Focus(
-              onFocusChange: (hasFocus) {
-                if (hasFocus) {
-                  _focusController.forward();
-                } else {
-                  _focusController.reverse();
-                }
-              },
-              child: TextField(
-                onChanged: (value) {
-                  context.read<app_controller.MenuController>().setSearchQuery(value);
-                },
-                style: TextStyle(
-                  fontSize: isMobile ? 16 : 18,
-                  color: Colors.black87,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search menu items...',
-                  hintStyle: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: isMobile ? 14 : 16,
-                  ),
-                  prefixIcon: AnimatedBuilder(
-                    animation: _focusController,
-                    builder: (context, child) {
-                      return Container(
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.search,
-                          color: _focusController.value > 0.5
-                              ? const Color(0xFFFF6E40)
-                              : Colors.grey[600],
-                          size: isMobile ? 20 : 22,
-                        ),
-                      );
-                    },
-                  ),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Consumer<app_controller.MenuController>(
-                        builder: (context, controller, child) {
-                          if (controller.isSearching) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Text(
-                                '${controller.searchResultsCount} found',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: isMobile ? 12 : 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                      Consumer<app_controller.MenuController>(
-                        builder: (context, controller, child) {
-                          if (controller.searchQuery.isNotEmpty) {
-                            return IconButton(
-                              icon: AnimatedOpacity(
-                                opacity: 1.0,
-                                duration: const Duration(milliseconds: 200),
-                                child: Icon(
-                                  Icons.clear,
-                                  color: Colors.grey[600],
-                                  size: isMobile ? 20 : 22,
-                                ),
-                              ),
-                              onPressed: () {
-                                controller.setSearchQuery('');
-                              },
-                              padding: const EdgeInsets.all(12),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ],
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: Colors.grey[300]!,
-                      width: 1,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFFF6E40),
-                      width: 2,
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 16 : 20,
-                    vertical: isMobile ? 14 : 18,
-                  ),
-                ),
-              ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4), 
+      child: TextField(
+        controller: _controller,
+        onChanged: (value) {
+          context.read<app_controller.MenuController>().setSearchQuery(value);
+        },
+        style: GoogleFonts.outfit(
+          fontSize: 14,
+          color: AppTheme.primaryText,
+          height: 1.2, // IMPORTANT for vertical centering
+        ),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          isDense: true, // 🔥 fixes height math
+          hintText: 'Search menu items...',
+          hintStyle: GoogleFonts.outfit(
+            color: const Color(0xFF8E8E93),
+            fontSize: 14,
+            height: 1.2,
+          ),
+          prefixIcon: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Icon(
+              Icons.search,
+              color: Color(0xFF8E8E93),
+              size: 20,
             ),
           ),
-        );
-      },
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 40,
+            minHeight: 40,
+          ),
+          suffixIcon: Consumer<app_controller.MenuController>(
+            builder: (context, controller, child) {
+              if (controller.searchQuery.isNotEmpty) {
+                return GestureDetector(
+                  onTap: () {
+                    HapticHelper.light();
+                    _controller.clear();
+                    controller.setSearchQuery('');
+                    FocusScope.of(context).unfocus();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Icon(
+                      Icons.clear,
+                      color: Color(0xFF8E8E93),
+                      size: 18,
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 40,
+            minHeight: 40,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
     );
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_auth_provider.dart';
+import '../theme/admin_theme.dart';
 
 class AdminSidebar extends StatelessWidget {
   final int selectedIndex;
@@ -22,278 +22,162 @@ class AdminSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      width: isCollapsed ? 60 : 250,
+      width: isCollapsed ? 72 : 260,
       height: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(2, 0),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: AdminTheme.sidebarBackground,
+        border: Border(
+          right: BorderSide(color: AdminTheme.dividerColor, width: 1),
+        ),
       ),
       child: Column(
         children: [
-          // Logo and App Name
+          // Logo Section
           Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            height: 80,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            alignment: Alignment.centerLeft,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (!isCollapsed)
-                  const Text(
-                    'ScanServe',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1976D2),
-                    ),
-                  )
-                else
-                  const Text(
-                    'SS',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1976D2),
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AdminTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                IconButton(
-                  icon: Icon(
-                    isCollapsed
-                        ? Ionicons.chevron_forward_outline
-                        : Ionicons.chevron_back_outline,
-                    color: Colors.grey,
-                  ),
-                  onPressed: onToggleCollapse,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                  child: const Icon(Ionicons.restaurant, 
+                    color: AdminTheme.primaryColor, size: 24),
                 ),
+                if (!isCollapsed) ...[
+                  const SizedBox(width: 12),
+                  const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Scan & Serve',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryText,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Text(
+                        'ADMIN PORTAL',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.secondaryText,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          
-          const Divider(height: 1, thickness: 1),
-          
-          // Navigation Items
+
+          const SizedBox(height: 10),
+
+          // Navigation Section
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-               children: [
-                if (role == 'superadmin' && context.read<AdminAuthProvider>().tenantId != 'global') ...[
-                  _buildNavItem(
-                    context: context,
-                    index: 10,
-                    icon: Ionicons.planet_outline,
-                    label: 'Master Console',
-                    isCollapsed: isCollapsed,
-                    onTapOverride: () {
-                      context.read<AdminAuthProvider>().resetToGlobal();
-                      onItemSelected(10);
-                    },
-                    colorOverride: Colors.purple,
-                  ),
-                  const Divider(height: 16),
-                ],
-                if (role != 'kitchen' && role != 'captain') ...[
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                if (role != 'kitchen') ...[
                   _buildNavItem(
                     context: context,
                     index: 0,
                     icon: Ionicons.grid_outline,
+                    activeIcon: Ionicons.grid,
                     label: 'Dashboard',
                     isCollapsed: isCollapsed,
                   ),
                   _buildNavItem(
                     context: context,
-                    index: 1,
-                    icon: Ionicons.restaurant_outline,
-                    label: 'Menu Items',
-                    isCollapsed: isCollapsed,
-                  ),
-                ],
-                if (role != 'kitchen') ...[
-                  _buildNavItem(
-                    context: context,
-                    index: 2,
-                    icon: Ionicons.apps_outline,
-                    label: 'Tables',
+                    index: 3,
+                    icon: Ionicons.list_outline,
+                    activeIcon: Ionicons.list,
+                    label: 'Orders',
                     isCollapsed: isCollapsed,
                   ),
                 ],
                 _buildNavItem(
                   context: context,
-                  index: 3,
-                  icon: Ionicons.list_outline,
-                  label: 'Orders',
+                  index: 9,
+                  icon: Ionicons.desktop_outline,
+                  activeIcon: Ionicons.desktop,
+                  label: 'KDS',
                   isCollapsed: isCollapsed,
                 ),
-                if (role != 'kitchen' && role != 'captain') ...[
+                if (role != 'kitchen') ...[
+                  _buildNavItem(
+                    context: context,
+                    index: 1,
+                    icon: Ionicons.restaurant_outline,
+                    activeIcon: Ionicons.restaurant,
+                    label: 'Menu',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 2,
+                    icon: Ionicons.tablet_landscape_outline,
+                    activeIcon: Ionicons.tablet_landscape,
+                    label: 'Tables',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 8,
+                    icon: Ionicons.cube_outline,
+                    activeIcon: Ionicons.cube,
+                    label: 'Inventory',
+                    isCollapsed: isCollapsed,
+                  ),
                   _buildNavItem(
                     context: context,
                     index: 4,
                     icon: Ionicons.receipt_outline,
-                    label: 'Bills',
+                    activeIcon: Ionicons.receipt,
+                    label: 'Billing',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 6,
+                    icon: Ionicons.people_outline,
+                    activeIcon: Ionicons.people,
+                    label: 'Staff',
                     isCollapsed: isCollapsed,
                   ),
                   _buildNavItem(
                     context: context,
                     index: 5,
                     icon: Ionicons.stats_chart_outline,
-                    label: 'Analytics',
+                    activeIcon: Ionicons.stats_chart,
+                    label: 'Reports',
                     isCollapsed: isCollapsed,
-                  ),
-                  _buildNavItem(
-                    context: context,
-                    index: 6,
-                    icon: Ionicons.cube_outline,
-                    label: 'Inventory',
-                    isCollapsed: isCollapsed,
-                  ),
-                ],
-                const SizedBox(height: 8),
-                if (role != 'kitchen' && role != 'captain') ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(
-                      'SETTINGS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
                   ),
                   _buildNavItem(
                     context: context,
                     index: 7,
                     icon: Ionicons.settings_outline,
+                    activeIcon: Ionicons.settings,
                     label: 'Settings',
                     isCollapsed: isCollapsed,
                   ),
-                  _buildNavItem(
-                    context: context,
-                    index: 9,
-                    icon: Ionicons.list_outline,
-                    label: 'Activity Logs',
-                    isCollapsed: isCollapsed,
-                  ),
-                ],
-                  _buildNavItem(
-                    context: context,
-                    index: 8,
-                    icon: Ionicons.help_circle_outline,
-                    label: 'Help & Support',
-                    isCollapsed: isCollapsed,
-                  ),
-                if (role == 'superadmin') ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text(
-                      'SUPER ADMIN',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.purple,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  _buildNavItem(
-                    context: context,
-                    index: 10,
-                    icon: Ionicons.business_outline,
-                    label: 'Manage Tenants',
-                    isCollapsed: isCollapsed,
-                  ),
                 ],
               ],
             ),
           ),
-          
-          // User profile at bottom
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Colors.grey[200]!),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  dense: true,
-                  leading: const CircleAvatar(
-                    radius: 12,
-                    backgroundColor: Colors.blue,
-                    child: Icon(Ionicons.person, size: 12, color: Colors.white),
-                  ),
-                  title: !isCollapsed
-                      ? Text(
-                          role == 'superadmin' ? 'Super Admin' :
-                          role == 'kitchen' ? 'Kitchen Staff' : 
-                          role == 'captain' ? 'Captain/Waiter' : 'Admin User',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : null,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  minLeadingWidth: 8,
-                ),
-                ListTile(
-                  dense: true,
-                  leading: Icon(
-                    Ionicons.log_out_outline,
-                    size: 20,
-                    color: Colors.red[400],
-                  ),
-                  title: !isCollapsed
-                      ? Text(
-                          'Logout',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.red[400],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        )
-                      : null,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  minLeadingWidth: 8,
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Confirm Logout'),
-                        content: const Text('Are you sure you want to logout?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              context.read<AdminAuthProvider>().signOut();
-                            },
-                            child: const Text('Logout', style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
+
+          // Bottom Section
+          _buildUserProfile(context),
         ],
       ),
     );
@@ -303,45 +187,135 @@ class AdminSidebar extends StatelessWidget {
     required BuildContext context,
     required int index,
     required IconData icon,
+    required IconData activeIcon,
     required String label,
     required bool isCollapsed,
-    VoidCallback? onTapOverride,
-    Color? colorOverride,
   }) {
     final isSelected = selectedIndex == index;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final activeColor = colorOverride ?? colorScheme.primary;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: isSelected ? colorScheme.primary.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isSelected ? activeColor : Colors.grey[700],
-          size: 20,
-        ),
-        title: !isCollapsed
-            ? Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? activeColor : Colors.grey[800],
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: () => onItemSelected(index),
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.symmetric(
+            horizontal: isCollapsed ? 0 : 16,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected ? AdminTheme.primaryColor.withOpacity(0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            children: [
+              Icon(
+                isSelected ? activeIcon : icon,
+                color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText,
+                size: 22,
+              ),
+              if (!isCollapsed) ...[
+                const SizedBox(width: 16),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  ),
                 ),
-              )
-            : null,
-        minLeadingWidth: 8,
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: isCollapsed ? 8 : 16,
-          vertical: 4,
+              ],
+            ],
+          ),
         ),
-        dense: true,
-        onTap: onTapOverride ?? () => onItemSelected(index),
+      ),
+    );
+  }
+
+  Widget _buildUserProfile(BuildContext context) {
+    final auth = context.read<AdminAuthProvider>();
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AdminTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AdminTheme.dividerColor),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AdminTheme.primaryColor.withOpacity(0.2),
+            backgroundImage: const NetworkImage('https://i.pravatar.cc/150?u=manager'),
+          ),
+          if (!isCollapsed) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'James Wilson',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AdminTheme.primaryText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    role?.toUpperCase() ?? 'MANAGER',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: AdminTheme.secondaryText,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => _handleLogout(context),
+              icon: const Icon(Ionicons.log_out_outline, 
+                color: AdminTheme.critical, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _handleLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AdminTheme.cardBackground,
+        title: const Text('Confirm Logout'),
+        content: const Text('Do you want to sign out from the portal?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AdminAuthProvider>().signOut();
+            },
+            child: const Text('LOGOUT', style: TextStyle(color: AdminTheme.critical)),
+          ),
+        ],
       ),
     );
   }
 }
+
