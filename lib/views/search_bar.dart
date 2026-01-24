@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/menu_controller.dart' as app_controller;
 import '../theme/app_theme.dart';
 import '../utils/haptic_helper.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class SearchBar extends StatefulWidget {
   final double maxWidth;
@@ -36,7 +37,7 @@ class _SearchBarState extends State<SearchBar> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD1D1D6), width: 1.5), // More visible border
+        border: Border.all(color: Colors.black, width: 2.r), // Highly visible border
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.12),

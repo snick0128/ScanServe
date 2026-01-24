@@ -11,7 +11,15 @@ import '../theme/admin_theme.dart';
 
 class StaffOrderDialog extends StatefulWidget {
   final String tenantId;
-  const StaffOrderDialog({super.key, required this.tenantId});
+  final String? preselectedTableId;
+  final String? preselectedTableName;
+
+  const StaffOrderDialog({
+    super.key, 
+    required this.tenantId,
+    this.preselectedTableId,
+    this.preselectedTableName,
+  });
 
   @override
   State<StaffOrderDialog> createState() => _StaffOrderDialogState();
@@ -21,6 +29,13 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
   String? _selectedTableId;
   String? _selectedTableName;
   bool _isCreating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTableId = widget.preselectedTableId;
+    _selectedTableName = widget.preselectedTableName;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,43 +56,65 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
               ],
             ),
             const SizedBox(height: 24),
-            const Text('1. Select Table', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Consumer<TablesProvider>(
-              builder: (context, tablesProvider, _) {
-                final tables = tablesProvider.tables;
-                return Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: tables.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final table = tables[index];
-                      final isSelected = _selectedTableId == table.id;
-                      return ListTile(
-                        leading: Icon(Icons.table_restaurant, color: table.isOccupied ? Colors.orange : Colors.green),
-                        title: Text(table.name),
-                        subtitle: Text(table.isOccupied ? 'Currently Occupied' : 'Available'),
-                        trailing: isSelected ? const Icon(Icons.check_circle, color: AdminTheme.success) : null,
-                        onTap: () {
-                          setState(() {
-                            _selectedTableId = table.id;
-                            _selectedTableName = table.name;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 32),
+            if (widget.preselectedTableId == null) ...[
+              const Text('1. Select Table', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              Consumer<TablesProvider>(
+                builder: (context, tablesProvider, _) {
+                  final tables = tablesProvider.tables;
+                  return Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: tables.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final table = tables[index];
+                        final isSelected = _selectedTableId == table.id;
+                        return ListTile(
+                          leading: Icon(Icons.table_restaurant, color: table.isOccupied ? Colors.orange : Colors.green),
+                          title: Text(table.name),
+                          subtitle: Text(table.isOccupied ? 'Currently Occupied' : 'Available'),
+                          trailing: isSelected ? const Icon(Icons.check_circle, color: AdminTheme.success) : null,
+                          onTap: () {
+                            setState(() {
+                              _selectedTableId = table.id;
+                              _selectedTableName = table.name;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 32),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AdminTheme.success.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AdminTheme.success.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.table_restaurant, color: AdminTheme.success),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Ordering for ${widget.preselectedTableName}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
             SizedBox(
               width: double.infinity,
               height: 54,
@@ -87,7 +124,10 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                   backgroundColor: AdminTheme.primaryColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('Next: Select Menu Items', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(
+                  widget.preselectedTableId != null ? 'Start Ordering' : 'Next: Select Menu Items', 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                ),
               ),
             ),
           ],

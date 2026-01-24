@@ -9,6 +9,7 @@ import '../../providers/admin_auth_provider.dart';
 import '../../theme/admin_theme.dart';
 import '../../widgets/table_orders_dialog.dart';
 import '../../widgets/staff_order_dialog.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class TablesScreen extends StatefulWidget {
   final String tenantId;
@@ -57,7 +58,7 @@ class _TablesScreenState extends State<TablesScreen> {
               _buildFiltersBar(),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: EdgeInsets.symmetric(horizontal: 32.w),
                   itemCount: groupedTables.length,
                   itemBuilder: (context, index) {
                     final section = groupedTables.keys.elementAt(index);
@@ -75,47 +76,59 @@ class _TablesScreenState extends State<TablesScreen> {
           context: context,
           builder: (context) => StaffOrderDialog(tenantId: widget.tenantId),
         ),
-        icon: const Icon(Ionicons.add, color: Colors.white),
-        label: const Text('New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        icon: Icon(Ionicons.add, color: Colors.white, size: 24.w),
+        label: Text('New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15.sp)),
         backgroundColor: AdminTheme.primaryColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.r)),
       ),
     );
   }
 
   Widget _buildHeader(TablesProvider provider) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
+      padding: EdgeInsets.fromLTRB(32.w, 32.h, 32.w, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             'Tables & Sessions',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+            style: TextStyle(fontSize: 32.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
           ),
           Row(
             children: [
               Container(
-                width: 300,
-                height: 44,
+                width: 300.w,
+                height: 48.h,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F3F4),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  decoration: const InputDecoration(
-                    hintText: 'Search tables...',
-                    prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  decoration: InputDecoration(
+                    hintText: 'Search table or customer...',
+                    hintStyle: TextStyle(color: AdminTheme.secondaryText, fontSize: 13.sp),
+                    prefixIcon: Icon(Ionicons.search_outline, size: 18.w, color: AdminTheme.secondaryText),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              _buildIconButton(Ionicons.notifications_outline),
-              const SizedBox(width: 12),
-              _buildIconButton(Ionicons.help_circle_outline),
+              SizedBox(width: 16.w),
+              ElevatedButton.icon(
+                onPressed: () => _showManageTablesDialog(context, provider),
+                icon: const Icon(Ionicons.settings_outline, size: 18),
+                label: const Text('Manage Tables'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AdminTheme.primaryText,
+                  elevation: 0,
+                  side: BorderSide(color: Colors.grey[200]!),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             ],
           ),
         ],
@@ -123,17 +136,7 @@ class _TablesScreenState extends State<TablesScreen> {
     );
   }
 
-  Widget _buildIconButton(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 20, color: AdminTheme.primaryText),
-    );
-  }
+  // Removed _buildIconButton
 
   Widget _buildKPIBar(TablesProvider provider) {
     return Padding(
@@ -163,9 +166,9 @@ class _TablesScreenState extends State<TablesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
+            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1.2)),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            Text(value, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
           ],
         ),
       ),
@@ -182,7 +185,15 @@ class _TablesScreenState extends State<TablesScreen> {
           child: ChoiceChip(
             label: Text(f),
             selected: _selectedFilter == f,
-            onSelected: (val) => setState(() => _selectedFilter = f),
+            onSelected: (val) {
+              setState(() {
+                _selectedFilter = f;
+                if (f == 'All Tables') {
+                  _searchQuery = '';
+                  _searchController.clear();
+                }
+              });
+            },
             selectedColor: AdminTheme.primaryColor,
             labelStyle: TextStyle(
               color: _selectedFilter == f ? Colors.white : AdminTheme.secondaryText,
@@ -209,9 +220,9 @@ class _TablesScreenState extends State<TablesScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
               ),
-              const Text('Updated just now', style: TextStyle(color: AdminTheme.secondaryText, fontSize: 12)),
+              const Text('Updated just now', style: TextStyle(color: AdminTheme.secondaryText, fontSize: 13)),
             ],
           ),
         ),
@@ -248,6 +259,108 @@ class _TablesScreenState extends State<TablesScreen> {
       result = result.where((t) => t.status == 'billRequested').toList();
     }
     return result;
+  }
+
+  void _showManageTablesDialog(BuildContext context, TablesProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Manage Tables'),
+          content: SizedBox(
+            width: 600,
+            height: 500,
+            child: Column(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _showAddEditTableDialog(context, provider, null),
+                  icon: const Icon(Ionicons.add_outline),
+                  label: const Text('Add New Table'),
+                ),
+                const Divider(height: 32),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: provider.tables.length,
+                    itemBuilder: (context, index) {
+                      final table = provider.tables[index];
+                      return ListTile(
+                        leading: CircleAvatar(child: Text(table.name.replaceAll(RegExp(r'[^0-9]'), ''))),
+                        title: Text(table.name),
+                        subtitle: Text('${table.section} • Max Pax: ${table.capacity}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Ionicons.create_outline, size: 18),
+                              onPressed: () => _showAddEditTableDialog(context, provider, table),
+                            ),
+                            IconButton(
+                              icon: const Icon(Ionicons.trash_outline, size: 18, color: AdminTheme.critical),
+                              onPressed: () => provider.deleteTable(table.id),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddEditTableDialog(BuildContext context, TablesProvider provider, RestaurantTable? table) {
+    final nameController = TextEditingController(text: table?.name ?? '');
+    final sectionController = TextEditingController(text: table?.section ?? 'Main Hall');
+    final capacityController = TextEditingController(text: table?.capacity.toString() ?? '4');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(table == null ? 'Add Table' : 'Edit Table'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Table Name (e.g. Table 1)')),
+            TextField(controller: sectionController, decoration: const InputDecoration(labelText: 'Section')),
+            TextField(controller: capacityController, decoration: const InputDecoration(labelText: 'Capacity'), keyboardType: TextInputType.number),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) return;
+              
+              final newTable = RestaurantTable(
+                id: table?.id ?? 'table_${DateTime.now().millisecondsSinceEpoch}',
+                name: nameController.text,
+                section: sectionController.text,
+                capacity: int.tryParse(capacityController.text) ?? 4,
+                orderIndex: table?.orderIndex ?? provider.tables.length,
+                isOccupied: table?.isOccupied ?? false,
+                isAvailable: table?.isAvailable ?? true,
+                status: table?.status ?? 'available',
+              );
+              
+              if (table == null) {
+                await provider.addTable(newTable);
+              } else {
+                await provider.updateTable(newTable);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -300,7 +413,7 @@ class _TableCard extends StatelessWidget {
                       style: TextStyle(
                         color: isActive ? Colors.white : AdminTheme.secondaryText,
                         fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                        fontSize: 22,
                       ),
                     ),
                   ),
@@ -319,7 +432,7 @@ class _TableCard extends StatelessWidget {
                     children: [
                       const Icon(Ionicons.time_outline, size: 14, color: AdminTheme.secondaryText),
                       const SizedBox(width: 8),
-                      Text('${table.getTimeOccupied()} elapsed', style: const TextStyle(fontSize: 13, color: AdminTheme.secondaryText)),
+                      Text('${table.getTimeOccupied()} elapsed', style: const TextStyle(fontSize: 15, color: AdminTheme.secondaryText)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -327,7 +440,7 @@ class _TableCard extends StatelessWidget {
                     children: [
                       const Icon(Ionicons.cart_outline, size: 14, color: AdminTheme.secondaryText),
                       const SizedBox(width: 8),
-                      Text('$itemsCount items ordered', style: const TextStyle(fontSize: 13, color: AdminTheme.secondaryText)),
+                      Text('$itemsCount items ordered', style: const TextStyle(fontSize: 15, color: AdminTheme.secondaryText)),
                     ],
                   ),
                 ],
@@ -388,16 +501,19 @@ class _TableCard extends StatelessWidget {
           _buildReleaseButton(context),
           const SizedBox(width: 8),
           Expanded(
-            child: SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                onPressed: () => _handleAction(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AdminTheme.primaryColor,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            child: Tooltip(
+              message: 'Settle bills and close session',
+              child: SizedBox(
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => _handleAction(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AdminTheme.primaryColor,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('PAYMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
-                child: const Text('PAYMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
               ),
             ),
           ),
@@ -409,15 +525,18 @@ class _TableCard extends StatelessWidget {
           _buildReleaseButton(context),
           const SizedBox(width: 8),
           Expanded(
-            child: SizedBox(
-              height: 44,
-              child: OutlinedButton(
-                onPressed: () => _handleAction(context),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.grey[200]!),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            child: Tooltip(
+              message: 'View active orders and session info',
+              child: SizedBox(
+                height: 44,
+                child: OutlinedButton(
+                  onPressed: () => _handleAction(context),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey[200]!),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('DETAILS', style: TextStyle(color: AdminTheme.primaryText, fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
-                child: const Text('DETAILS', style: TextStyle(color: AdminTheme.primaryText, fontWeight: FontWeight.bold, fontSize: 11)),
               ),
             ),
           ),
@@ -425,8 +544,9 @@ class _TableCard extends StatelessWidget {
       );
     } else {
       return SizedBox(
-        width: double.infinity,
         height: 44,
+      child: Tooltip(
+        message: 'Click to start a new order for guests',
         child: OutlinedButton(
           onPressed: () => _handleAction(context),
           style: OutlinedButton.styleFrom(
@@ -436,23 +556,27 @@ class _TableCard extends StatelessWidget {
           ),
           child: const Text('OPEN SESSION', style: TextStyle(color: AdminTheme.primaryText, fontWeight: FontWeight.bold, fontSize: 12)),
         ),
+      ),
       );
     }
   }
 
   Widget _buildReleaseButton(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      width: 44,
-      child: OutlinedButton(
-        onPressed: () => _confirmRelease(context),
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          foregroundColor: AdminTheme.critical,
-          side: BorderSide(color: AdminTheme.critical.withOpacity(0.2)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return Tooltip(
+      message: 'Emergency release / force close session',
+      child: SizedBox(
+        height: 44,
+        width: 44,
+        child: OutlinedButton(
+          onPressed: () => _confirmRelease(context),
+          style: OutlinedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            foregroundColor: AdminTheme.critical,
+            side: BorderSide(color: AdminTheme.critical.withOpacity(0.2)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: const Icon(Ionicons.log_out_outline, size: 20),
         ),
-        child: const Icon(Ionicons.log_out_outline, size: 20),
       ),
     );
   }
@@ -486,10 +610,14 @@ class _TableCard extends StatelessWidget {
 
   void _handleAction(BuildContext context) {
     if (!table.isOccupied && table.status == 'vacant') {
-      // Open Session - For now show StaffOrderDialog
+      // Open Session - Skip table selector by passing preselected data
        showDialog(
         context: context,
-        builder: (context) => StaffOrderDialog(tenantId: context.read<AdminAuthProvider>().tenantId!),
+        builder: (context) => StaffOrderDialog(
+          tenantId: context.read<AdminAuthProvider>().tenantId!,
+          preselectedTableId: table.id,
+          preselectedTableName: table.name,
+        ),
       );
     } else {
       // View Details or Process Payment

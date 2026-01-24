@@ -104,6 +104,16 @@ class TablesProvider with ChangeNotifier {
     await _tablesService.updateTable(_tenantId!, table);
   }
 
+  Future<void> addTable(RestaurantTable table) async {
+    if (_tenantId == null) return;
+    await _tablesService.addTable(_tenantId!, table);
+  }
+
+  Future<void> deleteTable(String tableId) async {
+    if (_tenantId == null) return;
+    await _tablesService.deleteTable(_tenantId!, tableId);
+  }
+
   Future<void> releaseTable(String tableId) async {
     if (_tenantId == null) return;
     

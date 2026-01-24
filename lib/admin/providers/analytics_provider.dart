@@ -6,7 +6,7 @@ import '../../models/tenant_model.dart';
 class AnalyticsProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _tenantId;
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 0));
+  DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
   String _dateFilter = 'Today';
 
@@ -34,6 +34,8 @@ class AnalyticsProvider with ChangeNotifier {
   double get avgOrderValue => _avgOrderValue;
   int get activeTablesCount => _activeTablesCount;
   String get dateFilter => _dateFilter;
+  DateTime get startDate => _startDate;
+  DateTime get endDate => _endDate;
   
   double get revenueTrend => _revenueTrend;
   double get ordersTrend => _ordersTrend;
@@ -70,6 +72,13 @@ class AnalyticsProvider with ChangeNotifier {
         break;
     }
     
+    await refreshData();
+  }
+
+  Future<void> setCustomDateRange(DateTime start, DateTime end) async {
+    _dateFilter = 'Custom';
+    _startDate = start;
+    _endDate = end;
     await refreshData();
   }
 

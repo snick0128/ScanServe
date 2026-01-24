@@ -206,7 +206,8 @@ class _KDSScreenState extends State<KDSScreen> {
     final statusColor = isUrgent ? AdminTheme.critical : (isMedium ? Colors.orange : Colors.green);
     final statusLabel = isUrgent ? 'URGENT' : (isMedium ? 'COOKING' : 'NEW');
 
-    final allChecked = stationItems.every((item) => (_checkedItems[order.id]?.contains(item.id) ?? false) || item.status == model.OrderItemStatus.ready);
+    final hasCheckedItems = _checkedItems[order.id]?.isNotEmpty ?? false;
+    final allCheckedReady = stationItems.every((item) => item.status == model.OrderItemStatus.ready);
 
     return Container(
       width: 320,
@@ -322,7 +323,7 @@ class _KDSScreenState extends State<KDSScreen> {
             child: Column(
               children: [
                 ElevatedButton(
-                  onPressed: allChecked ? () => _markStationReady(order.id, stationItems) : null,
+                  onPressed: (hasCheckedItems && !allCheckedReady) ? () => _markCheckedItemsReady(order.id, stationItems) : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AdminTheme.success,
                     foregroundColor: Colors.white,
@@ -331,7 +332,10 @@ class _KDSScreenState extends State<KDSScreen> {
                     elevation: 0,
                     disabledBackgroundColor: Colors.grey[200],
                   ),
-                  child: const Text('MARK AS READY', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+                  child: Text(
+                    allCheckedReady ? 'ALL READY' : 'MARK SELECTED READY', 
+                    style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)
+                  ),
                 ),
                 if (_currentStation?.id == 'pass_expo') ...[
                   const SizedBox(height: 8),
@@ -372,11 +376,15 @@ class _KDSScreenState extends State<KDSScreen> {
     });
   }
 
-  Future<void> _markStationReady(String orderId, List<model.OrderItem> items) async {
+  Future<void> _markCheckedItemsReady(String orderId, List<model.OrderItem> allItems) async {
     final provider = context.read<OrdersProvider>();
+    final checkedItemIds = _checkedItems[orderId] ?? {};
+    
+    if (checkedItemIds.isEmpty) return;
+
     try {
-      for (var item in items) {
-        if (item.status != model.OrderItemStatus.ready) {
+      for (var item in allItems) {
+        if (checkedItemIds.contains(item.id) && item.status != model.OrderItemStatus.ready) {
           await provider.updateOrderItemStatus(orderId, item.id, model.OrderItemStatus.ready);
         }
       }
@@ -387,7 +395,7 @@ class _KDSScreenState extends State<KDSScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Items marked as READY'), backgroundColor: AdminTheme.success),
+          const SnackBar(content: Text('Selected items marked as READY'), backgroundColor: AdminTheme.success),
         );
       }
     } catch (e) {

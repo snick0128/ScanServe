@@ -11,6 +11,8 @@ import '../../theme/admin_theme.dart';
 import '../../providers/bills_provider.dart';
 import '../../providers/admin_auth_provider.dart';
 import '../../../services/bill_service.dart';
+import 'bill_details_screen.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class BillsScreen extends StatefulWidget {
   final String tenantId;
@@ -50,29 +52,57 @@ class _BillsScreenState extends State<BillsScreen> {
       body: Consumer<BillsProvider>(
         builder: (context, provider, _) {
           return Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(16.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(provider),
-                const SizedBox(height: 24),
-                _buildKPICards(provider),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _showHistoryDialog(context, provider),
-                      icon: const Icon(Ionicons.time_outline, size: 18),
-                      label: const Text('View All History'),
-                      style: TextButton.styleFrom(foregroundColor: AdminTheme.primaryColor),
-                    ),
-                  ],
+                SizedBox(height: 24.h),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // MAIN CONTENT (TABLE)
+                      Expanded(
+                        flex: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Pending Settlement', 
+                                  style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                                TextButton.icon(
+                                  onPressed: () => _showHistoryDialog(context, provider),
+                                  icon: Icon(Ionicons.time_outline, size: 18.w),
+                                  label: Text('View All History', style: TextStyle(fontSize: 14.sp)),
+                                  style: TextButton.styleFrom(foregroundColor: AdminTheme.primaryColor),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                            Expanded(child: _buildPendingBillsTable(provider)),
+                            SizedBox(height: 24.h),
+                            _buildBulkOperations(provider),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 32.w),
+                      // RIGHT SIDE PANEL (KPIs & SUMMARY)
+                      SizedBox(
+                        width: 300.w,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _buildKPICards(provider),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Expanded(child: _buildPendingBillsTable(provider)),
-                const SizedBox(height: 24),
-                _buildBulkOperations(provider),
               ],
             ),
           );
@@ -84,45 +114,45 @@ class _BillsScreenState extends State<BillsScreen> {
   Widget _buildHeader(BillsProvider provider) {
     return Row(
       children: [
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Billing & Payments',
               style: TextStyle(
-                fontSize: 28,
+                fontSize: 32.sp,
                 fontWeight: FontWeight.bold,
                 color: AdminTheme.primaryText,
               ),
             ),
             Text(
               'Live financial control panel',
-              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 14),
+              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 14.sp),
             ),
           ],
         ),
-        const SizedBox(width: 48),
+        SizedBox(width: 48.w),
         Expanded(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
-            height: 44,
+            constraints: BoxConstraints(maxWidth: 400.w),
+            height: 48.h,
             decoration: BoxDecoration(
               color: AdminTheme.cardBackground,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(10.r),
               border: Border.all(color: AdminTheme.dividerColor),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4.w, offset: const Offset(0, 2)),
               ],
             ),
             child: TextField(
               controller: _searchController,
               onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Search by table, bill ID, or session...',
-                hintStyle: TextStyle(color: AdminTheme.secondaryText, fontSize: 13),
-                prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
+                hintStyle: TextStyle(color: AdminTheme.secondaryText, fontSize: 13.sp),
+                prefixIcon: Icon(Ionicons.search_outline, size: 18.w, color: AdminTheme.secondaryText),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 11),
+                contentPadding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 12.w),
               ),
             ),
           ),
@@ -133,15 +163,15 @@ class _BillsScreenState extends State<BillsScreen> {
           children: [
             Text(
               DateFormat('EEEE, MMM d').format(_now),
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AdminTheme.primaryText),
+              style: TextStyle(fontWeight: FontWeight.w600, color: AdminTheme.primaryText, fontSize: 14.sp),
             ),
             Text(
               DateFormat('h:mm:ss a').format(_now),
-              style: const TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18.sp),
             ),
           ],
         ),
-        const SizedBox(width: 24),
+        SizedBox(width: 24.w),
           IconButton(
           onPressed: () {
             provider.refreshBills();
@@ -149,7 +179,7 @@ class _BillsScreenState extends State<BillsScreen> {
               const SnackBar(content: Text('Billing data refreshed')),
             );
           },
-          icon: const Icon(Ionicons.refresh_outline),
+          icon: Icon(Ionicons.refresh_outline, size: 20.w),
           style: IconButton.styleFrom(
             backgroundColor: AdminTheme.cardBackground,
             side: const BorderSide(color: AdminTheme.dividerColor),
@@ -160,7 +190,7 @@ class _BillsScreenState extends State<BillsScreen> {
   }
 
   Widget _buildKPICards(BillsProvider provider) {
-    return Row(
+    return Column(
       children: [
         _buildKPICard(
           'Total Pending Amount',
@@ -169,7 +199,7 @@ class _BillsScreenState extends State<BillsScreen> {
           Ionicons.wallet_outline,
           AdminTheme.critical,
         ),
-        const SizedBox(width: 24),
+        const SizedBox(height: 24),
         _buildKPICard(
           'Active Sessions',
           provider.activeSessionsCount.toString(),
@@ -177,7 +207,7 @@ class _BillsScreenState extends State<BillsScreen> {
           Ionicons.time_outline,
           AdminTheme.warning,
         ),
-        const SizedBox(width: 24),
+        const SizedBox(height: 24),
         _buildKPICard(
           'Completed Today',
           provider.completedTodayCount.toString(),
@@ -190,33 +220,32 @@ class _BillsScreenState extends State<BillsScreen> {
   }
 
   Widget _buildKPICard(String title, String value, String subtitle, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AdminTheme.cardBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.1), width: 1.5),
-          boxShadow: [
-            BoxShadow(color: AdminTheme.primaryColor.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title, style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 14, fontWeight: FontWeight.w600)),
-                Icon(icon, color: color, size: 22),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(value, style: const TextStyle(color: AdminTheme.primaryText, fontSize: 32, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(color: subtitle.contains('+') ? AdminTheme.success : AdminTheme.secondaryText, fontSize: 12, fontWeight: FontWeight.bold)),
-          ],
-        ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AdminTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.1), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: AdminTheme.primaryColor.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 13, fontWeight: FontWeight.w600)),
+              Icon(icon, color: color, size: 22),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(value, style: const TextStyle(color: AdminTheme.primaryText, fontSize: 32, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: TextStyle(color: subtitle.contains('+') ? AdminTheme.success : AdminTheme.secondaryText, fontSize: 11, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
@@ -235,58 +264,56 @@ class _BillsScreenState extends State<BillsScreen> {
                   itemCount: provider.allBills.length,
                   itemBuilder: (context, index) {
                     final bill = provider.allBills[index];
-                    return ExpansionTile(
-                      leading: const Icon(Ionicons.receipt_outline, color: AdminTheme.primaryColor),
-                      title: Text('Bill #${bill['billId']?.toString().substring(0, 8) ?? 'N/A'}'),
-                      subtitle: Text('Table: ${bill['tableId']} • ${DateFormat('MMM d, h:mm a').format((bill['createdAt'] as Timestamp).toDate())}'),
-                      trailing: Text('₹${bill['finalTotal']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AdminTheme.scaffoldBackground,
-                            borderRadius: BorderRadius.circular(8),
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(context); // Close dialog
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BillDetailsScreen(bill: bill, tenantId: widget.tenantId),
                           ),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Settled By:', style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
-                                  Text(bill['customerName'] ?? 'Guest', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                ],
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        decoration: const BoxDecoration(
+                          border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AdminTheme.primaryColor.withOpacity(0.1),
+                                shape: BoxShape.circle,
                               ),
-                              const Divider(),
-                              ...((bill['orderDetails'] as List? ?? []).expand((order) => (order['items'] as List? ?? [])).map((item) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('${item['quantity']}x ${item['name']}', style: const TextStyle(fontSize: 12)),
-                                    Text('₹${item['total']}', style: const TextStyle(fontSize: 12)),
-                                  ],
-                                ),
-                              ))),
-                              const Divider(),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
+                              child: const Icon(Ionicons.receipt_outline, color: AdminTheme.primaryColor, size: 20),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ElevatedButton.icon(
-                                    onPressed: () => _printSingleBill(bill['billId']),
-                                    icon: const Icon(Ionicons.print_outline, size: 16),
-                                    label: const Text('Reprint Receipt'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AdminTheme.primaryColor,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    ),
+                                  Text(
+                                    'Bill #${bill['billId']?.toString().substring(0, 8) ?? 'N/A'}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                                  ),
+                                  Text(
+                                    'Table: ${bill['tableId']} • ${DateFormat('MMM d, h:mm a').format((bill['createdAt'] as Timestamp).toDate())}',
+                                    style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                            Text(
+                              '₹${bill['finalTotal']}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AdminTheme.primaryText),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Ionicons.chevron_forward, size: 16, color: AdminTheme.secondaryText),
+                          ],
                         ),
-                      ],
+                      ),
                     );
                   },
                 ),
@@ -330,12 +357,13 @@ class _BillsScreenState extends State<BillsScreen> {
           dataRowHeight: 72,
           horizontalMargin: 24,
           headingRowColor: MaterialStateProperty.all(AdminTheme.scaffoldBackground),
+          columnSpacing: 64,
           columns: const [
-            DataColumn(label: Text('TABLE #', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 12))),
-            DataColumn(label: Text('CUSTOMER / SESSION', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 12))),
-            DataColumn(label: Text('BILL AMOUNT', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 12))),
-            DataColumn(label: Text('TIME ELAPSED', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 12))),
-            DataColumn(label: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 12))),
+            DataColumn(label: Text('TABLE #', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
+            DataColumn(label: Text('CUSTOMER / SESSION', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
+            DataColumn(label: Text('BILL AMOUNT', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
+            DataColumn(label: Text('TIME ELAPSED', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
+            DataColumn(label: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
           ],
           rows: sessions.map((session) {
             final diff = _now.difference(session.sessionStartedAt);
@@ -368,8 +396,8 @@ class _BillsScreenState extends State<BillsScreen> {
                   Text(session.guestId?.substring(0, 8).toUpperCase() ?? 'SID-0000', style: const TextStyle(fontSize: 11, color: AdminTheme.secondaryText)),
                 ],
               )),
-              DataCell(Text('₹${NumberFormat('#,##,###.00').format(session.totalAmount)}', style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText))),
-              DataCell(Text('$mins mins', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold))),
+              DataCell(Text('₹${NumberFormat('#,##,###.00').format(session.totalAmount)}', style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 15))),
+              DataCell(Text('$mins mins', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 15))),
               DataCell(Row(
                 children: [
                    _processingTableId == session.tableId 
@@ -394,11 +422,11 @@ class _BillsScreenState extends State<BillsScreen> {
                 ],
               )),
             ]);
-          }).toList(),
-        ),
+        }).toList(),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _confirmCancelSession(BuildContext context, BillsProvider provider, dynamic session) {
     final reasonController = TextEditingController();

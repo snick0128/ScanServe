@@ -6,6 +6,7 @@ import '../../../theme/admin_theme.dart';
 import '../../../../models/tenant_model.dart';
 import '../../../../models/inventory_item.dart';
 import '../../../providers/inventory_provider.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class MenuItemDialog extends StatefulWidget {
   final MenuItem? item;
@@ -115,7 +116,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   Widget build(BuildContext context) {
     final isEditing = widget.item != null;
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 24.h),
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -134,7 +135,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 key: _formKey,
                 child: SingleChildScrollView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.all(40),
+                  padding: EdgeInsets.all(40.w),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -145,14 +146,14 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildGeneralInfoSection(),
-                            const SizedBox(height: 32),
+                            SizedBox(height: 32.h),
                             _buildPricingAndCategorySection(),
-                            const SizedBox(height: 32),
+                            SizedBox(height: 32.h),
                             _buildRecipeBuilderSection(),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      SizedBox(width: 48.w),
                       // RIGHT COLUMN: Meta & Controls
                       Expanded(
                         flex: 2,
@@ -160,9 +161,9 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildImageSection(),
-                            const SizedBox(height: 32),
+                            SizedBox(height: 32.h),
                             _buildStatusSettingsSection(),
-                            const SizedBox(height: 32),
+                            SizedBox(height: 32.h),
                             _buildPrepTimeSection(),
                           ],
                         ),
@@ -180,7 +181,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
 
   Widget _buildStickyHeader(bool isEditing) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 24.h),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -195,11 +196,11 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
               children: [
                 Text(
                   isEditing ? 'Edit Menu Item' : 'Add New Menu Item',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                  style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
                 ),
                 Text(
                   isEditing ? 'Update details, price and ingredients' : 'Configure your new dish for the digital menu',
-                  style: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                  style: TextStyle(fontSize: 14.sp, color: AdminTheme.secondaryText),
                 ),
               ],
             ),
@@ -207,23 +208,23 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
           OutlinedButton(
             onPressed: _isSaving ? null : () => Navigator.pop(context),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
               side: const BorderSide(color: AdminTheme.dividerColor),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
             ),
-            child: const Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
+            child: Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 14.sp)),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16.w),
           ElevatedButton(
             onPressed: _isSaving ? null : _saveItem,
             style: ElevatedButton.styleFrom(
               backgroundColor: AdminTheme.primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
             ),
             child: _isSaving 
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text(isEditing ? 'Save Changes' : 'Create Item', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : Text(isEditing ? 'Save Changes' : 'Create Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
           ),
         ],
       ),
@@ -444,7 +445,6 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildTrackingTab(InventoryTrackingType.none, 'None'),
-          _buildTrackingTab(InventoryTrackingType.simple, 'Simple'),
           _buildTrackingTab(InventoryTrackingType.recipe, 'Recipe'),
         ],
       ),
@@ -454,10 +454,21 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   Widget _buildTrackingTab(InventoryTrackingType type, String label) {
     final isSelected = _trackingType == type;
     return GestureDetector(
-      onTap: () => setState(() {
-        _trackingType = type;
-        if (type == InventoryTrackingType.none) _ingredients.clear();
-      }),
+      onTap: () {
+        setState(() {
+          _trackingType = type;
+          if (type == InventoryTrackingType.none) _ingredients.clear();
+        });
+        if (type == InventoryTrackingType.recipe) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          });
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(

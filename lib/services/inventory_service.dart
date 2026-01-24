@@ -210,4 +210,9 @@ class InventoryService {
       }
     }
   }
+
+  /// Delete an inventory item
+  Future<void> deleteItem(String tenantId, String itemId) async {
+    await _itemsRef(tenantId).doc(itemId).delete();
+  }
 }

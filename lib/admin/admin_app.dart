@@ -14,6 +14,7 @@ import 'providers/menu_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'theme/admin_theme.dart';
 import '../theme/app_theme.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class AdminApp extends StatelessWidget {
   const AdminApp({super.key});
@@ -98,6 +99,10 @@ class AdminApp extends StatelessWidget {
         title: 'ScanServe Admin',
         debugShowCheckedModeBanner: false,
         theme: AdminTheme.lightTheme,
+        builder: (context, child) {
+          ScreenScale.init(context);
+          return child!;
+        },
         home: const AuthWrapper(),
         routes: {
           '/login': (context) => const AdminLoginScreen(),

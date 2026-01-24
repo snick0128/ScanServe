@@ -383,25 +383,35 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                               child: orders.isEmpty 
                                 ? const Center(child: Text('No active orders'))
                                 : ListView.builder(
-                                  itemCount: orders.length,
+                                  itemCount: orders.length + 1, // +1 for the bill section
                                   itemBuilder: (context, index) {
-                                    final order = orders[index];
-                                    return _buildOrderCard(order);
+                                    if (index < orders.length) {
+                                      final order = orders[index];
+                                      return _buildOrderCard(order);
+                                    } else {
+                                      // LAST ITEM: Bill Section (Scrollable)
+                                      if (orders.isNotEmpty && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain)) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(top: 24, bottom: 80), // bottom padding for fixed bar
+                                            child: _buildBillSection(orders),
+                                          );
+                                      } else if (orders.isNotEmpty) {
+                                        return const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Text(
+                                            'Billing restricted for your role. Please contact Admin.',
+                                            style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    }
                                   },
                                 ),
                             ),
-                            const Divider(height: 24),
-                            // ALLOW CAPTAIN TO GENERATE BILL
-                            if (orders.isNotEmpty && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain))
-                              _buildBillSection(orders)
-                            else if (orders.isNotEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Text(
-                                  'Billing restricted for your role. Please contact Admin.',
-                                  style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
-                                ),
-                              ),
+                            // FIXED BOTTOM TOTAL BAR
+                            if (orders.isNotEmpty)
+                              _buildFixedTotalBar(totalTotal),
                           ],
                         );
                       },
@@ -417,25 +427,38 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
   }
 
   Widget _buildBillSection(List<model.Order> orders) {
-    final subtotal = orders.fold<double>(
-      0.0,
-      (sum, model.Order order) => sum + order.subtotal,
-    );
-    final tax = orders.fold<double>(
-      0.0,
-      (sum, model.Order order) => sum + order.tax,
-    );
-    final total = orders.fold<double>(
-      0.0,
-      (sum, model.Order order) => sum + order.total,
-    );
-
     return Column(
       children: [
-        _buildBillSummary(subtotal, tax, total),
+        _buildBillSummary(orders),
         const SizedBox(height: 16),
         _buildGenerateBillButton(orders),
       ],
+    );
+  }
+
+  Widget _buildFixedTotalBar(double total) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: AdminTheme.dividerColor)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'FINAL TOTALAMOUNT', 
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)
+          ),
+          Text(
+            '₹${total.toStringAsFixed(2)}', 
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryColor)
+          ),
+        ],
+      ),
     );
   }
 
@@ -664,7 +687,10 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     );
   }
 
-  Widget _buildBillSummary(double subtotal, double tax, double total) {
+  Widget _buildBillSummary(List<model.Order> orders) {
+    final subtotal = orders.fold<double>(0.0, (sum, o) => sum + o.subtotal);
+    final tax = orders.fold<double>(0.0, (sum, o) => sum + o.tax);
+
     final discount = double.tryParse(_discountController.text) ?? 0.0;
     final discountAmount = subtotal * (discount / 100);
     final discountedSubtotal = subtotal - discountAmount;
@@ -673,42 +699,35 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     final finalTotal = discountedSubtotal + newTax;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
+        color: AdminTheme.scaffoldBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AdminTheme.dividerColor),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text('BILLING DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
+          const SizedBox(height: 20),
+          _buildBillRow('Session Subtotal', '₹${subtotal.toStringAsFixed(2)}'),
+          _buildBillRow('Tax (Recalculated)', '₹${newTax.toStringAsFixed(2)}'),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Subtotal:'),
-              Text('₹${subtotal.toStringAsFixed(2)}'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Tax ${discount > 0 ? "(Recalculated)" : ""}:'),
-              Text('₹${newTax.toStringAsFixed(2)}'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Discount (%):'),
+              const Text('Add Discount (%)', style: TextStyle(fontWeight: FontWeight.w600)),
               SizedBox(
                 width: 80,
                 child: TextField(
                   controller: _discountController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -716,36 +735,30 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
             ],
           ),
           if (discount > 0) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Discount Amount (on Subtotal):', style: TextStyle(color: Colors.green)),
-                Text(
-                  '-₹${discountAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(color: Colors.green),
-                ),
-              ],
-            ),
+            const SizedBox(height: 12),
+            _buildBillRow('Discount Savings', '-₹${discountAmount.toStringAsFixed(2)}', color: AdminTheme.success),
           ],
-          const Divider(height: 16),
+          const Divider(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Final Total:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                '₹${finalTotal.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AdminTheme.primaryColor,
-                ),
-              ),
+              const Text('Bill Payable', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text('₹${finalTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AdminTheme.primaryColor)),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillRow(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: AdminTheme.secondaryText)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );

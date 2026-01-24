@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/customer_details_bottom_sheet.dart';
 import '../utils/haptic_helper.dart';
 import 'upi_payment_page.dart';
+import 'bill_view.dart';
 
 class PaymentPage extends StatefulWidget {
   final String tenantId;
@@ -135,7 +136,15 @@ class _PaymentPageState extends State<PaymentPage> {
               TextButton(
                 onPressed: () {
                   Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Back to previous screen
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BillView(
+                        orders: orderController.activeOrders,
+                        tableName: tableName,
+                      ),
+                    ),
+                  );
                 },
                 child: Text(
                   'Got it',

@@ -11,6 +11,7 @@ import '../services/guest_session_service.dart';
 import '../widgets/customer_details_bottom_sheet.dart';
 import 'components/order_status_badge.dart';
 import '../theme/app_theme.dart';
+import 'bill_view.dart';
 
 class OrderListScreen extends StatefulWidget {
   const OrderListScreen({Key? key}) : super(key: key);
@@ -349,6 +350,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
       );
 
       if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BillView(
+              orders: orderController.activeOrders,
+              tableName: tableName,
+            ),
+          ),
+        );
         SnackbarHelper.showTopSnackBar(
           context,
           '✅ Bill requested — staff notified',
