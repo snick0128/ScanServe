@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../models/tenant_model.dart';
 import '../theme/app_theme.dart';
 import '../utils/haptic_helper.dart';
+import '../controllers/cart_controller.dart';
 
-class ItemPreviewSheet extends StatelessWidget {
+class ItemPreviewSheet extends StatefulWidget {
   final MenuItem item;
   final VoidCallback onAdd;
 
@@ -15,7 +17,25 @@ class ItemPreviewSheet extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<ItemPreviewSheet> createState() => _ItemPreviewSheetState();
+}
+
+class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
+  Variant? _selectedVariant;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.item.hasVariants && widget.item.variants.isNotEmpty) {
+      _selectedVariant = widget.item.variants.first;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Determine price to show
+    final displayPrice = _selectedVariant?.price ?? widget.item.price;
+
     return Container(
       // We wrap in a Stack so we can have the floating close button
       // Use a fixed or constrained height to match bottom sheet behavior
@@ -48,7 +68,7 @@ class ItemPreviewSheet extends StatelessWidget {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
                                 child: Image.network(
-                                  item.imageUrl ?? 'https://via.placeholder.com/400x300',
+                                  widget.item.imageUrl ?? 'https://via.placeholder.com/400x300',
                                   width: double.infinity,
                                   height: 280,
                                   fit: BoxFit.cover,
@@ -77,19 +97,19 @@ class ItemPreviewSheet extends StatelessWidget {
                                     width: 16,
                                     height: 16,
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: item.isVeg ? const Color(0xFF0F6D3F) : Colors.red, width: 1),
+                                      border: Border.all(color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red, width: 1),
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                     padding: const EdgeInsets.all(2),
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
+                                        color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  if (item.isBestseller) ...[
+                                  if (widget.item.isBestseller) ...[
                                     _buildTag('Bestseller', const Color(0xFFE6F4EC), const Color(0xFF0F6D3F)),
                                     const SizedBox(width: 8),
                                   ],
@@ -100,7 +120,7 @@ class ItemPreviewSheet extends StatelessWidget {
 
                               // Item Name
                               Text(
-                                item.name,
+                                widget.item.name,
                                 style: GoogleFonts.outfit(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
@@ -112,7 +132,7 @@ class ItemPreviewSheet extends StatelessWidget {
 
                               // Price
                               Text(
-                                '₹${item.price.toInt()}',
+                                '₹${displayPrice.toInt()}',
                                 style: GoogleFonts.outfit(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -123,7 +143,7 @@ class ItemPreviewSheet extends StatelessWidget {
 
                               // Description
                               Text(
-                                item.description,
+                                widget.item.description,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.outfit(
@@ -132,6 +152,22 @@ class ItemPreviewSheet extends StatelessWidget {
                                   height: 1.4,
                                 ),
                               ),
+                              
+                              // Variants Selection
+                              if (widget.item.hasVariants) ...[
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Select Portion / Variant',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF1C1C1E),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                ...widget.item.variants.map((v) => _buildVariantOption(v)),
+                              ],
+                              
                               const SizedBox(height: 100), // Reserve space for footer
                             ],
                           ),
@@ -185,13 +221,19 @@ class ItemPreviewSheet extends StatelessWidget {
                   child: InkWell(
                     onTap: () {
                       HapticHelper.medium();
-                      onAdd();
+                      if (widget.item.hasVariants) {
+                        if (_selectedVariant != null) {
+                          context.read<CartController>().addItem(widget.item, _selectedVariant);
+                        }
+                      } else {
+                        widget.onAdd();
+                      }
                       Navigator.pop(context);
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Center(
                       child: Text(
-                        'ADD',
+                        'ADD TO PLATE - ₹${displayPrice.toInt()}',
                         style: GoogleFonts.outfit(
                           color: Colors.white,
                           fontSize: 16,
@@ -237,6 +279,66 @@ class ItemPreviewSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVariantOption(Variant variant) {
+    final isSelected = _selectedVariant?.name == variant.name;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedVariant = variant);
+        HapticHelper.light();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF2FDF7) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0F6D3F) : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                variant.name,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? const Color(0xFF0F6D3F) : Colors.black,
+                ),
+              ),
+            ),
+            Text(
+              '₹${variant.price.toInt()}',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? const Color(0xFF0F6D3F) : Colors.black,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF0F6D3F) : Colors.grey[400]!,
+                  width: 2,
+                ),
+                color: isSelected ? const Color(0xFF0F6D3F) : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Center(child: Icon(Icons.check, size: 14, color: Colors.white))
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }

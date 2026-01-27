@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:intl/intl.dart';
-import '../../../models/order.dart' as model;
-import '../../../models/tenant_model.dart';
-import '../../providers/orders_provider.dart';
-import '../../providers/admin_auth_provider.dart';
-import '../../providers/menu_provider.dart';
-import '../../theme/admin_theme.dart';
+import 'package:scan_serve/models/order.dart' as model;
+import 'package:scan_serve/models/tenant_model.dart';
+import 'package:scan_serve/admin/providers/orders_provider.dart';
+import 'package:scan_serve/admin/providers/admin_auth_provider.dart';
+import 'package:scan_serve/admin/providers/menu_provider.dart';
+import 'package:scan_serve/admin/theme/admin_theme.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class StationConfig {
   final String id;
@@ -38,6 +41,7 @@ class _KDSScreenState extends State<KDSScreen> {
   bool _isFullScreen = false;
   StationConfig? _currentStation;
   Map<String, Set<String>> _checkedItems = {}; // orderId -> set of itemIds
+  final Set<String> _printedOrders = {};
 
   @override
   void initState() {
@@ -89,6 +93,17 @@ class _KDSScreenState extends State<KDSScreen> {
       backgroundColor: const Color(0xFFF1F3F4), // Light KDS background
       body: Consumer2<OrdersProvider, MenuProvider>(
         builder: (context, ordersProvider, menuProvider, _) {
+          // Auto-Print Logic
+          if (ordersProvider.latestNewOrder != null && !_printedOrders.contains(ordersProvider.latestNewOrder!.id)) {
+             final newOrder = ordersProvider.latestNewOrder!;
+             _printedOrders.add(newOrder.id);
+             WidgetsBinding.instance.addPostFrameCallback((_) {
+               _printKOT(newOrder);
+               // Optional: Clear latestNewOrder from provider if you want to stop other screens from printing
+               // ordersProvider.clearLatestNewOrder(); 
+             });
+          }
+
           final stationOrders = _filterOrdersForStation(ordersProvider.currentOrders, menuProvider.allItems);
           
           return Column(
@@ -464,7 +479,7 @@ class _KDSScreenState extends State<KDSScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {}, // Handle print
+                      onPressed: () => _printKOT(order), // Handle print
                       icon: const Icon(Ionicons.print_outline, size: 18),
                       label: const Text('PRINT KOT'),
                       style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
@@ -508,5 +523,87 @@ class _KDSScreenState extends State<KDSScreen> {
 
   List<model.OrderItem> _filterItemsForStation(List<model.OrderItem> items, List<MenuItem> menuItems) {
     return items; // Return all items
+  }
+
+  Future<void> _printKOT(model.Order order) async {
+    try {
+      final pdf = pw.Document();
+      final font = await PdfGoogleFonts.notoSansDevanagariRegular();
+      final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.roll80,
+          margin: const pw.EdgeInsets.all(10),
+          theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
+                  child: pw.Text('KOT Ticket', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.Divider(),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Table: ${order.tableName ?? "N/A"}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                    pw.Text(DateFormat('h:mm a').format(order.createdAt), style: const pw.TextStyle(fontSize: 12)),
+                  ],
+                ),
+                pw.Text('Order: #${order.id.substring(0, 8)}', style: const pw.TextStyle(fontSize: 10)),
+                if (order.customerName != null)
+                   pw.Text('Cust: ${order.customerName}', style: const pw.TextStyle(fontSize: 10)),
+                pw.Divider(borderStyle: pw.BorderStyle.dashed),
+                pw.SizedBox(height: 5),
+                ...order.items.map((item) {
+                  return pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 8),
+                    child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Container(
+                          width: 20,
+                          child: pw.Text('${item.quantity}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                        ),
+                        pw.Expanded(
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(item.name, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                               /* Variants display in KOT */
+                              if (item.variantName != null) 
+                                pw.Text('(${item.variantName})', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                              if (item.notes != null && item.notes!.isNotEmpty)
+                                pw.Text('Note: ${item.notes}', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                              if (item.addons != null && item.addons!.isNotEmpty)
+                                ...item.addons!.map((a) => pw.Text('+ $a', style: const pw.TextStyle(fontSize: 10))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                pw.Divider(),
+                pw.Center(
+                  child: pw.Text('Printed at ${DateFormat('h:mm a').format(DateTime.now())}', style: const pw.TextStyle(fontSize: 8)),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'KOT_${order.id.substring(0, 8)}',
+      );
+    } catch (e) {
+      debugPrint('Error printing KOT: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print Error: $e')));
+      }
+    }
   }
 }

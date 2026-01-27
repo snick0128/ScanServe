@@ -45,6 +45,12 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   late Map<String, double> _ingredients; // itemId -> qty (ALWAYS in base units: kg, Liter, etc.)
   final Map<String, String> _displayUnits = {}; // itemId -> displayed unit in UI (grams, ml, etc.)
 
+  // Variants state
+  bool _hasVariants = false;
+  List<Variant> _variants = [];
+  final _variantNameController = TextEditingController();
+  final _variantPriceController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +65,8 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
 
     _trackingType = widget.item?.inventoryTrackingType ?? InventoryTrackingType.none;
     _ingredients = Map.from(widget.item?.inventoryIngredients ?? {});
+    _hasVariants = widget.item?.hasVariants ?? false;
+    _variants = List.from(widget.item?.variants ?? []);
 
     // Initialize category
     if (widget.item != null) {
@@ -109,6 +117,8 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     _priceController.dispose();
     _imageController.dispose();
     _scrollController.dispose();
+    _variantNameController.dispose();
+    _variantPriceController.dispose();
     super.dispose();
   }
 
@@ -301,6 +311,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: widget.categories.any((c) => c.id == _selectedCategoryId) ? _selectedCategoryId : null,
+                    isExpanded: true, // Prevent overflow
                     decoration: InputDecoration(
                       labelText: 'Category',
                       labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
@@ -310,7 +321,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     ),
                     items: widget.categories
                         .fold<List<Category>>([], (list, cat) => list.any((c) => c.id == cat.id) ? list : [...list, cat])
-                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis)))
                         .toList(),
                     onChanged: (v) => setState(() => _selectedCategoryId = v),
                   ),
@@ -333,6 +344,8 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            _buildVariantsSection(),
             const SizedBox(height: 24),
             const Text('Diet Preference', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
             const SizedBox(height: 12),
@@ -805,6 +818,106 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     );
   }
 
+  Widget _buildVariantsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Checkbox(
+              value: _hasVariants,
+              onChanged: (val) => setState(() => _hasVariants = val ?? false),
+              activeColor: AdminTheme.primaryColor,
+            ),
+            const Text('Has Variants / Portions', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        if (_hasVariants) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AdminTheme.dividerColor),
+            ),
+            child: Column(
+              children: [
+                // List of variants
+                ..._variants.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final variant = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(variant.name, style: const TextStyle(fontWeight: FontWeight.w500))),
+                        Text('₹${variant.price}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Ionicons.close_circle, size: 20, color: AdminTheme.critical),
+                          onPressed: () => setState(() => _variants.removeAt(index)),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const Divider(),
+                // Add new variant
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _variantNameController,
+                        decoration: const InputDecoration(
+                          hintText: 'Name (e.g. Half)',
+                          isDense: true,
+                          contentPadding: EdgeInsets.all(12),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 1,
+                      child: TextField(
+                        controller: _variantPriceController,
+                        decoration: const InputDecoration(
+                          hintText: 'Price',
+                          isDense: true,
+                          contentPadding: EdgeInsets.all(12),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Ionicons.add_circle, color: AdminTheme.primaryColor, size: 28),
+                      onPressed: () {
+                        if (_variantNameController.text.isNotEmpty && _variantPriceController.text.isNotEmpty) {
+                          setState(() {
+                            _variants.add(Variant(
+                              name: _variantNameController.text,
+                              price: double.tryParse(_variantPriceController.text) ?? 0.0,
+                            ));
+                            _variantNameController.clear();
+                            _variantPriceController.clear();
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   void _saveItem() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCategoryId == null) return;
@@ -829,6 +942,8 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         isBestseller: _isBestseller,
         inventoryTrackingType: _trackingType,
         inventoryIngredients: _ingredients,
+        hasVariants: _hasVariants,
+        variants: _variants,
       );
 
       if (mounted) {

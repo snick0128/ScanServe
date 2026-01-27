@@ -198,6 +198,29 @@ class AdminAuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw Exception('No user signed in');
+    }
+
+    try {
+      // Re-authenticate user
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+      
+      print('🔥 Auth: Password updated successfully for ${user.email}');
+    } catch (e) {
+      print('🔥 Auth: Error changing password: $e');
+      rethrow;
+    }
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
     _isAdmin = false;

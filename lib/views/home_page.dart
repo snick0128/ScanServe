@@ -82,6 +82,15 @@ class _HomeContentState extends State<HomeContent> {
           _isVegOnly = tenant?.isVegOnly ?? false;
           _isLoadingTenant = false;
         });
+
+        // Apply strict veg mode if configured
+        if (_isVegOnly == true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              context.read<app_controller.MenuController>().setStrictVegMode(true);
+            }
+          });
+        }
       }
     } catch (e) {
       print('Error loading tenant info: $e');
@@ -343,14 +352,31 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildFilterChips() {
+    final menuController = context.watch<app_controller.MenuController>();
+    
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       child: Row(
         children: [
           _buildChip('Filter', Icons.tune),
-          _buildChip('Veg', null, isVeg: true),
-          _buildChip('Non-Veg', null, isNonVeg: true),
+          if (!menuController.isStrictVeg) ...[
+            _buildChip('Veg', null, isVeg: true),
+            _buildChip('Non-Veg', null, isNonVeg: true),
+          ] else ...[
+             Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                   decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green)),
+                   child: const Row(children:[
+                       Icon(Icons.eco, size: 16, color: Colors.green),
+                       SizedBox(width:6),
+                       Text('Pure Veg Restaurant', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)) 
+                   ]),
+                ),
+             ),
+          ],
           _buildChip('Bestseller', null),
         ],
       ),
@@ -518,12 +544,15 @@ class _HomeContentState extends State<HomeContent> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      amountText,
-                      style: GoogleFonts.outfit(
-                        color: Colors.white,
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        amountText,
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Row(
@@ -564,7 +593,19 @@ class _HomeContentState extends State<HomeContent> {
           items: [
             BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, size: 24.w), label: 'Orders'),
             BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu, size: 24.w), label: 'Menu'),
-            BottomNavigationBarItem(icon: Icon(Icons.shopping_cart_outlined, size: 24.w), label: 'Cart'),
+            BottomNavigationBarItem(
+              icon: Consumer<CartController>(
+                builder: (context, cart, child) {
+                  return Badge(
+                    isLabelVisible: cart.itemCount > 0,
+                    label: Text('${cart.itemCount}'),
+                    backgroundColor: AppTheme.primaryColor,
+                    child: Icon(Icons.shopping_cart_outlined, size: 24.w),
+                  );
+                },
+              ),
+              label: 'Cart',
+            ),
           ],
         ),
       ],

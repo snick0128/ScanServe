@@ -18,6 +18,7 @@ class MenuController extends ChangeNotifier {
   bool _isVegOnly = false;
   bool _isNonVegOnly = false;
   bool _isBestsellerOnly = false;
+  bool _isStrictVeg = false; // Restaurant-level setting
   SortOrder _sortOrder = SortOrder.none;
   final List<MenuItem> _items = [];
   List<InventoryItem> _inventory = [];
@@ -28,9 +29,10 @@ class MenuController extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   int get searchResultsCount => filteredItems.length;
   bool get isSearching => _searchQuery.isNotEmpty;
-  bool get isVegOnly => _isVegOnly;
+  bool get isVegOnly => _isVegOnly || _isStrictVeg;
   bool get isNonVegOnly => _isNonVegOnly;
   bool get isBestsellerOnly => _isBestsellerOnly;
+  bool get isStrictVeg => _isStrictVeg;
   SortOrder get sortOrder => _sortOrder;
 
   int get activeFiltersCount {
@@ -56,7 +58,7 @@ class MenuController extends ChangeNotifier {
       if (_selectedSubcategory != null && item.subcategory != _selectedSubcategory) return false;
 
       // Veg filter
-      if (_isVegOnly && !item.isVeg) return false;
+      if ((_isVegOnly || _isStrictVeg) && !item.isVeg) return false;
 
       // Non-Veg filter
       if (_isNonVegOnly && item.isVeg) return false;
@@ -137,6 +139,15 @@ class MenuController extends ChangeNotifier {
     _isNonVegOnly = isNonVegOnly;
     _isBestsellerOnly = isBestsellerOnly;
     _sortOrder = sortOrder;
+    notifyListeners();
+  }
+
+  void setStrictVegMode(bool enable) {
+    _isStrictVeg = enable;
+    if (enable) {
+      _isVegOnly = true;
+      _isNonVegOnly = false;
+    }
     notifyListeners();
   }
 

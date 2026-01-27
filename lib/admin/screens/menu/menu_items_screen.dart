@@ -6,6 +6,7 @@ import '../../providers/menu_provider.dart';
 import '../../providers/admin_auth_provider.dart';
 import '../../theme/admin_theme.dart';
 import 'widgets/menu_item_dialog.dart';
+import 'widgets/category_management_dialog.dart';
 
 class MenuItemsScreen extends StatefulWidget {
   final String tenantId;
@@ -90,6 +91,13 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
     super.dispose();
   }
 
+  void _showCategoryManagement(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const CategoryManagementDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,23 +127,29 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Menu Management',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Manage your restaurant’s digital menu items, categories, and availability.',
-                style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Menu Management',
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Manage ${provider.allItems.length} digital menu items, categories, and availability.',
+                  style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
           Row(
             children: [
               _buildActionCircle(Ionicons.download_outline, 'Export CSV', () => _exportCsv(context, provider.allItems)),
+              const SizedBox(width: 16),
+              _buildActionCircle(Ionicons.grid_outline, 'Categories', () => _showCategoryManagement(context)),
               const SizedBox(width: 16),
               ElevatedButton.icon(
                 onPressed: () => _showEditDialog(null, provider),

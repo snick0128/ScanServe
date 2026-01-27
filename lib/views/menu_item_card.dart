@@ -47,7 +47,11 @@ class _MenuItemCardState extends State<MenuItemCard>
     _scaleController.forward().then((_) {
       _scaleController.reverse();
     });
-    widget.onAddPressed();
+    if (widget.item.hasVariants) {
+      _showItemPreview();
+    } else {
+      widget.onAddPressed();
+    }
   }
 
   void _showItemPreview() {
@@ -66,7 +70,7 @@ class _MenuItemCardState extends State<MenuItemCard>
   Widget build(BuildContext context) {
     final cartController = context.watch<CartController>();
     final quantity = cartController.getItemQuantity(widget.item.id);
-    final isInCart = quantity > 0;
+    final isInCart = quantity > 0 && !widget.item.hasVariants;
 
     return InkWell(
       onTap: _showItemPreview,
@@ -248,7 +252,7 @@ class _MenuItemCardState extends State<MenuItemCard>
         onTap: _onAddPressed,
         child: Center(
           child: Text(
-            'ADD',
+            widget.item.hasVariants ? 'SELECT' : 'ADD',
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
