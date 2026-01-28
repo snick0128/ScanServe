@@ -7,14 +7,17 @@ import 'shimmer_loading.dart';
 import 'package:scan_serve/utils/snackbar_helper.dart';
 
 class MenuGrid extends StatelessWidget {
-  const MenuGrid({Key? key}) : super(key: key);
+  final List<MenuItem>? items;
+  final bool? isLoading;
+
+  const MenuGrid({Key? key, this.items, this.isLoading}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final menuController = context.watch<app_controller.MenuController>();
-    final items = menuController.filteredItems;
-    final isLoading = menuController.isLoading;
+    final actualItems = items ?? menuController.filteredItems;
+    final actualIsLoading = isLoading ?? menuController.isLoading;
 
     // Enhanced responsive breakpoints
     int crossAxisCount;
@@ -60,7 +63,7 @@ class MenuGrid extends StatelessWidget {
       mainAxisSpacing = 32;
     }
 
-    if (isLoading) {
+    if (actualIsLoading) {
       return ShimmerLoading.buildShimmerGrid(
         itemCount: 8, // Show more shimmer items for better loading experience
         crossAxisCount: crossAxisCount,
@@ -73,7 +76,7 @@ class MenuGrid extends StatelessWidget {
       );
     }
 
-    if (items.isEmpty) {
+    if (actualItems.isEmpty) {
       return Container(
         width: double.infinity,
         height: 200,
@@ -127,12 +130,12 @@ class MenuGrid extends StatelessWidget {
         crossAxisSpacing: crossAxisSpacing,
         mainAxisSpacing: mainAxisSpacing,
       ),
-      itemCount: items.length,
+      itemCount: actualItems.length,
       shrinkWrap: true, // Add this to prevent layout issues
       physics:
           const NeverScrollableScrollPhysics(), // Add this to prevent nested scrolling issues
       itemBuilder: (context, index) {
-        final item = items[index];
+        final item = actualItems[index];
         return MenuItemCard(
           item: item,
           onAddPressed: () {

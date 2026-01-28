@@ -14,6 +14,7 @@ class MenuController extends ChangeNotifier {
 
   String _selectedMealTime = ''; // Start with no filter
   String? _selectedSubcategory;
+  List<String> _selectedCategories = [];
   String _searchQuery = '';
   bool _isVegOnly = false;
   bool _isNonVegOnly = false;
@@ -25,6 +26,7 @@ class MenuController extends ChangeNotifier {
 
   String get selectedMealTime => _selectedMealTime;
   String? get selectedSubcategory => _selectedSubcategory;
+  List<String> get selectedCategories => _selectedCategories;
   String get searchQuery => _searchQuery;
   int get searchResultsCount => filteredItems.length;
   bool get isSearching => _searchQuery.isNotEmpty;
@@ -33,11 +35,23 @@ class MenuController extends ChangeNotifier {
   bool get isBestsellerOnly => _isBestsellerOnly;
   SortOrder get sortOrder => _sortOrder;
 
+  List<String> get availableCategories {
+    final categories = _items
+        .map((item) => item.category)
+        .where((cat) => cat != null && cat.isNotEmpty)
+        .map((cat) => cat!)
+        .toSet()
+        .toList();
+    categories.sort();
+    return categories;
+  }
+
   int get activeFiltersCount {
     int count = 0;
     if (_isVegOnly) count++;
     if (_isNonVegOnly) count++;
     if (_isBestsellerOnly) count++;
+    if (_selectedCategories.isNotEmpty) count++;
     if (_sortOrder != SortOrder.none) count++;
     return count;
   }
@@ -54,6 +68,11 @@ class MenuController extends ChangeNotifier {
 
       // Subcategory filter
       if (_selectedSubcategory != null && item.subcategory != _selectedSubcategory) return false;
+
+      // Filter Bottom Sheet Categories filter
+      if (_selectedCategories.isNotEmpty && (item.category == null || !_selectedCategories.contains(item.category))) {
+        return false;
+      }
 
       // Veg filter
       if (_isVegOnly && !item.isVeg) return false;
@@ -101,6 +120,16 @@ class MenuController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setSubcategory(String? subcategory) {
+    _selectedSubcategory = subcategory;
+    notifyListeners();
+  }
+
+  void setCategories(List<String> categories) {
+    _selectedCategories = categories;
+    notifyListeners();
+  }
+
   void testFirebaseConnection() async {
     print('🧪 TESTING FIREBASE CONNECTION...');
     try {
@@ -132,11 +161,13 @@ class MenuController extends ChangeNotifier {
     required bool isNonVegOnly,
     required bool isBestsellerOnly,
     required SortOrder sortOrder,
+    List<String> selectedCategories = const [],
   }) {
     _isVegOnly = isVegOnly;
     _isNonVegOnly = isNonVegOnly;
     _isBestsellerOnly = isBestsellerOnly;
     _sortOrder = sortOrder;
+    _selectedCategories = List.from(selectedCategories);
     notifyListeners();
   }
 
@@ -145,6 +176,7 @@ class MenuController extends ChangeNotifier {
     _isNonVegOnly = false;
     _isBestsellerOnly = false;
     _sortOrder = SortOrder.none;
+    _selectedCategories = [];
     notifyListeners();
   }
 

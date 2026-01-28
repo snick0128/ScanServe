@@ -248,20 +248,62 @@ class _HomeContentState extends State<HomeContent> {
 
             // Menu items (Scrollable area)
             Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _buildSectionTitle('Browse Menu'),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: MenuGrid(),
+              child: Consumer<app_controller.MenuController>(
+                builder: (context, menuController, child) {
+                  final items = menuController.filteredItems;
+                  final isLoading = menuController.isLoading;
+
+                  if (isLoading) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          _buildSectionTitle('Loading Menu...'),
+                          const MenuGrid(isLoading: true),
+                        ],
+                      ),
+                    );
+                  }
+
+                  if (items.isEmpty) {
+                    return const Center(child: MenuGrid());
+                  }
+
+                  // Group items by category
+                  final groupedItems = <String, List<app_controller.MenuItem>>{};
+                  for (var item in items) {
+                    final cat = item.category ?? 'Others';
+                    groupedItems.putIfAbsent(cat, () => []).add(item);
+                  }
+
+                  // Sort category names for consistent display
+                  final sortedCategories = groupedItems.keys.toList()..sort();
+
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        ...sortedCategories.map((category) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle(category),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: MenuGrid(items: groupedItems[category]),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          );
+                        }).toList(),
+                        // Padding at bottom for floating unit
+                        const SizedBox(height: 100),
+                      ],
                     ),
-                    // Padding at bottom for floating unit
-                    const SizedBox(height: 100),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ],

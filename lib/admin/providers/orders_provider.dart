@@ -9,6 +9,7 @@ import './admin_auth_provider.dart';
 import '../../services/menu_service.dart';
 import '../../services/inventory_service.dart';
 import '../../models/tenant_model.dart';
+import '../services/print_service.dart';
 
 class OrdersProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -21,6 +22,7 @@ class OrdersProvider with ChangeNotifier {
   ActivityProvider? _activity;
   StreamSubscription<QuerySnapshot>? _ordersSubscription;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final PrintService _printService = PrintService();
   DateTime? _lastOrderTime;
   bool _isFirstLoad = true;
   final Map<String, StreamSubscription> _orderSubscriptions = {};
@@ -162,16 +164,22 @@ class OrdersProvider with ChangeNotifier {
                     shouldAlert = true;
                     _latestNewOrder = order;
                     print('🔔 New Order Alert: ${order.id}');
+                    // Trigger Auto-Print for New Order
+                    _printService.printKOT(order, isAddon: false);
                   } else {
                     if (order.items.length > existingOrder.items.length) {
                       shouldAlert = true;
                       _latestNewOrder = order;
                       print('🔔 Add-on Item Alert for Order: ${order.id}');
+                      // Trigger Auto-Print for Add-ons
+                      _printService.printKOT(order, isAddon: true);
                     }
                     if (order.chefNote != existingOrder.chefNote && order.chefNote != null && order.chefNote!.isNotEmpty) {
                       shouldAlert = true;
                       _latestNewOrder = order;
                       print('🔔 Chef Note Alert for Order: ${order.id}');
+                      // Optionally print chef notes too
+                      _printService.printKOT(order, isAddon: true);
                     }
                   }
                 }

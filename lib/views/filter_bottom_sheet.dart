@@ -18,6 +18,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
   bool _tempNonVegOnly = false;
   bool _tempBestsellerOnly = false;
   app_controller.SortOrder _tempSortOrder = app_controller.SortOrder.none;
+  List<String> _tempSelectedCategories = [];
   bool _syncInitialized = false;
 
   @override
@@ -29,6 +30,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       _tempNonVegOnly = menuController.isNonVegOnly;
       _tempBestsellerOnly = menuController.isBestsellerOnly;
       _tempSortOrder = menuController.sortOrder;
+      _tempSelectedCategories = List.from(menuController.selectedCategories);
       _syncInitialized = true;
     }
   }
@@ -39,6 +41,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     if (_tempNonVegOnly) count++;
     if (_tempBestsellerOnly) count++;
     if (_tempSortOrder != app_controller.SortOrder.none) count++;
+    if (_tempSelectedCategories.isNotEmpty) count++;
     return count;
   }
 
@@ -145,6 +148,27 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       _tempBestsellerOnly,
                       () => setState(() => _tempBestsellerOnly = !_tempBestsellerOnly),
                     ),
+                    const SizedBox(height: 16),
+                    _buildSectionTitle('Categories'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: menuController.availableCategories.map((category) {
+                        final isSelected = _tempSelectedCategories.contains(category);
+                        return _buildChip(
+                          category,
+                          isSelected,
+                          () => setState(() {
+                            if (isSelected) {
+                              _tempSelectedCategories.remove(category);
+                            } else {
+                              _tempSelectedCategories.add(category);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
                   ],
                 ),
               ),
@@ -175,6 +199,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                           _tempNonVegOnly = false;
                           _tempBestsellerOnly = false;
                           _tempSortOrder = app_controller.SortOrder.none;
+                          _tempSelectedCategories = [];
                         });
                       },
                       style: OutlinedButton.styleFrom(
@@ -202,6 +227,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                           isNonVegOnly: _tempNonVegOnly,
                           isBestsellerOnly: _tempBestsellerOnly,
                           sortOrder: _tempSortOrder,
+                          selectedCategories: _tempSelectedCategories,
                         );
                         Navigator.pop(context);
                       },
