@@ -5,9 +5,10 @@ import '../controllers/cart_controller.dart';
 import 'menu_item_card.dart';
 import 'shimmer_loading.dart';
 import 'package:scan_serve/utils/snackbar_helper.dart';
+import '../models/tenant_model.dart';
 
 class MenuGrid extends StatelessWidget {
-  final List<app_controller.MenuItem>? items;
+  final List<MenuItem>? items;
   final bool? isLoading;
 
   const MenuGrid({Key? key, this.items, this.isLoading}) : super(key: key);

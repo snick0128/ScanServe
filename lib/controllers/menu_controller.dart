@@ -143,11 +143,6 @@ class MenuController extends ChangeNotifier {
     }
   }
 
-  void setSubcategory(String? subcategory) {
-    _selectedSubcategory = subcategory;
-    notifyListeners();
-  }
-
   void setSearchQuery(String query) {
     _searchQuery = query;
     notifyListeners();

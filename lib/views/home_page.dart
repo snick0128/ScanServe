@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:scan_serve/services/tenant_service.dart';
 import 'package:scan_serve/models/order_model.dart';
+import '../models/tenant_model.dart';
 import '../controllers/menu_controller.dart' as app_controller;
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
@@ -292,7 +293,7 @@ class _HomeContentState extends State<HomeContent> {
                   }
 
                   // Group items by category
-                  final groupedItems = <String, List<app_controller.MenuItem>>{};
+                  final groupedItems = <String, List<MenuItem>>{};
                   for (var item in items) {
                     final cat = item.category ?? 'Others';
                     groupedItems.putIfAbsent(cat, () => []).add(item);
