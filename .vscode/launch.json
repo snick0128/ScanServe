@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Create Tenant (Ghar jesa khana)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/create_ghar_jesa_khana.dart",
+            "args": [
+                "-d",
+                "windows"
+            ]
+        },
+        {
+            "name": "scan_serve",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "scan_serve (profile)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "scan_serve (release)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}

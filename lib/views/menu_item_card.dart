@@ -47,7 +47,11 @@ class _MenuItemCardState extends State<MenuItemCard>
     _scaleController.forward().then((_) {
       _scaleController.reverse();
     });
-    widget.onAddPressed();
+    if (widget.item.hasVariants) {
+      _showItemPreview();
+    } else {
+      widget.onAddPressed();
+    }
   }
 
   void _showItemPreview() {
@@ -66,14 +70,12 @@ class _MenuItemCardState extends State<MenuItemCard>
   Widget build(BuildContext context) {
     final cartController = context.watch<CartController>();
     final quantity = cartController.getItemQuantity(widget.item.id);
-    final isInCart = quantity > 0;
+    final isInCart = quantity > 0 && !widget.item.hasVariants;
 
     return InkWell(
       onTap: _showItemPreview,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        width: 165,
-        height: 250, // Total height remains 250
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -93,21 +95,25 @@ class _MenuItemCardState extends State<MenuItemCard>
             // Image Section with 10px Top, Left, Right padding
             Stack(
               children: [
-                Container(
-                  height: 150, // 140 image height + 10 top padding
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: widget.item.imageUrl != null
-                        ? Image.network(
-                            widget.item.imageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(color: const Color(0xFFF2F2F7)),
-                          )
-                        : Container(color: const Color(0xFFF2F2F7)),
-                  ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Container(
+                      height: constraints.maxWidth * 0.75, // Reduced from 0.85 to give text more room
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: widget.item.imageUrl != null
+                            ? Image.network(
+                                widget.item.imageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(color: const Color(0xFFF2F2F7)),
+                              )
+                            : Container(color: const Color(0xFFF2F2F7)),
+                      ),
+                    );
+                  }
                 ),
                 // Veg/Non-veg indicator overlay
                 Positioned(
@@ -151,7 +157,7 @@ class _MenuItemCardState extends State<MenuItemCard>
                           _buildTag('Non-Veg', AppTheme.lightOrange, Colors.red),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8), // Reduced from 10
                     Text(
                       widget.item.name,
                       style: GoogleFonts.outfit(
@@ -162,7 +168,7 @@ class _MenuItemCardState extends State<MenuItemCard>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4), // Reduced from 6
                     Text(
                       widget.item.description,
                       style: GoogleFonts.outfit(
@@ -177,22 +183,32 @@ class _MenuItemCardState extends State<MenuItemCard>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '₹${widget.item.price.toInt()}',
-                          style: GoogleFonts.outfit(
-                            color: AppTheme.primaryText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            '₹${widget.item.price.toInt()}',
+                            style: GoogleFonts.outfit(
+                              color: AppTheme.primaryText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (isInCart)
-                          _QuantityControls(
-                            itemId: widget.item.id,
-                            quantity: quantity,
-                            onUpdateQuantity: (id, q) => cartController.updateQuantity(id, q),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8), // Reduced padding
+                            child: _QuantityControls(
+                              itemId: widget.item.id,
+                              quantity: quantity,
+                              onUpdateQuantity: (id, q) => cartController.updateQuantity(id, q),
+                            ),
                           )
                         else
-                          _buildAddButton(),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: _buildAddButton(),
+                          ),
                       ],
                     ),
                   ],
@@ -225,8 +241,8 @@ class _MenuItemCardState extends State<MenuItemCard>
 
   Widget _buildAddButton() {
     return Container(
-      height: 35, // Updated height
-      width: 85,  // Updated width
+      height: 32, // More compact
+      width: 76,  // More compact
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -236,7 +252,7 @@ class _MenuItemCardState extends State<MenuItemCard>
         onTap: _onAddPressed,
         child: Center(
           child: Text(
-            'ADD',
+            widget.item.hasVariants ? 'SELECT' : 'ADD',
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -263,11 +279,18 @@ class _QuantityControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 35, // Match ADD button height
-      width: 85,  // Match ADD button width
+      height: 38, // Increased height for better tap area
+      width: 90,  // Increased width
       decoration: BoxDecoration(
         color: AppTheme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -288,14 +311,20 @@ class _QuantityControls extends StatelessWidget {
   }
 
   Widget _buildBtn(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: () {
-        HapticHelper.light();
-        onTap();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Icon(icon, color: Colors.white, size: 16),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticHelper.light();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 32,
+          height: 38,
+          alignment: Alignment.center,
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
       ),
     );
   }

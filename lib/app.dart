@@ -13,6 +13,7 @@ import 'services/offline_service.dart';
 import 'services/tenant_service.dart';
 import 'theme/app_theme.dart';
 import 'views/splash_screen.dart';
+import 'utils/screen_scale.dart';
 
 class App extends StatelessWidget {
   final AppConfig config;
@@ -32,10 +33,13 @@ class App extends StatelessWidget {
           dispose: (_, service) => service.dispose(),
         ),
       ],
-      child: MaterialApp(
-        title: 'ScanServe',
-        theme: AppTheme.themeData,
-        home: Initializer(config: config),
+      child: Builder(
+        builder: (context) {
+          ScreenScale.init(context);
+          return MaterialApp(
+            title: 'ScanServe',
+            theme: AppTheme.themeData,
+            home: Initializer(config: config),
         onGenerateRoute: (settings) {
           if (settings.name == '/checkout') {
             final args = settings.arguments as Map<String, dynamic>;
@@ -49,6 +53,8 @@ class App extends StatelessWidget {
           }
           return null;
         },
+          );
+        }
       ),
     );
   }

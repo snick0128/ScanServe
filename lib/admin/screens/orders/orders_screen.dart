@@ -170,58 +170,57 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   Widget _buildFilters() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          flex: 2,
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F3F4),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (v) => setState(() => _searchQuery = v),
-              decoration: const InputDecoration(
-                hintText: 'Search by table, ID or item...',
-                prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 300,
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F3F4),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                decoration: const InputDecoration(
+                  hintText: 'Search by table, ID or item...',
+                  prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        _buildFilterChip(Ionicons.restaurant_outline, 'All Tables', _selectedTableId != null, () {}),
-        const SizedBox(width: 12),
-        _buildFilterChip(Ionicons.time_outline, 'Preparing', _selectedStatus == model.OrderStatus.preparing, () {
-          setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.preparing ? null : model.OrderStatus.preparing);
-        }),
-        const SizedBox(width: 12),
-        _buildFilterChip(Ionicons.checkmark_done_outline, 'Ready', _selectedStatus == model.OrderStatus.ready, () {
-          setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.ready ? null : model.OrderStatus.ready);
-        }),
-        const SizedBox(width: 12),
-        _buildFilterChip(Ionicons.alert_outline, 'Priority', _filterUrgentOnly, () {
-          setState(() => _filterUrgentOnly = !_filterUrgentOnly);
-        }),
-        if (_tabController.index == 1 || _tabController.index == 2) ...[
-          const SizedBox(width: 24),
-          const VerticalDivider(width: 1, color: Color(0xFFE0E0E0)),
-          const SizedBox(width: 24),
-          _buildDateChip('ALL', _dateFilterType == 'ALL'),
+          const SizedBox(width: 16),
+          _buildFilterChip(Ionicons.restaurant_outline, 'All Tables', _selectedTableId != null, () {}),
           const SizedBox(width: 12),
-          _buildDateChip('Today', _dateFilterType == 'Today'),
+          _buildFilterChip(Ionicons.time_outline, 'Preparing', _selectedStatus == model.OrderStatus.preparing, () {
+            setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.preparing ? null : model.OrderStatus.preparing);
+          }),
           const SizedBox(width: 12),
-          _buildDateChip(
-            _dateFilterType != 'Range' ? 'Date range' : '${DateFormat('MMM dd').format(_dateRange.start)} - ${DateFormat('MMM dd').format(_dateRange.end)}',
-            _dateFilterType == 'Range',
-            isRange: true,
-          ),
+          _buildFilterChip(Ionicons.checkmark_done_outline, 'Ready', _selectedStatus == model.OrderStatus.ready, () {
+            setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.ready ? null : model.OrderStatus.ready);
+          }),
+          if (_tabController.index == 1 || _tabController.index == 2) ...[
+            const SizedBox(width: 24),
+            const SizedBox(height: 44, child: VerticalDivider(width: 1, color: Color(0xFFE0E0E0))),
+            const SizedBox(width: 24),
+            _buildDateChip('ALL', _dateFilterType == 'ALL'),
+            const SizedBox(width: 12),
+            _buildDateChip('Today', _dateFilterType == 'Today'),
+            const SizedBox(width: 12),
+            _buildDateChip(
+              _dateFilterType != 'Range' ? 'Date range' : '${DateFormat('MMM dd').format(_dateRange.start)} - ${DateFormat('MMM dd').format(_dateRange.end)}',
+              _dateFilterType == 'Range',
+              isRange: true,
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -502,8 +501,6 @@ class _OrderCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(item.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AdminTheme.primaryText)),
-                              if (item.notes != null && item.notes!.isNotEmpty)
-                                Text(item.notes!, style: const TextStyle(fontSize: 12, color: AdminTheme.warning, fontStyle: FontStyle.italic)),
                             ],
                           ),
                         ),

@@ -22,6 +22,8 @@ import '../theme/app_theme.dart';
 import '../utils/haptic_helper.dart';
 import 'filter_bottom_sheet.dart';
 import 'payment_page.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
+import 'package:scan_serve/admin/theme/admin_theme.dart';
 
 class HomePage extends StatelessWidget {
   final String tenantId;
@@ -80,6 +82,15 @@ class _HomeContentState extends State<HomeContent> {
           _isVegOnly = tenant?.isVegOnly ?? false;
           _isLoadingTenant = false;
         });
+
+        // Apply strict veg mode if configured
+        if (_isVegOnly == true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              context.read<app_controller.MenuController>().setStrictVegMode(true);
+            }
+          });
+        }
       }
     } catch (e) {
       print('Error loading tenant info: $e');
@@ -145,7 +156,7 @@ class _HomeContentState extends State<HomeContent> {
           _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
           style: GoogleFonts.outfit(
             color: AppTheme.primaryText,
-            fontSize: 18,
+            fontSize: 18.sp,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -156,34 +167,44 @@ class _HomeContentState extends State<HomeContent> {
       backgroundColor: AppTheme.backgroundColor,
       elevation: 0,
       centerTitle: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20.r),
       ),
       title: Row(
         children: [
-          Text(
-            _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
-            style: GoogleFonts.outfit(
-              color: AppTheme.primaryText,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppTheme.primaryColor, width: 1),
-            ),
-            child: const Text(
-              'OPEN',
-              style: TextStyle(
-                color: AppTheme.primaryColor,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-              ),
+          Expanded(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
+                    style: GoogleFonts.outfit(
+                      color: AppTheme.primaryText,
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.primaryColor, width: 1),
+                  ),
+                  child: Text(
+                    'OPEN',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -211,7 +232,7 @@ class _HomeContentState extends State<HomeContent> {
                         'Table ${orderController.currentSession!.tableId}',
                         style: GoogleFonts.outfit(
                           color: AppTheme.primaryColor,
-                          fontSize: 13,
+                          fontSize: 13.sp,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -299,7 +320,7 @@ class _HomeContentState extends State<HomeContent> {
                           );
                         }).toList(),
                         // Padding at bottom for floating unit
-                        const SizedBox(height: 100),
+                        SizedBox(height: 100.h),
                       ],
                     ),
                   );
@@ -313,13 +334,13 @@ class _HomeContentState extends State<HomeContent> {
         Positioned(
           left: 16,
           right: 16,
-          bottom: 12, // Gap of 12px from whatever is below (View Cart or Tabs)
+          bottom: 12.h,
           child: Row(
             children: [
               Expanded(
                 child: custom_search.SearchBar(maxWidth: double.infinity),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12.w),
               _buildCallWaiterButton(),
             ],
           ),
@@ -331,10 +352,10 @@ class _HomeContentState extends State<HomeContent> {
   Widget _buildCallWaiterButton() {
     return InkWell(
       onTap: _callWaiter,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: 48.h,
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
         decoration: BoxDecoration(
           color: const Color(0xFF1C1C1E), // Black background
           borderRadius: BorderRadius.circular(12),
@@ -354,13 +375,16 @@ class _HomeContentState extends State<HomeContent> {
               color: Colors.white,
               size: 18,
             ),
-            const SizedBox(width: 8),
-            Text(
-              'Waiter',
-              style: GoogleFonts.outfit(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            SizedBox(width: 8.w),
+            Flexible(
+              child: Text(
+                'Waiter',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -370,14 +394,31 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildFilterChips() {
+    final menuController = context.watch<app_controller.MenuController>();
+    
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       child: Row(
         children: [
           _buildChip('Filter', Icons.tune),
-          _buildChip('Veg', null, isVeg: true),
-          _buildChip('Non-Veg', null, isNonVeg: true),
+          if (!menuController.isStrictVeg) ...[
+            _buildChip('Veg', null, isVeg: true),
+            _buildChip('Non-Veg', null, isNonVeg: true),
+          ] else ...[
+             Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                   decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green)),
+                   child: const Row(children:[
+                       Icon(Icons.eco, size: 16, color: Colors.green),
+                       SizedBox(width:6),
+                       Text('Pure Veg Restaurant', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)) 
+                   ]),
+                ),
+             ),
+          ],
           _buildChip('Bestseller', null),
         ],
       ),
@@ -417,10 +458,10 @@ class _HomeContentState extends State<HomeContent> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isActive ? AppTheme.lightGreen : AppTheme.backgroundColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(20.r),
           border: Border.all(
             color: isActive ? AppTheme.primaryColor : AppTheme.borderColor,
-            width: 1,
+            width: 1.w,
           ),
         ),
         child: Row(
@@ -466,7 +507,7 @@ class _HomeContentState extends State<HomeContent> {
               label,
               style: GoogleFonts.outfit(
                 color: AppTheme.primaryText,
-                fontSize: 13,
+                fontSize: 14.sp, // Slightly increased
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -479,14 +520,14 @@ class _HomeContentState extends State<HomeContent> {
   Widget _buildSectionTitle(String title) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        padding: EdgeInsets.symmetric(vertical: 24.h),
         child: Text(
           title.toUpperCase(),
           style: GoogleFonts.outfit(
-            color: AppTheme.primaryText,
-            fontSize: 14,
+            color: AdminTheme.secondaryText, // Better contrast
+            fontSize: 15.sp, // Slightly increased
             fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+            letterSpacing: 0.8,
           ),
         ),
       ),
@@ -537,20 +578,23 @@ class _HomeContentState extends State<HomeContent> {
                 }
               },
               child: Container(
-                height: 48, // Slightly taller for better touch target
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: 48.h, // Slightly taller for better touch target
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
                 decoration: const BoxDecoration(
                   color: AppTheme.primaryColor,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      amountText,
-                      style: GoogleFonts.outfit(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        amountText,
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Row(
@@ -561,13 +605,13 @@ class _HomeContentState extends State<HomeContent> {
                           ctaText,
                           style: GoogleFonts.outfit(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: 15.sp,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+                        SizedBox(width: 4.w),
+                        Icon(Icons.arrow_forward, color: Colors.white, size: 16.w),
                       ],
                     ),
                   ],
@@ -577,27 +621,33 @@ class _HomeContentState extends State<HomeContent> {
           },
         ),
         
-        // 1px Top Divider (Mandatory visual stack cut)
-        Container(
-          height: 1,
-          color: const Color(0xFFE5E5EA),
-        ),
-        
         // Navigation Tab Bar
         BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           backgroundColor: Colors.white,
           selectedItemColor: AppTheme.primaryColor,
-          unselectedItemColor: AppTheme.secondaryText,
+          unselectedItemColor: AdminTheme.secondaryText, // Higher contrast
           type: BottomNavigationBarType.fixed,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
+          selectedFontSize: 12.sp,
+          unselectedFontSize: 12.sp,
           elevation: 0,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), label: 'Orders'),
-            BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Menu'),
-            BottomNavigationBarItem(icon: Icon(Icons.shopping_cart_outlined), label: 'Cart'),
+          items: [
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, size: 24.w), label: 'Orders'),
+            BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu, size: 24.w), label: 'Menu'),
+            BottomNavigationBarItem(
+              icon: Consumer<CartController>(
+                builder: (context, cart, child) {
+                  return Badge(
+                    isLabelVisible: cart.itemCount > 0,
+                    label: Text('${cart.itemCount}'),
+                    backgroundColor: AppTheme.primaryColor,
+                    child: Icon(Icons.shopping_cart_outlined, size: 24.w),
+                  );
+                },
+              ),
+              label: 'Cart',
+            ),
           ],
         ),
       ],

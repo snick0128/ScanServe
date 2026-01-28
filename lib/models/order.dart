@@ -91,6 +91,7 @@ class OrderItem {
   final bool isAddon;
   final String? chefNote;
   final String? captainName;
+  final String? variantName;
 
   OrderItem({
     required this.id,
@@ -106,6 +107,7 @@ class OrderItem {
     this.isAddon = false,
     this.chefNote,
     this.captainName,
+    this.variantName,
   }) : this.timestamp = timestamp ?? DateTime.now();
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
@@ -129,6 +131,7 @@ class OrderItem {
       isAddon: data['isAddon'] ?? false,
       chefNote: data['chefNote'],
       captainName: data['captainName'],
+      variantName: data['variantName'],
     );
   }
 
@@ -147,6 +150,7 @@ class OrderItem {
       'isAddon': isAddon,
       'chefNote': chefNote,
       'captainName': captainName,
+      'variantName': variantName,
     };
   }
 
@@ -164,6 +168,7 @@ class OrderItem {
     bool? isAddon,
     String? chefNote,
     String? captainName,
+    String? variantName,
   }) {
     return OrderItem(
       id: id ?? this.id,
@@ -179,6 +184,7 @@ class OrderItem {
       isAddon: isAddon ?? this.isAddon,
       chefNote: chefNote ?? this.chefNote,
       captainName: captainName ?? this.captainName,
+      variantName: variantName ?? this.variantName,
     );
   }
 

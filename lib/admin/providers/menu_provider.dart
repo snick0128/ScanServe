@@ -167,4 +167,22 @@ class MenuProvider with ChangeNotifier {
     await _menuService.deleteMenuItem(_tenantId!, categoryId, itemId);
     await refreshData();
   }
+
+  Future<void> addCategory(Category category) async {
+    if (_tenantId == null) return;
+    await _menuService.addCategory(_tenantId!, category);
+    await refreshData();
+  }
+
+  Future<void> updateCategory(Category category) async {
+    if (_tenantId == null) return;
+    await _menuService.updateCategory(_tenantId!, category);
+    await refreshData();
+  }
+
+  Future<void> deleteCategory(String categoryId) async {
+    if (_tenantId == null) return;
+    await _menuService.deleteCategory(_tenantId!, categoryId);
+    await refreshData();
+  }
 }

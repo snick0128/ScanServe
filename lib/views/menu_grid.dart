@@ -7,7 +7,7 @@ import 'shimmer_loading.dart';
 import 'package:scan_serve/utils/snackbar_helper.dart';
 
 class MenuGrid extends StatelessWidget {
-  final List<MenuItem>? items;
+  final List<app_controller.MenuItem>? items;
   final bool? isLoading;
 
   const MenuGrid({Key? key, this.items, this.isLoading}) : super(key: key);
@@ -28,37 +28,37 @@ class MenuGrid extends StatelessWidget {
     if (screenWidth < 480) {
       // Mobile - very small screens
       crossAxisCount = 2;
-      childAspectRatio = 0.66; // Updated for 250px height
+      childAspectRatio = 0.62; // Updated for 250px height
       crossAxisSpacing = 12;
       mainAxisSpacing = 16;
     } else if (screenWidth < 600) {
       // Mobile
       crossAxisCount = 2;
-      childAspectRatio = 0.66; 
+      childAspectRatio = 0.62; 
       crossAxisSpacing = 16;
       mainAxisSpacing = 16;
     } else if (screenWidth < 900) {
       // Tablet - portrait
       crossAxisCount = 3;
-      childAspectRatio = 0.66; 
+      childAspectRatio = 0.62; 
       crossAxisSpacing = 20;
       mainAxisSpacing = 20;
     } else if (screenWidth < 1200) {
       // Tablet - landscape
       crossAxisCount = 4;
-      childAspectRatio = 0.66; 
+      childAspectRatio = 0.62; 
       crossAxisSpacing = 24;
       mainAxisSpacing = 24;
     } else if (screenWidth < 1600) {
       // Desktop - medium
       crossAxisCount = 5;
-      childAspectRatio = 0.66; 
+      childAspectRatio = 0.62; 
       crossAxisSpacing = 28;
       mainAxisSpacing = 28;
     } else {
       // Desktop - large
       crossAxisCount = 6;
-      childAspectRatio = 0.66; 
+      childAspectRatio = 0.62; 
       crossAxisSpacing = 32;
       mainAxisSpacing = 32;
     }

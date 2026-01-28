@@ -7,6 +7,7 @@ import '../../providers/admin_auth_provider.dart';
 import '../../../models/inventory_item.dart';
 import '../../../models/inventory_log.dart';
 import '../../theme/admin_theme.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class InventoryScreen extends StatefulWidget {
   final String tenantId;
@@ -44,12 +45,12 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
           }
 
           return Padding(
-            padding: const EdgeInsets.all(32.0),
+            padding: EdgeInsets.all(16.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(context, provider),
-                const SizedBox(height: 16),
+                SizedBox(height: 16.h),
                 TabBar(
                   controller: _tabController,
                   isScrollable: true,
@@ -57,31 +58,52 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                   labelColor: AdminTheme.primaryColor,
                   unselectedLabelColor: AdminTheme.secondaryText,
                   indicatorColor: AdminTheme.primaryColor,
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  indicatorWeight: 3.h,
+                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp),
                   tabs: const [
                     Tab(text: 'Stock Console'),
                     Tab(text: 'Audit History'),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24.h),
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // TAB 1: STOCK CONSOLE
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildFilters(context, provider),
-                          const SizedBox(height: 24),
-                          Expanded(child: _buildInventoryTable(context, provider)),
-                          const SizedBox(height: 32),
-                          _buildSummaryCards(provider),
-                        ],
+                      // MAIN CONTENT AREA
+                      Expanded(
+                        flex: 4,
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            // TAB 1: STOCK CONSOLE
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFilters(context, provider),
+                                SizedBox(height: 24.h),
+                                Expanded(child: _buildInventoryTable(context, provider)),
+                              ],
+                            ),
+                            // TAB 2: AUDIT HISTORY
+                            _InventoryAuditLogs(),
+                          ],
+                        ),
                       ),
-                      // TAB 2: AUDIT HISTORY
-                      _InventoryAuditLogs(),
+                      SizedBox(width: 32.w),
+                      // RIGHT SIDE PANEL
+                      SizedBox(
+                        width: 300.w,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _buildSummaryCards(provider),
+                              SizedBox(height: 24.h),
+                              _buildQuickActions(context, provider),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -166,7 +188,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                 controller: _searchController,
                 onChanged: provider.setSearchQuery,
                 decoration: const InputDecoration(
-                  hintText: 'Search ingredients, SKUs or categories...',
+                  hintText: 'Search ingredients by name...',
                   prefixIcon: Icon(Ionicons.search_outline, size: 20, color: AdminTheme.secondaryText),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 12),
@@ -248,6 +270,9 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       );
     }
 
+    final verticalController = ScrollController();
+    final horizontalController = ScrollController();
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -255,23 +280,40 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         border: Border.all(color: Colors.grey[100]!),
       ),
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowHeight: 56,
-          dataRowHeight: 64,
-          horizontalMargin: 24,
-          columnSpacing: 40,
-          headingRowColor: MaterialStateProperty.all(const Color(0xFFFBFBFB)),
-          columns: const [
-            DataColumn(label: Text('ITEM NAME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-            DataColumn(label: Text('CATEGORY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-            DataColumn(label: Text('CURRENT STOCK', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-            DataColumn(label: Text('REORDER LEVEL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-            DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-            DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-          ],
-          rows: provider.items.map((item) => _buildDataRow(context, provider, item)).toList(),
+      child: Scrollbar(
+        controller: verticalController,
+        thumbVisibility: true,
+        child: Scrollbar(
+          controller: horizontalController,
+          thumbVisibility: true,
+          notificationPredicate: (notification) => notification.depth == 1,
+          child: SingleChildScrollView(
+            controller: verticalController,
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              controller: horizontalController,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: 1200, // Fixed width to allow horizontal scrolling if needed, or use constraints
+                child: DataTable(
+                  headingRowHeight: 56,
+                  dataRowHeight: 64,
+                  horizontalMargin: 24,
+                  columnSpacing: 56,
+                  headingRowColor: MaterialStateProperty.all(const Color(0xFFFBFBFB)),
+                  columns: const [
+                    DataColumn(label: Text('ITEM NAME', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                    DataColumn(label: Text('CATEGORY', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                    DataColumn(label: Text('CURRENT STOCK', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                    DataColumn(label: Text('LOW STOCK ALERT', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                    DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                    DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                  ],
+                  rows: provider.items.map((item) => _buildDataRow(context, provider, item)).toList(),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -298,7 +340,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     }
 
     return DataRow(cells: [
-      DataCell(Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+      DataCell(Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
       DataCell(Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -309,9 +351,10 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       )),
       DataCell(Text('${item.currentStock} ${item.unit}', style: TextStyle(
         fontWeight: FontWeight.bold, 
+        fontSize: 15,
         color: item.currentStock <= 0 ? AdminTheme.critical : AdminTheme.primaryText
       ))),
-      DataCell(Text('${item.lowStockLevel} ${item.unit}', style: const TextStyle(color: AdminTheme.secondaryText))),
+      DataCell(Text('${item.lowStockLevel} ${item.unit}', style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 15))),
       DataCell(Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
@@ -332,6 +375,12 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
           IconButton(
             onPressed: () => _showAdjustDialog(context, provider, item),
             icon: const Icon(Ionicons.create_outline, size: 18, color: AdminTheme.secondaryText),
+            tooltip: 'Adjust Stock',
+          ),
+          IconButton(
+            onPressed: () => _confirmDelete(context, provider, item),
+            icon: const Icon(Ionicons.trash_outline, size: 18, color: AdminTheme.critical),
+            tooltip: 'Delete Item',
           ),
         ],
       )),
@@ -339,29 +388,77 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
   }
 
   Widget _buildSummaryCards(InventoryProvider provider) {
-    return Row(
+    return Column(
       children: [
         _SummaryCard(
           label: 'CRITICAL STOCK',
           value: '${provider.lowStockItems.length + provider.outOfStockItems.length} Items',
-          icon: Ionicons.warning_outline,
+          icon: Ionicons.information_circle_outline,
           color: AdminTheme.warning,
         ),
-        const SizedBox(width: 24),
+        const SizedBox(height: 16),
         _SummaryCard(
           label: 'TOTAL INVENTORY',
           value: '${provider.items.length} Items',
           icon: Ionicons.cube_outline,
           color: AdminTheme.success,
         ),
-        const SizedBox(width: 24),
-        _SummaryCard(
-          label: 'INCOMING ORDERS',
-          value: '0 Batches',
-          icon: Ionicons.trail_sign_outline,
-          color: Colors.blue,
-        ),
       ],
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context, InventoryProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AdminTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AdminTheme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Quick Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 16),
+          _ActionButton(
+            label: 'Add Ingredient',
+            icon: Ionicons.add_circle_outline,
+            onTap: () => _showAddIngredientDialog(context, provider),
+          ),
+          const SizedBox(height: 12),
+          _ActionButton(
+            label: 'Generate Report',
+            icon: Ionicons.document_text_outline,
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, InventoryProvider provider, InventoryItem item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Ingredient'),
+        content: Text('Are you sure you want to delete "${item.name}"? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              await provider.deleteItem(item.id);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${item.name} deleted')),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AdminTheme.critical),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -377,54 +474,67 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add New Ingredient'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Ingredient Name')),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedCategory,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: ['Meat', 'Produce', 'Dairy', 'Spices', 'Bakery', 'General'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setDialogState(() => selectedCategory = v!),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: selectedUnit,
-                      decoration: const InputDecoration(labelText: 'Unit'),
-                      items: ['kg', 'Liter', 'Units', 'Grams', 'ml'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                      onChanged: (v) => setDialogState(() => selectedUnit = v!),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Ingredient Name (Required)')),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: ['Meat', 'Produce', 'Dairy', 'Spices', 'Bakery', 'General'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedCategory = v!),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedUnit,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: ['kg', 'Liter', 'Units', 'Grams', 'ml'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                        onChanged: (v) => setDialogState(() => selectedUnit = v!),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Initial Stock'), keyboardType: TextInputType.number),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(controller: reorderController, decoration: const InputDecoration(labelText: 'Reorder Level'), keyboardType: TextInputType.number),
-            ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Initial Stock'), keyboardType: TextInputType.number),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(controller: reorderController, decoration: const InputDecoration(labelText: 'Low Stock Alert Level'), keyboardType: TextInputType.number),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingredient name is required')));
+                  return;
+                }
+                final initialStock = double.tryParse(stockController.text) ?? -1;
+                if (initialStock < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Initial stock must be 0 or greater')));
+                  return;
+                }
+                
                 final item = InventoryItem(
                   id: '',
                   tenantId: widget.tenantId,
-                  name: nameController.text,
+                  name: nameController.text.trim(),
                   category: selectedCategory,
                   unit: selectedUnit,
-                  currentStock: double.tryParse(stockController.text) ?? 0,
+                  currentStock: initialStock,
                   lowStockLevel: double.tryParse(reorderController.text) ?? 10,
                   lastUpdated: DateTime.now(),
                 );
                 await provider.addItem(item, context.read<AdminAuthProvider>().userName ?? 'Admin');
-                Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Add Ingredient'),
             ),
@@ -437,46 +547,79 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
   void _showAdjustDialog(BuildContext context, InventoryProvider provider, InventoryItem item) {
     final qtyController = TextEditingController();
     InventoryChangeReason selectedReason = InventoryChangeReason.manual;
+    String adjustmentMode = 'Add';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text('Adjust Stock: ${item.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Current Stock: ${item.currentStock} ${item.unit}'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: qtyController,
-                decoration: InputDecoration(
-                  labelText: 'Adjustment Amount (+ / -)',
-                  hintText: 'e.g. 5, -2, 10',
-                  suffixText: item.unit,
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Current Stock: ${item.currentStock} ${item.unit}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: adjustmentMode,
+                        decoration: const InputDecoration(labelText: 'Action', border: OutlineInputBorder()),
+                        items: ['Add', 'Remove'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                        onChanged: (v) => setDialogState(() => adjustmentMode = v!),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: qtyController,
+                        decoration: InputDecoration(
+                          labelText: 'Quantity',
+                          hintText: 'e.g. 5, 10',
+                          suffixText: item.unit,
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: true),
+                      ),
+                    ),
+                  ],
                 ),
-                keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<InventoryChangeReason>(
-                value: selectedReason,
-                decoration: const InputDecoration(labelText: 'Reason'),
-                items: InventoryChangeReason.values.map((r) => DropdownMenuItem(value: r, child: Text(r.label))).toList(),
-                onChanged: (v) => setDialogState(() => selectedReason = v!),
-              ),
-            ],
+                const SizedBox(height: 16),
+                DropdownButtonFormField<InventoryChangeReason>(
+                  value: selectedReason,
+                  decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
+                  items: InventoryChangeReason.values.map((r) => DropdownMenuItem(value: r, child: Text(r.label))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedReason = v!),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                final change = double.tryParse(qtyController.text) ?? 0;
-                if (change == 0) return;
+                double quantity = double.tryParse(qtyController.text) ?? 0;
+                if (quantity == 0) return;
+                
+                // Force positive then apply mode
+                quantity = quantity.abs();
+                final double finalChange = adjustmentMode == 'Add' ? quantity : -quantity;
+                
+                if (item.currentStock + finalChange < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error: Stock cannot be negative.')),
+                  );
+                  return;
+                }
                 
                 await provider.updateStock(
                   itemId: item.id,
-                  quantityChange: change,
-                  type: change > 0 ? InventoryChangeType.stockIn : InventoryChangeType.stockOut,
+                  quantityChange: finalChange,
+                  type: finalChange > 0 ? InventoryChangeType.stockIn : InventoryChangeType.stockOut,
                   reason: selectedReason,
                   performedBy: context.read<AdminAuthProvider>().userName ?? 'Admin',
                 );
@@ -484,7 +627,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Stock for ${item.name} updated: ${change > 0 ? "+" : ""}$change ${item.unit}')),
+                    SnackBar(content: Text('Stock for ${item.name} updated: ${finalChange > 0 ? "+" : ""}$finalChange ${item.unit}')),
                   );
                 }
               },
@@ -494,10 +637,6 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         ),
       ),
     );
-  }
-
-  void _showBulkUpdateDialog(BuildContext context, InventoryProvider provider) {
-     // Re-reconcile dialog for all items if needed
   }
 }
 
@@ -536,7 +675,7 @@ class _InventoryAuditLogs extends StatelessWidget {
               
               return Row(
                 children: [
-                  Container(
+                   Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
@@ -624,32 +763,58 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[100]!),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 20),
-            Column(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[100]!),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
+                Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
               ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ActionButton({required this.label, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          foregroundColor: AdminTheme.primaryText,
+          side: const BorderSide(color: AdminTheme.dividerColor),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
     );

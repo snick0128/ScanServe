@@ -174,4 +174,46 @@ class MenuService {
       rethrow;
     }
   }
+
+  Future<void> addCategory(String tenantId, Category category) async {
+    try {
+      await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .doc(category.id)
+          .set(category.toMap());
+    } catch (e) {
+      print('Error adding category: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateCategory(String tenantId, Category category) async {
+    try {
+      await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .doc(category.id)
+          .update(category.toMap());
+    } catch (e) {
+      print('Error updating category: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCategory(String tenantId, String categoryId) async {
+    try {
+      await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('categories')
+          .doc(categoryId)
+          .delete();
+    } catch (e) {
+      print('Error deleting category: $e');
+      rethrow;
+    }
+  }
 }

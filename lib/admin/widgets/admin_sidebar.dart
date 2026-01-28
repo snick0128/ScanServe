@@ -3,6 +3,7 @@ import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_auth_provider.dart';
 import '../theme/admin_theme.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class AdminSidebar extends StatelessWidget {
   final int selectedIndex;
@@ -24,7 +25,7 @@ class AdminSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      width: isCollapsed ? 72 : 260,
+      width: isCollapsed ? 72.w : 260.w,
       height: double.infinity,
       decoration: const BoxDecoration(
         color: AdminTheme.sidebarBackground,
@@ -36,30 +37,30 @@ class AdminSidebar extends StatelessWidget {
         children: [
           // Logo Section
           Container(
-            height: 80,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            height: 80.h,
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(8.r),
                   decoration: BoxDecoration(
                     color: AdminTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10.r),
                   ),
-                  child: const Icon(Ionicons.restaurant, 
-                    color: AdminTheme.primaryColor, size: 24),
+                  child: Icon(Ionicons.restaurant, 
+                    color: AdminTheme.primaryColor, size: 24.w),
                 ),
                 if (!isCollapsed) ...[
-                  const SizedBox(width: 12),
-                  const Column(
+                  SizedBox(width: 12.w),
+                  Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Scan & Serve',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 18.sp,
                           fontWeight: FontWeight.bold,
                           color: AdminTheme.primaryText,
                           letterSpacing: 0.5,
@@ -68,7 +69,7 @@ class AdminSidebar extends StatelessWidget {
                       Text(
                         'ADMIN PORTAL',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11.sp,
                           fontWeight: FontWeight.bold,
                           color: AdminTheme.secondaryText,
                           letterSpacing: 1.2,
@@ -86,7 +87,7 @@ class AdminSidebar extends StatelessWidget {
           // Navigation Section
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: EdgeInsets.symmetric(horizontal: 12.w),
               children: [
                 if (role != 'kitchen') ...[
                   _buildNavItem(
@@ -131,14 +132,15 @@ class AdminSidebar extends StatelessWidget {
                     label: 'Tables',
                     isCollapsed: isCollapsed,
                   ),
-                  _buildNavItem(
-                    context: context,
-                    index: 8,
-                    icon: Ionicons.cube_outline,
-                    activeIcon: Ionicons.cube,
-                    label: 'Inventory',
-                    isCollapsed: isCollapsed,
-                  ),
+                  if (role != 'captain')
+                    _buildNavItem(
+                      context: context,
+                      index: 8,
+                      icon: Ionicons.cube_outline,
+                      activeIcon: Ionicons.cube,
+                      label: 'Inventory',
+                      isCollapsed: isCollapsed,
+                    ),
                   _buildNavItem(
                     context: context,
                     index: 4,
@@ -147,22 +149,15 @@ class AdminSidebar extends StatelessWidget {
                     label: 'Billing',
                     isCollapsed: isCollapsed,
                   ),
-                  _buildNavItem(
-                    context: context,
-                    index: 6,
-                    icon: Ionicons.people_outline,
-                    activeIcon: Ionicons.people,
-                    label: 'Staff',
-                    isCollapsed: isCollapsed,
-                  ),
-                  _buildNavItem(
-                    context: context,
-                    index: 5,
-                    icon: Ionicons.stats_chart_outline,
-                    activeIcon: Ionicons.stats_chart,
-                    label: 'Reports',
-                    isCollapsed: isCollapsed,
-                  ),
+                  if (role != 'captain')
+                    _buildNavItem(
+                      context: context,
+                      index: 5,
+                      icon: Ionicons.stats_chart_outline,
+                      activeIcon: Ionicons.stats_chart,
+                      label: 'Reports',
+                      isCollapsed: isCollapsed,
+                    ),
                   _buildNavItem(
                     context: context,
                     index: 7,
@@ -201,12 +196,12 @@ class AdminSidebar extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: EdgeInsets.symmetric(
-            horizontal: isCollapsed ? 0 : 16,
-            vertical: 12,
+            horizontal: isCollapsed ? 0 : 16.w,
+            vertical: 12.h,
           ),
           decoration: BoxDecoration(
             color: isSelected ? AdminTheme.primaryColor.withOpacity(0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
           ),
           child: Row(
             mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
@@ -214,16 +209,20 @@ class AdminSidebar extends StatelessWidget {
               Icon(
                 isSelected ? activeIcon : icon,
                 color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText,
-                size: 22,
+                size: 22.w,
               ),
               if (!isCollapsed) ...[
-                const SizedBox(width: 16),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
+                      fontSize: 15.sp,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -238,31 +237,31 @@ class AdminSidebar extends StatelessWidget {
     final auth = context.read<AdminAuthProvider>();
     
     return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(16.w),
+      margin: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
         color: AdminTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16.r),
         border: Border.all(color: AdminTheme.dividerColor),
       ),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 18,
+            radius: 18.r,
             backgroundColor: AdminTheme.primaryColor.withOpacity(0.2),
             backgroundImage: const NetworkImage('https://i.pravatar.cc/150?u=manager'),
           ),
           if (!isCollapsed) ...[
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'James Wilson',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14.sp,
                       fontWeight: FontWeight.bold,
                       color: AdminTheme.primaryText,
                     ),
@@ -271,8 +270,8 @@ class AdminSidebar extends StatelessWidget {
                   ),
                   Text(
                     role?.toUpperCase() ?? 'MANAGER',
-                    style: const TextStyle(
-                      fontSize: 9,
+                    style: TextStyle(
+                      fontSize: 10.sp,
                       color: AdminTheme.secondaryText,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
@@ -283,8 +282,8 @@ class AdminSidebar extends StatelessWidget {
             ),
             IconButton(
               onPressed: () => _handleLogout(context),
-              icon: const Icon(Ionicons.log_out_outline, 
-                color: AdminTheme.critical, size: 20),
+              icon: Icon(Ionicons.log_out_outline, 
+                color: AdminTheme.critical, size: 20.w),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),

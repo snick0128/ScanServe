@@ -57,6 +57,10 @@ class InventoryProvider with ChangeNotifier {
       final matchesStatus = _selectedStatus == null || item.status == _selectedStatus;
       return matchesSearch && matchesCategory && matchesStatus;
     }).toList();
+    
+    // Sort by lastUpdated descending (Newest first)
+    _filteredItems.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
+    
     notifyListeners();
   }
 
@@ -127,6 +131,10 @@ class InventoryProvider with ChangeNotifier {
       actualQuantity: actualQuantity,
       performedBy: performedBy,
     );
+  }
+
+  Future<void> deleteItem(String itemId) async {
+    await _service.deleteItem(tenantId, itemId);
   }
 
   @override

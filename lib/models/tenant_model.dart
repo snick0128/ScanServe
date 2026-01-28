@@ -52,12 +52,48 @@ class Category {
           [],
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'menu_items': items.map((x) => x.toMap()).toList(),
+    };
+  }
 }
 
 enum InventoryTrackingType {
   none,
   simple,
   recipe
+}
+
+class Variant {
+  final String name;
+  final double price;
+  final bool isAvailable;
+
+  Variant({
+    required this.name,
+    required this.price,
+    this.isAvailable = true,
+  });
+
+  factory Variant.fromMap(Map<String, dynamic> map) {
+    return Variant(
+      name: map['name'] ?? '',
+      price: (map['price'] ?? 0.0).toDouble(),
+      isAvailable: map['isAvailable'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'price': price,
+      'isAvailable': isAvailable,
+    };
+  }
 }
 
 class MenuItem {
@@ -77,6 +113,9 @@ class MenuItem {
   final Map<String, double> inventoryIngredients; // Map of itemId to quantity per sale
 
   final bool isBestseller;
+  
+  final bool hasVariants;
+  final List<Variant> variants;
   
   bool get isVeg {
     if (itemType == null) return true; // Default to veg if not specified
@@ -129,6 +168,8 @@ class MenuItem {
     this.inventoryTrackingType = InventoryTrackingType.none,
     this.inventoryIngredients = const {},
     this.isBestseller = false,
+    this.hasVariants = false,
+    this.variants = const [],
   }) {
     this.itemType = itemType;
   }
@@ -168,6 +209,10 @@ class MenuItem {
       inventoryTrackingType: trackingType,
       inventoryIngredients: ingredients,
       isBestseller: data['isBestseller'] ?? false,
+      hasVariants: data['hasVariants'] ?? false,
+      variants: (data['variants'] as List<dynamic>?)
+          ?.map((v) => Variant.fromMap(v))
+          .toList() ?? const [],
     );
   }
 
@@ -187,6 +232,8 @@ class MenuItem {
       'inventoryTrackingType': inventoryTrackingType.name,
       'inventoryIngredients': inventoryIngredients,
       'isBestseller': isBestseller,
+      'hasVariants': hasVariants,
+      'variants': variants.map((v) => v.toMap()).toList(),
     };
   }
 
@@ -205,6 +252,8 @@ class MenuItem {
     InventoryTrackingType? inventoryTrackingType,
     Map<String, double>? inventoryIngredients,
     bool? isBestseller,
+    bool? hasVariants,
+    List<Variant>? variants,
   }) {
     return MenuItem(
       id: id ?? this.id,
@@ -221,6 +270,8 @@ class MenuItem {
       inventoryTrackingType: inventoryTrackingType ?? this.inventoryTrackingType,
       inventoryIngredients: inventoryIngredients ?? this.inventoryIngredients,
       isBestseller: isBestseller ?? this.isBestseller,
+      hasVariants: hasVariants ?? this.hasVariants,
+      variants: variants ?? this.variants,
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../providers/analytics_provider.dart';
 import '../../services/export_service.dart';
 import '../../theme/admin_theme.dart';
 import '../../widgets/all_items_performance_dialog.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   final String tenantId;
@@ -36,23 +37,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(32.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(provider),
-                const SizedBox(height: 32),
+                if (provider.dateFilter == 'Custom') ...[
+                  SizedBox(height: 12.h),
+                  _buildCustomRangeBanner(provider),
+                ],
+                SizedBox(height: 32.h),
                 _buildKPISection(provider),
-                const SizedBox(height: 32),
+                SizedBox(height: 32.h),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(flex: 2, child: _buildRevenueChart(provider)),
-                    const SizedBox(width: 32),
+                    SizedBox(width: 32.w),
                     Expanded(flex: 1, child: _buildTopItems(provider)),
                   ],
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32.h),
                 _buildCategoryDistribution(provider),
               ],
             ),
@@ -69,21 +74,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Operational Reports',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+              style: TextStyle(fontSize: 32.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4.h),
             Text(
               'View performance metrics and analytics for your restaurant.',
-              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
+              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 16.sp),
             ),
           ],
         ),
         Row(
           children: [
             _buildDateFilter(provider),
-            const SizedBox(width: 16),
+            SizedBox(width: 16.w),
             _buildExportButton(provider),
           ],
         ),
@@ -93,31 +98,57 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildDateFilter(AnalyticsProvider provider) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F3F4),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: ['Today', 'Week', 'Month'].map((f) {
+        children: ['Today', 'Week', 'Month', 'Custom'].map((f) {
           final isSelected = provider.dateFilter == f;
           return GestureDetector(
-            onTap: () => provider.setDateFilter(f),
+            onTap: () async {
+              if (f == 'Custom') {
+                final range = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2023),
+                  lastDate: DateTime.now(),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AdminTheme.primaryColor,
+                          onPrimary: Colors.white,
+                          onSurface: AdminTheme.primaryText,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (range != null) {
+                  provider.setCustomDateRange(range.start, range.end);
+                }
+              } else {
+                provider.setDateFilter(f);
+              }
+            },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 boxShadow: isSelected
-                    ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
+                    ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4.w, offset: const Offset(0, 2))]
                     : null,
               ),
               child: Text(
                 f,
                 style: TextStyle(
-                  color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 14.sp,
                 ),
               ),
             ),
@@ -340,9 +371,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: item['imageUrl'] != null
-                          ? Image.network(item['imageUrl'], width: 50, height: 50, fit: BoxFit.cover)
-                          : Container(color: const Color(0xFFF1F3F4), width: 50, height: 50),
+                      child: item['imageUrl'] != null && item['imageUrl'].toString().startsWith('http')
+                          ? Image.network(
+                              item['imageUrl'], 
+                              width: 50, 
+                              height: 50, 
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildItemFallback(),
+                            )
+                          : _buildItemFallback(),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -372,7 +409,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           const SizedBox(height: 16),
           SizedBox(
-            width: double.infinity,
             child: OutlinedButton(
               onPressed: () => showDialog(
                 context: context,
@@ -496,5 +532,49 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       const Color(0xFF8B5CF6),
     ];
     return colors[index % colors.length];
+  }
+
+  Widget _buildCustomRangeBanner(AnalyticsProvider provider) {
+    final dateFormat = DateFormat('dd MMM yyyy');
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: AdminTheme.primaryColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Ionicons.calendar_outline, size: 18.w, color: AdminTheme.primaryColor),
+          SizedBox(width: 12.w),
+          Text(
+            'Range: ${dateFormat.format(provider.startDate)} – ${dateFormat.format(provider.endDate)}',
+            style: TextStyle(
+              color: AdminTheme.primaryColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 14.sp,
+            ),
+          ),
+          SizedBox(width: 8.w),
+          GestureDetector(
+            onTap: () => provider.setDateFilter('Today'),
+            child: Icon(Ionicons.close_circle, size: 18.w, color: AdminTheme.primaryColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemFallback() {
+    return Container(
+      width: 50.w,
+      height: 50.w,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F3F4),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Icon(Ionicons.fast_food_outline, color: AdminTheme.secondaryText, size: 20.w),
+    );
   }
 }

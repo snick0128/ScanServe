@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../theme/admin_theme.dart';
 import '../../providers/admin_auth_provider.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 import '../../../models/order.dart' as model;
 import '../../../models/bill_request_model.dart';
 import '../../../services/waiter_call_service.dart';
@@ -100,8 +101,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTopBar(bool isMobile) {
     final auth = context.read<AdminAuthProvider>();
     return Container(
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 70.h,
+      padding: EdgeInsets.symmetric(horizontal: 24.w),
       decoration: const BoxDecoration(
         color: AdminTheme.topBarBackground,
         border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
@@ -115,70 +116,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
-          Text(
-            auth.isKitchen ? 'Kitchen Display System' : (_selectedIndex == 0 ? 'Dashboard Overview' : 'System Console'),
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AdminTheme.primaryText,
-            ),
-          ),
-          const SizedBox(width: 48),
-          if (!isMobile && !auth.isKitchen)
-            Expanded(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 400),
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AdminTheme.cardBackground,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AdminTheme.dividerColor),
-                ),
-                child: const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search orders, tables, items...',
-                    hintStyle: TextStyle(color: AdminTheme.secondaryText, fontSize: 13),
-                    prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
+          Expanded(
+            child: Text(
+              auth.isKitchen ? 'Kitchen Display System' : 'Dashboard',
+              style: TextStyle(
+                fontSize: 22.sp,
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.primaryText,
               ),
-            ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AdminTheme.success.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AdminTheme.success.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AdminTheme.success,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Live System',
-                  style: TextStyle(
-                    color: AdminTheme.success,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 20),
-          const Icon(Ionicons.notifications_outline, color: AdminTheme.secondaryText),
-          const SizedBox(width: 20),
-          const Icon(Ionicons.help_circle_outline, color: AdminTheme.secondaryText),
+          SizedBox(width: 12.w),
+          CircleAvatar(
+            radius: 18.r,
+            backgroundColor: AdminTheme.dividerColor,
+            child: Icon(Ionicons.person_outline, size: 18.w, color: AdminTheme.secondaryText),
+          ),
         ],
       ),
     );
@@ -187,23 +141,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildContent(bool isTablet) {
     if (_selectedIndex != 0) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24.w),
         child: _buildModuleContent(),
       );
     }
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           flex: 3,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildKPISection(),
-                const SizedBox(height: 32),
+                SizedBox(height: 24.h),
                 _buildLiveOrdersSection(),
               ],
             ),
@@ -211,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         if (!isTablet)
           Container(
-            width: 320,
+            width: 320.w,
             decoration: const BoxDecoration(
               border: Border(left: BorderSide(color: AdminTheme.dividerColor)),
               color: AdminTheme.sidebarBackground,
@@ -251,51 +205,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
             .where((o) => o.status == model.OrderStatus.preparing)
             .length;
 
+        int crossAxisCount = 5;
+        double aspectRatio = 1.3;
+        
+        final width = MediaQuery.of(context).size.width;
+        if (width < 1100) {
+          crossAxisCount = 2;
+          aspectRatio = 1.8;
+        } else if (width < 1500) {
+          crossAxisCount = 3;
+          aspectRatio = 1.5;
+        }
+
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: MediaQuery.of(context).size.width < 1400 ? 2 : 5,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.8,
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 16.w,
+          mainAxisSpacing: 16.h,
+          childAspectRatio: aspectRatio,
           children: [
-            _buildKPICard('Active Tables', '${tablesProvider.activeSessionsCount}/${tablesProvider.totalTablesCount}', 'Live occupancy', Ionicons.restaurant_outline, AdminTheme.success),
-            _buildKPICard('Ongoing Orders', ordersProvider.orders.length.toString(), 'Active and served', Ionicons.cart_outline, AdminTheme.info),
-            _buildKPICard('Active KOT', activeKotCount.toString(), 'Being prepared', Ionicons.flame_outline, AdminTheme.warning),
-            _buildKPICard('Pending Bills', notificationsProvider.pendingBillRequestsCount.toString(), 'Ready to pay', Ionicons.receipt_outline, AdminTheme.critical),
-            _buildKPICard('Daily Revenue', '₹${NumberFormat('#,##,###').format(revenue)}', 'Gross today', Ionicons.cash_outline, AdminTheme.success),
+            _buildKPICard(
+              'Active Tables', 
+              '${tablesProvider.activeSessionsCount}/${tablesProvider.totalTablesCount}', 
+              'Live occupancy', 
+              Ionicons.restaurant_outline, 
+              AdminTheme.success,
+              onTap: () => _onItemTapped(2),
+            ),
+            _buildKPICard(
+              'Ongoing Orders', 
+              ordersProvider.orders.length.toString(), 
+              'Active and served', 
+              Ionicons.cart_outline, 
+              AdminTheme.info,
+              onTap: () => _onItemTapped(3),
+            ),
+            _buildKPICard(
+              'Active KOT', 
+              activeKotCount.toString(), 
+              'Being prepared', 
+              Ionicons.flame_outline, 
+              AdminTheme.warning,
+              onTap: () => _onItemTapped(9), // Navigate to KDS for Active KOT
+            ),
+            _buildKPICard(
+              'Pending Bills', 
+              notificationsProvider.pendingBillRequestsCount.toString(), 
+              'Ready to pay', 
+              Ionicons.receipt_outline, 
+              AdminTheme.critical,
+              onTap: () => _onItemTapped(4),
+            ),
+            _buildKPICard(
+              'Sales', 
+              '₹${NumberFormat('#,##,###').format(revenue)}', 
+              'Today\'s Total', 
+              Ionicons.cash_outline, 
+              AdminTheme.success,
+              onTap: () => _onItemTapped(5), // Analytics/Revenue
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildKPICard(String title, String value, String trend, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AdminTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AdminTheme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildKPICard(String title, String value, String trend, IconData icon, Color color, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: AdminTheme.cardBackground,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: AdminTheme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 13, fontWeight: FontWeight.w600)),
-              Icon(icon, color: color, size: 20),
+              Expanded(child: Text(title, style: TextStyle(color: AdminTheme.secondaryText, fontSize: 15.sp, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+              Icon(icon, color: color, size: 24.w),
             ],
           ),
           const Spacer(),
-          Text(value, style: const TextStyle(color: AdminTheme.primaryText, fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(trend, style: TextStyle(color: trend.contains('+') ? AdminTheme.success : AdminTheme.critical, fontSize: 11, fontWeight: FontWeight.bold)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: TextStyle(color: AdminTheme.primaryText, fontSize: 32.sp, fontWeight: FontWeight.bold)),
+          ),
+          SizedBox(height: 4.h),
+          Text(trend, style: TextStyle(color: trend.contains('+') ? AdminTheme.success : AdminTheme.critical, fontSize: 13.sp, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildLiveOrdersSection() {
     return Column(
@@ -303,84 +312,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Row(
-              children: [
-                Icon(Ionicons.flash_outline, color: AdminTheme.success, size: 20),
-                SizedBox(width: 8),
-                Text('Live Orders', style: TextStyle(color: AdminTheme.primaryText, fontSize: 18, fontWeight: FontWeight.bold)),
-              ],
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Ionicons.flash_outline, color: AdminTheme.success, size: 24.w),
+                  SizedBox(width: 8.w),
+                  Flexible(child: Text('Live Orders', style: TextStyle(color: AdminTheme.primaryText, fontSize: 20.sp, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                ],
+              ),
             ),
             TextButton(
               onPressed: () => _onItemTapped(3),
-              child: const Text('View All Orders', style: TextStyle(color: AdminTheme.success, fontWeight: FontWeight.bold)),
+              child: Text('VIEW ALL', style: TextStyle(color: AdminTheme.success, fontWeight: FontWeight.bold, fontSize: 12.sp)),
             ),
           ],
         ),
         const SizedBox(height: 16),
         Container(
+          height: 500.h, // Fixed height or expanded to use available space
           decoration: BoxDecoration(
             color: AdminTheme.cardBackground,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(16.r),
             border: Border.all(color: AdminTheme.dividerColor),
           ),
           child: Consumer<OrdersProvider>(
             builder: (context, provider, _) {
-              if (provider.isLoading) return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()));
-              
-              final orders = provider.orders.take(5).toList();
-              
+              final orders = provider.orders.take(10).toList();
               return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowHeight: 50,
-                  dataRowHeight: 70,
-                  horizontalMargin: 24,
-                  columnSpacing: 20,
-                  showCheckboxColumn: false,
-                  columns: const [
-                    DataColumn(label: Text('TABLE #', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('ORDER ITEMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('TIME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('ACTION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                  ],
-                  rows: orders.map((order) => DataRow(
-                  onSelectChanged: (_) {
-                    final isPast = order.status == model.OrderStatus.completed || 
-                                   order.status == model.OrderStatus.cancelled;
-                    showDialog(
-                      context: context,
-                      builder: (context) => isPast 
-                        ? OrderDetailsDialog(order: order)
-                        : TableOrdersDialog(
-                            tenantId: order.tenantId, 
-                            tableId: order.tableId ?? '', 
-                            tableName: order.tableName ?? 'Table'
-                          ),
-                    );
-                  },
-                  cells: [
-                    DataCell(Text(order.tableName ?? 'T-#', style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText))),
-                    DataCell(Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(order.items.map((i) => '${i.quantity}x ${i.name}').join(', '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AdminTheme.primaryText)),
-                        if (order.chefNote != null && order.chefNote!.isNotEmpty)
-                          Text(order.chefNote!, style: const TextStyle(fontSize: 11, color: AdminTheme.warning)),
-                      ],
-                    )),
-                    DataCell(Text('${DateTime.now().difference(order.createdAt).inMinutes} mins', style: const TextStyle(color: AdminTheme.primaryText))),
-                    DataCell(_buildStatusBadge(order.status)),
-                    DataCell(_buildActionButton(order)),
-                  ],
-                )).toList(),
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(25.w, 0, 25.w, 10.w),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minWidth: 800.w),
+                      child: DataTable(
+                        headingRowHeight: 64.h,
+                        dataRowHeight: 88.h,
+                        horizontalMargin: 0, // Margin handled by padding
+                        columnSpacing: 40.w,
+                        showCheckboxColumn: false,
+                        columns: [
+                          DataColumn(label: Text('TABLE #', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                          DataColumn(label: Text('ORDER ITEMS', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                          DataColumn(label: Text('TIME', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                          DataColumn(label: Text('ACTION', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                        ],
+                        rows: orders.map((order) => DataRow(
+                          onSelectChanged: (_) => _showLiveOrderDetails(context, order),
+                          cells: [
+                            DataCell(Text(order.tableName ?? 'T-#', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 16.sp))),
+                            DataCell(Text(order.items.map((i) => '${i.quantity}x ${i.name}').join(', '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AdminTheme.primaryText, fontSize: 15.sp))),
+                            DataCell(Text('${DateTime.now().difference(order.createdAt).inMinutes}m', style: TextStyle(color: AdminTheme.primaryText, fontSize: 15.sp))),
+                            DataCell(_buildActionButton(order)),
+                          ],
+                        )).toList(),
+                      ),
+                    ),
+                  ),
                 ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  void _showLiveOrderDetails(BuildContext context, model.Order order) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+        ),
+        padding: EdgeInsets.all(24.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Order Details - ${order.tableName}',
+                  style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold),
+                ),
+                IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Ionicons.close, size: 24.w)),
+              ],
+            ),
+            const Divider(),
+            ...order.items.map((item) => ListTile(
+              title: Text('${item.quantity}x ${item.name}', style: TextStyle(fontSize: 16.sp)),
+              trailing: Text('₹${item.price * item.quantity}', style: TextStyle(fontSize: 16.sp)),
+            )).toList(),
+            SizedBox(height: 20.h),
+            Container(
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                   Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18.sp)),
+                   Text('₹${order.total}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24.sp, color: Colors.green)),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+          ],
+        ),
+      ),
     );
   }
 
@@ -396,17 +443,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Text(
           label, 
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+          style: TextStyle(color: color, fontSize: 11.sp, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -435,11 +482,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        minimumSize: const Size(80, 32),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        minimumSize: Size(80.w, 32.h),
         side: BorderSide.none,
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -448,24 +495,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24.w),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
-                  Icon(Ionicons.notifications, color: AdminTheme.critical, size: 20),
-                  SizedBox(width: 8),
-                  Text('Staff Calls', style: TextStyle(color: AdminTheme.primaryText, fontSize: 18, fontWeight: FontWeight.bold)),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(Ionicons.notifications, color: AdminTheme.critical, size: 24.w),
+                    SizedBox(width: 8.w),
+                    Flexible(
+                      child: Text(
+                        'Staff Calls', 
+                        style: TextStyle(color: AdminTheme.primaryText, fontSize: 20.sp, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              SizedBox(width: 8.w),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: AdminTheme.critical, borderRadius: BorderRadius.circular(4)),
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(color: AdminTheme.critical, borderRadius: BorderRadius.circular(4.r)),
                 child: Consumer<NotificationsProvider>(
                   builder: (context, provider, _) => Text(
                     '${provider.totalNotificationsCount} NEW', 
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)
+                    style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: Colors.white)
                   ),
                 ),
               ),
@@ -479,7 +535,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (calls.isEmpty) return const Center(child: Text('No active calls', style: TextStyle(color: AdminTheme.secondaryText)));
               
               return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
                 itemCount: calls.length,
                 itemBuilder: (context, index) {
                   final call = calls[index];
@@ -487,59 +543,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   String tableName = isBill ? (call as BillRequest).tableName ?? 'Table' : (call as WaiterCall).tableName ?? 'Table';
                   
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
+                    margin: EdgeInsets.only(bottom: 12.h),
+                    padding: EdgeInsets.all(16.w),
                     decoration: BoxDecoration(
                       color: AdminTheme.cardBackground,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(16.r),
                       border: Border.all(color: AdminTheme.dividerColor),
                       boxShadow: [
-                        BoxShadow(color: (isBill ? AdminTheme.warning : AdminTheme.critical).withOpacity(0.1), blurRadius: 10),
+                        BoxShadow(color: (isBill ? AdminTheme.warning : AdminTheme.critical).withOpacity(0.1), blurRadius: 10.w),
                       ],
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: (isBill ? AdminTheme.warning : AdminTheme.critical).withOpacity(0.1),
-                            shape: BoxShape.circle,
+                    child: InkWell(
+                      onTap: () {
+                        if (isBill) {
+                          _onItemTapped(4); // Navigate to Billing
+                        } else {
+                          // Handle waiter call logic - maybe show table details
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(16.r),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(10.w),
+                            decoration: BoxDecoration(
+                              color: (isBill ? AdminTheme.warning : AdminTheme.critical).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(isBill ? Ionicons.receipt : Ionicons.person, 
+                              color: isBill ? AdminTheme.warning : AdminTheme.critical, size: 20.w),
                           ),
-                          child: Icon(isBill ? Ionicons.receipt : Ionicons.person, 
-                            color: isBill ? AdminTheme.warning : AdminTheme.critical, size: 20),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(tableName, style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
-                                  const Spacer(),
-                                  Text(
-                                    DateFormat('h:mm a').format(isBill ? (call as BillRequest).requestedAt : (call as WaiterCall).requestedAt), 
-                                    style: const TextStyle(fontSize: 10, color: AdminTheme.secondaryText)
-                                  ),
-                                ],
-                              ),
-                              Text(isBill ? 'Requested: Final Bill' : 'Requested: Waiter Service', 
-                                style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
-                            ],
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(child: Text(tableName, style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 15.sp), overflow: TextOverflow.ellipsis)),
+                                    SizedBox(width: 8.w),
+                                    Text(
+                                      DateFormat('h:mm a').format(isBill ? (call as BillRequest).requestedAt : (call as WaiterCall).requestedAt), 
+                                      style: TextStyle(fontSize: 12.sp, color: AdminTheme.secondaryText)
+                                    ),
+                                  ],
+                                ),
+                                Text(isBill ? 'Requested: Final Bill' : 'Requested: Waiter Service', 
+                                  style: TextStyle(fontSize: 14.sp, color: AdminTheme.secondaryText), overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        IconButton(
-                          icon: const Icon(Ionicons.checkmark_circle_outline, color: AdminTheme.success),
-                          onPressed: () {
-                            if (isBill) {
-                              provider.acknowledgeBillRequest((call as BillRequest).requestId);
-                            } else {
-                              provider.completeWaiterCall((call as WaiterCall).callId);
-                            }
-                          },
-                        ),
-                      ],
+                          SizedBox(width: 12.w),
+                          IconButton(
+                            icon: Icon(Ionicons.checkmark_circle_outline, color: AdminTheme.success, size: 24.w),
+                            onPressed: () {
+                              if (isBill) {
+                                provider.acknowledgeBillRequest((call as BillRequest).requestId);
+                              } else {
+                                provider.completeWaiterCall((call as WaiterCall).callId);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -548,17 +614,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24.w),
           child: Center(
             child: TextButton(
               onPressed: () {},
-              child: const Text('VIEW RESOLVED REQUESTS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+              child: Text('VIEW RESOLVED REQUESTS', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
             ),
           ),
         ),
       ],
     );
   }
+
 }
-
-

@@ -5,15 +5,17 @@ import '../models/tenant_model.dart'; // Make sure MenuItem is accessible
 
 class CartItem {
   final MenuItem item;
+  final Variant? selectedVariant;
   int quantity;
   String? note;
 
-  CartItem({required this.item, this.quantity = 1, this.note});
+  CartItem({required this.item, this.selectedVariant, this.quantity = 1, this.note});
 
-  double get totalPrice => item.price * quantity;
+  double get totalPrice => (selectedVariant?.price ?? item.price) * quantity;
 
   Map<String, dynamic> toJson() => {
     'item': item.toMap(),
+    'selectedVariant': selectedVariant?.toMap(),
     'quantity': quantity,
     'note': note,
   };
@@ -21,6 +23,9 @@ class CartItem {
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
       item: MenuItem.fromMap(json['item']),
+      selectedVariant: json['selectedVariant'] != null 
+          ? Variant.fromMap(json['selectedVariant']) 
+          : null,
       quantity: json['quantity'],
       note: json['note'],
     );
@@ -57,7 +62,8 @@ class CartController extends ChangeNotifier {
         _items.clear();
         for (var itemJson in decoded) {
           final cartItem = CartItem.fromJson(itemJson);
-          _items[cartItem.item.id] = cartItem;
+          final key = _generateKey(cartItem.item.id, cartItem.selectedVariant);
+          _items[key] = cartItem;
         }
         notifyListeners();
       }
@@ -80,11 +86,17 @@ class CartController extends ChangeNotifier {
     }
   }
 
-  void addItem(MenuItem item) {
-    if (_items.containsKey(item.id)) {
-      _items[item.id]!.quantity++;
+  String _generateKey(String itemId, Variant? variant) {
+    if (variant == null) return itemId;
+    return '${itemId}_${variant.name}';
+  }
+
+  void addItem(MenuItem item, [Variant? variant]) {
+    final key = _generateKey(item.id, variant);
+    if (_items.containsKey(key)) {
+      _items[key]!.quantity++;
     } else {
-      _items[item.id] = CartItem(item: item);
+      _items[key] = CartItem(item: item, selectedVariant: variant);
     }
     _saveCart();
     notifyListeners();
@@ -116,9 +128,13 @@ class CartController extends ChangeNotifier {
     }
   }
 
-  bool isItemInCart(String itemId) => _items.containsKey(itemId);
+  bool isItemInCart(String itemId) => _items.values.any((i) => i.item.id == itemId);
 
-  int getItemQuantity(String itemId) => _items[itemId]?.quantity ?? 0;
+  int getItemQuantity(String itemId) {
+    return _items.values
+        .where((i) => i.item.id == itemId)
+        .fold(0, (sum, i) => sum + i.quantity);
+  }
 
   void clear() {
     _items.clear();

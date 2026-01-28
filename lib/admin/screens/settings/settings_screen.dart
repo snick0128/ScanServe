@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../../providers/admin_auth_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String tenantId;
@@ -23,6 +25,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _captainCanDeleteItems = true;
   bool _captainRequiresApproval = false;
 
+  // Password Change
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _passwordFormKey = GlobalKey<FormState>();
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +46,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _descriptionController.dispose();
     _taxRateController.dispose();
     _avgPrepTimeController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
     super.dispose();
   }
 
@@ -96,6 +105,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving settings: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _changePassword() async {
+    if (!_passwordFormKey.currentState!.validate()) return;
+
+    try {
+      await context.read<AdminAuthProvider>().changePassword(
+        _currentPasswordController.text,
+        _newPasswordController.text,
+      );
+
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password changed successfully'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error changing password: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -203,6 +238,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _captainRequiresApproval,
               onChanged: (val) => setState(() => _captainRequiresApproval = val),
               contentPadding: EdgeInsets.zero,
+            ),
+            const Divider(height: 32),
+            const Text(
+              'Change Password',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Form(
+              key: _passwordFormKey,
+              child: Column(
+                children: [
+                   TextFormField(
+                    controller: _currentPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Current Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: (val) => val?.isEmpty == true ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _newPasswordController,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    validator: (val) => (val?.length ?? 0) < 6 ? 'Min 6 characters' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _changePassword,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Update Password'),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 32),
             
