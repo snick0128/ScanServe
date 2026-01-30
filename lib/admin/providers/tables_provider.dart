@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/tenant_model.dart';
+import '../../models/table_status.dart';
 import '../../services/tables_service.dart';
 import './orders_provider.dart';
 import '../../models/order.dart' as order_model;
@@ -21,11 +22,11 @@ class TablesProvider with ChangeNotifier {
 
   int get totalTablesCount => _tables.length;
   
-  int get activeSessionsCount => _tables.where((t) => t.isOccupied || t.status == 'occupied' || t.status == 'billRequested').length;
+  int get activeSessionsCount => _tables.where((t) => t.status.hasActiveSession).length;
   
-  int get billRequestsCount => _tables.where((t) => t.status == 'billRequested').length;
+  int get billRequestsCount => _tables.where((t) => t.status == TableStatus.billRequested).length;
   
-  int get vacantTablesCount => _tables.where((t) => !t.isOccupied && t.status == 'vacant').length;
+  int get vacantTablesCount => _tables.where((t) => t.status.canAcceptCustomers).length;
 
   void initialize(String tenantId, {OrdersProvider? ordersProvider}) {
     print('🔥 TablesProvider: Initialize called for tenant: $tenantId');
@@ -66,7 +67,7 @@ class TablesProvider with ChangeNotifier {
     );
   }
 
-  /// Automatically heals the state if orders exist for a 'vacant' table
+  /// Automatically heals the state by syncing table physical status with order data
   void _syncTablesWithOrders() {
     if (_ordersProvider == null || _tables.isEmpty || _tenantId == null) return;
 
@@ -75,27 +76,36 @@ class TablesProvider with ChangeNotifier {
       o.status != order_model.OrderStatus.cancelled
     ).toList();
 
-    if (activeOrders.isEmpty) return;
+    // Mapping of tableId -> activeOrder count
+    final Map<String, int> tableActiveOrders = {};
+    for (var o in activeOrders) {
+      if (o.tableId != null) {
+        tableActiveOrders[o.tableId!] = (tableActiveOrders[o.tableId!] ?? 0) + 1;
+      }
+    }
 
-    for (final order in activeOrders) {
-      if (order.tableId == null) continue;
-      
-      try {
-        final table = _tables.firstWhere((t) => t.id == order.tableId);
-        
-        // If table thinks it is vacant but has an active order -> Fix it
-        if (!table.isOccupied && table.status == 'available') {
-          print('🛠️ Auto-Sync: Marking table ${table.name} as occupied due to active order ${order.id}');
+    for (final table in _tables) {
+       final hasActiveOrders = tableActiveOrders.containsKey(table.id);
+       
+       if (hasActiveOrders && table.status == TableStatus.available) {
+          print('🛠️ Auto-Sync: Marking table ${table.name} as occupied due to active order');
           updateTable(table.copyWith(
             isOccupied: true,
             isAvailable: false,
-            status: 'occupied',
-            occupiedAt: order.createdAt,
+            status: TableStatus.occupied,
+            occupiedAt: activeOrders.firstWhere((o) => o.tableId == table.id).createdAt,
           ));
-        }
-      } catch (e) {
-        // Table not found in list, skip
-      }
+       } else if (!hasActiveOrders && table.status == TableStatus.occupied && table.lastReleasedAt != null) {
+          // If a table is occupied but has TRULY no orders, and it's been more than 30 mins since last released
+          // we could potentially auto-heal, but usually it's best to only do this for specific stale cases
+          // to avoid clearing a table that just sat down.
+          
+          final now = DateTime.now();
+          if (table.occupiedAt != null && now.difference(table.occupiedAt!).inHours > 6) {
+             print('🛠️ Auto-Sync: Releasing STALE table ${table.name} (Older than 6h with no orders)');
+             releaseTable(table.id);
+          }
+       }
     }
   }
 
@@ -131,14 +141,15 @@ class TablesProvider with ChangeNotifier {
         print('🔓 Released table $tableId - Completed ${activeOrders.length} orders via provider');
       }
       
-      // 2. Update table status to vacant
+      // 2. Update table status to available and track last released timestamp
       final table = _tables.firstWhere((t) => t.id == tableId);
       await updateTable(table.copyWith(
-        status: 'available',
+        status: TableStatus.available,
         isAvailable: true,
         isOccupied: false,
         currentSessionId: null,
         occupiedAt: null,
+        lastReleasedAt: DateTime.now(), // Tracking for Bug #6
       ));
     } catch (e) {
       print('Error releasing table: $e');

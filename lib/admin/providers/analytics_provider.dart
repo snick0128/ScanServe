@@ -8,7 +8,7 @@ class AnalyticsProvider with ChangeNotifier {
   String? _tenantId;
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
-  String _dateFilter = 'Today';
+  String _dateFilter = 'All';
 
   bool _isLoading = false;
   
@@ -49,7 +49,7 @@ class AnalyticsProvider with ChangeNotifier {
   void initialize(String tenantId) {
     if (_tenantId == tenantId) return;
     _tenantId = tenantId;
-    setDateFilter('Today');
+    setDateFilter('All');
   }
 
   Future<void> setDateFilter(String filter) async {
@@ -68,6 +68,10 @@ class AnalyticsProvider with ChangeNotifier {
         break;
       case 'Month':
         _startDate = DateTime(now.year, now.month, 1);
+        _endDate = now;
+        break;
+      case 'All':
+        _startDate = DateTime(2023, 1, 1);
         _endDate = now;
         break;
     }
@@ -193,7 +197,11 @@ class AnalyticsProvider with ChangeNotifier {
       _tablesTrend = 4.0;
 
     } catch (e) {
-      print('Error refreshing analytics: $e');
+      if (e.toString().contains('failed-precondition') || e.toString().contains('index')) {
+        debugPrint('⚠️ Analytics: Global query requires a Collection Group index. Link: $e');
+      } else {
+        debugPrint('❌ Error refreshing analytics: $e');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

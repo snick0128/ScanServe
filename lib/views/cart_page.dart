@@ -111,17 +111,19 @@ class _CartPageState extends State<CartPage> {
                             items: cartController.items,
                             onUpdateQuantity: (item, newQuantity) {
                               HapticHelper.light();
+                              final key = cartController.getCartKey(item.item.id, item.selectedVariant);
                               if (newQuantity <= 0) {
-                                cartController.removeItem(item.item.id);
+                                cartController.removeItem(key);
                               } else {
                                 cartController.updateQuantity(
-                                  item.item.id,
+                                  key,
                                   newQuantity,
                                 );
                               }
                             },
-                            onNoteUpdate: (itemId, note) {
-                              cartController.updateNote(itemId, note);
+                            onNoteUpdate: (item, note) {
+                              final key = cartController.getCartKey(item.item.id, item.selectedVariant);
+                              cartController.updateNote(key, note);
                             },
                             isMobile: isMobile,
                             isTablet: isTablet,
@@ -158,7 +160,7 @@ class _CartPageState extends State<CartPage> {
 class _CartItemsWithNotes extends StatelessWidget {
   final List<CartItem> items;
   final Function(CartItem, int) onUpdateQuantity;
-  final Function(String, String) onNoteUpdate;
+  final Function(CartItem, String) onNoteUpdate;
   final bool isMobile;
   final bool isTablet;
 
@@ -172,7 +174,6 @@ class _CartItemsWithNotes extends StatelessWidget {
   }) : super(key: key);
 
   void _showNoteBottomSheet(BuildContext context, CartItem item) {
-    final itemId = item.item.id;
     final currentNote = item.note ?? '';
     final noteController = TextEditingController(text: currentNote);
 
@@ -307,7 +308,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                       flex: 2,
                       child: ElevatedButton(
                         onPressed: () {
-                          onNoteUpdate(itemId, noteController.text.trim());
+                          onNoteUpdate(item, noteController.text.trim());
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
@@ -472,16 +473,33 @@ class _CartItemsWithNotes extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
-                                child: Text(
-                                  item.item.name,
-                                  style: TextStyle(
-                                    fontSize: isMobile ? 15 : 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.primaryText,
-                                    height: 1.3,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.item.name,
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 15 : 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primaryText,
+                                        height: 1.3,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (item.selectedVariant != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          item.selectedVariant!.name,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppTheme.primaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -610,7 +628,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                 color: AppTheme.primaryText,
                               ),
                               children: [
-                                TextSpan(text: '₹${item.item.price.toStringAsFixed(2)}'),
+                                TextSpan(text: '₹${(item.selectedVariant?.price ?? item.item.price).toStringAsFixed(2)}'),
                                 TextSpan(
                                   text: ' × ${item.quantity}',
                                   style: const TextStyle(
@@ -620,7 +638,7 @@ class _CartItemsWithNotes extends StatelessWidget {
                                 ),
                                 const TextSpan(text: ' = '),
                                 TextSpan(
-                                  text: '₹${(item.item.price * item.quantity).toStringAsFixed(2)}',
+                                  text: '₹${item.totalPrice.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -1012,29 +1030,29 @@ class _CartActionFooter extends StatelessWidget {
             child: total != null
                 ? Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          text,
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            text,
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        Flexible(
-                          child: Text(
+                          Text(
                             ' • ₹${total.toStringAsFixed(2)}',
                             style: GoogleFonts.outfit(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   )
                 : Text(

@@ -58,6 +58,19 @@ class _OrderStatusStyle {
           background: Colors.grey.withOpacity(0.1),
           foreground: Colors.grey[400]!,
         );
+      case OrderStatus.billRequested:
+        return _OrderStatusStyle(
+          label: "Bill Requested",
+          background: Colors.blue.withOpacity(0.1),
+          foreground: Colors.blue[600]!,
+        );
+      case OrderStatus.paymentPending:
+        return _OrderStatusStyle(
+          label: "Payment Pending",
+          background: Colors.orange.withOpacity(0.1),
+          foreground: Colors.orange[600]!,
+        );
+
       case OrderStatus.preparing:
         return _OrderStatusStyle(
           label: "Preparing",

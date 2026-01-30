@@ -12,6 +12,9 @@ import 'package:scan_serve/admin/theme/admin_theme.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 
 class StationConfig {
   final String id;
@@ -43,6 +46,13 @@ class _KDSScreenState extends State<KDSScreen> {
   Map<String, Set<String>> _checkedItems = {}; // orderId -> set of itemIds
   final Set<String> _printedOrders = {};
 
+  // Bug #8: Connectivity & Heartbeat
+  DateTime _lastUpdate = DateTime.now();
+  bool _isOffline = false;
+  ConnectivityResult _connectionStatus = ConnectivityResult.none;
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  Timer? _heartbeatTimer;
+
   @override
   void initState() {
     super.initState();
@@ -50,9 +60,42 @@ class _KDSScreenState extends State<KDSScreen> {
       if (mounted) setState(() {});
     });
     
-    // Auto-resolve station based on user's kitchenStationId or role
+    // Enable Wakelock to keep KDS screen on
+    WakelockPlus.enable();
+
+    // Setup connectivity monitoring
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+      setState(() {
+        _connectionStatus = results.first;
+        if (_connectionStatus == ConnectivityResult.none) {
+          _isOffline = true;
+        }
+      });
+    });
+
+    // Heartbeat monitoring (Every 30 seconds)
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _checkHeartbeat();
+    });
+
+    // Auto-resolve station
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resolveStation();
+    });
+  }
+
+  void _checkHeartbeat() {
+    final now = DateTime.now();
+    // If no update received for more than 2 minutes, trigger offline warning
+    if (now.difference(_lastUpdate).inMinutes >= 2) {
+      setState(() => _isOffline = true);
+    }
+  }
+
+  void _acknowledgeOnline() {
+    setState(() {
+      _lastUpdate = DateTime.now();
+      _isOffline = false;
     });
   }
 
@@ -74,7 +117,7 @@ class _KDSScreenState extends State<KDSScreen> {
       else if (role.contains('cold')) _currentStation = StationConfig.defaultStations[1];
       else if (role.contains('bar')) _currentStation = StationConfig.defaultStations[2];
       else if (role.contains('kitchen')) _currentStation = StationConfig.defaultStations[0];
-      else _currentStation = StationConfig.defaultStations[0]; // Default
+      else _currentStation = StationConfig.defaultStations[3]; // Default to PASS / EXPO (shows all)
     }
     
     print('🔥 KDS: Active Station is ${_currentStation?.name}');
@@ -84,6 +127,9 @@ class _KDSScreenState extends State<KDSScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _heartbeatTimer?.cancel();
+    _connectivitySubscription.cancel();
+    WakelockPlus.disable();
     super.dispose();
   }
 
@@ -91,73 +137,147 @@ class _KDSScreenState extends State<KDSScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F3F4), // Light KDS background
-      body: Consumer2<OrdersProvider, MenuProvider>(
-        builder: (context, ordersProvider, menuProvider, _) {
-          // Auto-Print Logic
-          if (ordersProvider.latestNewOrder != null && !_printedOrders.contains(ordersProvider.latestNewOrder!.id)) {
-             final newOrder = ordersProvider.latestNewOrder!;
-             _printedOrders.add(newOrder.id);
-             WidgetsBinding.instance.addPostFrameCallback((_) {
-               _printKOT(newOrder);
-               // Optional: Clear latestNewOrder from provider if you want to stop other screens from printing
-               // ordersProvider.clearLatestNewOrder(); 
-             });
-          }
+      body: Stack(
+        children: [
+          Consumer2<OrdersProvider, MenuProvider>(
+            builder: (context, ordersProvider, menuProvider, _) {
+              // Track last update time from provider
+              if (ordersProvider.orders.isNotEmpty || !ordersProvider.isLoading) {
+                _lastUpdate = DateTime.now();
+              }
 
-          final stationOrders = _filterOrdersForStation(ordersProvider.currentOrders, menuProvider.allItems);
+              // Final station filtering
+              final stationOrders = _filterOrdersForStation(ordersProvider.kdsOrders, menuProvider.allItems);
+              
+              return Column(
+                children: [
+                  _buildTopStatusBar(stationOrders.length, ordersProvider),
+                  Expanded(
+                    child: (menuProvider.isLoading && menuProvider.allItems.isEmpty)
+                      ? const Center(child: CircularProgressIndicator())
+                      : (stationOrders.isEmpty 
+                        ? _buildEmptyState()
+                        : ClipRect(child: _buildOrderGrid(stationOrders, menuProvider.allItems))),
+                  ),
+                  if (ordersProvider.latestNewOrder != null)
+                    _buildNewOrderBanner(ordersProvider),
+                ],
+              );
+            },
+          ),
           
-          return Column(
-            children: [
-              _buildTopStatusBar(stationOrders.length),
-              Expanded(
-                child: (menuProvider.isLoading && menuProvider.allItems.isEmpty)
-                  ? const Center(child: CircularProgressIndicator())
-                  : (stationOrders.isEmpty 
-                    ? _buildEmptyState()
-                    : _buildOrderGrid(stationOrders, menuProvider.allItems)),
-              ),
-            ],
-          );
-        },
+          // Bug #8: Offline Overlay
+          if (_isOffline)
+            _buildOfflineOverlay(),
+        ],
       ),
     );
   }
 
-  Widget _buildTopStatusBar(int activeCount) {
+  Widget _buildOfflineOverlay() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      color: Colors.black.withOpacity(0.9),
+      width: double.infinity,
+      height: double.infinity,
+      child: Center(
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(40),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Ionicons.cloud_offline_outline, size: 80, color: AdminTheme.critical),
+              const SizedBox(height: 24),
+              const Text(
+                'CONNECTION LOST',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AdminTheme.critical),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'The KDS has stopped receiving orders. This may be due to a network failure or session expiry.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, color: AdminTheme.primaryText),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: _acknowledgeOnline,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AdminTheme.critical,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 64),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('RETRY & ACKNOWLEDGE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Manual acknowledgement is required to resume kitchen operations.',
+                style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopStatusBar(int activeCount, OrdersProvider provider) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
       ),
       child: Row(
         children: [
-          // Station Name & Status
-          Row(
-            children: [
-              Container(
-                width: 12, height: 12,
-                decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'MAIN KITCHEN DISPLAY',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
-              ),
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  width: 10, height: 10,
+                  decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                ),
+                SizedBox(width: 8.w),
+                Flexible(
+                  child: Text(
+                    'KITCHEN DISPLAY',
+                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
           const Spacer(),
           
-          // Active Count
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(color: AdminTheme.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-            child: Text(
-              '$activeCount ACTIVE ORDERS',
-              style: const TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13),
+          // Station Display & Selector
+          InkWell(
+            onTap: _showStationSettings,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                border: Border.all(color: AdminTheme.primaryColor),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Ionicons.restaurant_outline, size: 16, color: AdminTheme.primaryColor),
+                  SizedBox(width: 8.w),
+                  Text(
+                    _currentStation?.name ?? 'SELECT STATION',
+                    style: TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13.sp),
+                  ),
+                  SizedBox(width: 4.w),
+                  Icon(Ionicons.chevron_down, size: 14, color: AdminTheme.primaryColor),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           
           // Controls
           _buildStatusBarIcon(Ionicons.expand_outline, () {
@@ -226,6 +346,7 @@ class _KDSScreenState extends State<KDSScreen> {
 
     return Container(
       width: 320,
+      margin: EdgeInsets.only(bottom: 8.h),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -253,7 +374,7 @@ class _KDSScreenState extends State<KDSScreen> {
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Ionicons.information_circle_outline, size: 20),
+                          icon: const Icon(Ionicons.information_circle_outline, size: 20, color: AdminTheme.secondaryText),
                           onPressed: () => _showOrderDetails(order, menuItems),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -269,11 +390,19 @@ class _KDSScreenState extends State<KDSScreen> {
                 ),
                 const SizedBox(height: 8),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(4)),
                       child: Text(statusLabel, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Ionicons.print_outline, size: 20, color: AdminTheme.secondaryText),
+                      onPressed: () => _printKOT(order),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Print KOT',
                     ),
                   ],
                 ),
@@ -334,35 +463,49 @@ class _KDSScreenState extends State<KDSScreen> {
           
           // Action Button
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16.w),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 ElevatedButton(
                   onPressed: (hasCheckedItems && !allCheckedReady) ? () => _markCheckedItemsReady(order.id, stationItems) : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AdminTheme.success,
                     foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 52),
+                    minimumSize: Size(double.infinity, 48.h),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                     disabledBackgroundColor: Colors.grey[200],
                   ),
                   child: Text(
                     allCheckedReady ? 'ALL READY' : 'MARK SELECTED READY', 
-                    style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)
+                    style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13.sp)
                   ),
                 ),
-                if (_currentStation?.id == 'pass_expo') ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton(
+                if (_currentStation?.id == 'pass_expo' && context.read<AdminAuthProvider>().isAdmin) ...[
+                  SizedBox(height: 8.h),
+                  ElevatedButton(
                     onPressed: () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.served),
-                    style: OutlinedButton.styleFrom(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
                       foregroundColor: AdminTheme.primaryColor,
-                      minimumSize: const Size(double.infinity, 44),
-                      side: const BorderSide(color: AdminTheme.primaryColor),
+                      minimumSize: Size(double.infinity, 48.h),
+                      side: const BorderSide(color: AdminTheme.primaryColor, width: 2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                      elevation: 0,
                     ),
-                    child: const Text('SERVE ENTIRE ORDER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Ionicons.checkmark_done_outline, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'SERVE ENTIRE ORDER', 
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.sp, letterSpacing: 0.5)
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -514,15 +657,29 @@ class _KDSScreenState extends State<KDSScreen> {
     );
   }
 
-  // LOGIC: Show ALL orders regardless of station
   List<model.Order> _filterOrdersForStation(List<model.Order> orders, List<MenuItem> menuItems) {
-    // Only show NEW / PREPARING orders
-    final allowedStatuses = [model.OrderStatus.pending, model.OrderStatus.preparing];
-    return orders.where((o) => allowedStatuses.contains(o.status)).toList();
+    if (_currentStation?.id == 'pass_expo') return orders;
+    
+    return orders.where((order) {
+      // Logic: Show order ONLY if it contains items belonging to THIS station's categories
+      return order.items.any((item) {
+        final menuItem = menuItems.firstWhere((mi) => mi.id == item.id || mi.name == item.name, orElse: () => MenuItem(id: '', name: '', category: '', price: 0, description: '', imageUrl: '', isManualAvailable: true, itemType: 'veg'));
+        return _currentStation?.categories.contains(menuItem.category) ?? true;
+      });
+    }).toList();
   }
 
   List<model.OrderItem> _filterItemsForStation(List<model.OrderItem> items, List<MenuItem> menuItems) {
-    return items; // Return all items
+    if (_currentStation?.id == 'pass_expo') return items;
+    
+    return items.where((item) {
+      final menuItem = menuItems.firstWhere(
+        (mi) => mi.id == item.id || mi.name == item.name, 
+        orElse: () => MenuItem(id: '', name: '', category: '', price: 0, description: '', imageUrl: '', isManualAvailable: true, itemType: 'veg')
+      );
+      if (menuItem.id.isEmpty) return true; // Keep if unknown to be safe
+      return _currentStation?.categories.contains(menuItem.category) ?? true;
+    }).toList();
   }
 
   Future<void> _printKOT(model.Order order) async {
@@ -605,5 +762,29 @@ class _KDSScreenState extends State<KDSScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print Error: $e')));
       }
     }
+  }
+
+  Widget _buildNewOrderBanner(OrdersProvider provider) {
+    final order = provider.latestNewOrder!;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
+      color: AdminTheme.primaryColor,
+      child: Row(
+        children: [
+          Icon(Ionicons.alert_circle, color: Colors.white, size: 24.w),
+          SizedBox(width: 16.w),
+          Expanded(
+            child: Text(
+              'NEW ORDER RECEIVED: Table ${order.tableName} - #${order.id.substring(0, 8)}',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.sp),
+            ),
+          ),
+          TextButton(
+            onPressed: () => provider.clearLatestNewOrder(),
+            child: Text('ACKNOWLEDGE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, decoration: TextDecoration.underline, fontSize: 13.sp)),
+          ),
+        ],
+      ),
+    );
   }
 }

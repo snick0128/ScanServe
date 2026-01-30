@@ -23,6 +23,7 @@ class OrderSession {
   final String status;
   final String paymentStatus; // 'paid' or 'pending'
   final String paymentMethod; // 'UPI' or 'Cash'
+  final String sessionId; // Added for Bug #6
 
   OrderSession({
     required this.orderId,
@@ -35,6 +36,7 @@ class OrderSession {
     this.status = 'Pending',
     this.paymentStatus = 'pending',
     this.paymentMethod = 'Cash',
+    required this.sessionId,
   });
 
   factory OrderSession.create({
@@ -45,15 +47,17 @@ class OrderSession {
     String paymentStatus = 'pending',
     String paymentMethod = 'Cash',
   }) {
+    final now = DateTime.now();
     return OrderSession(
-      orderId: DateTime.now().millisecondsSinceEpoch.toString(),
+      orderId: now.millisecondsSinceEpoch.toString(),
       tableId: tableId,
       tenantId: tenantId,
       type: type,
-      timestamp: DateTime.now(),
+      timestamp: now,
       guestId: guestId,
       paymentStatus: paymentStatus,
       paymentMethod: paymentMethod,
+      sessionId: 'session_${now.millisecondsSinceEpoch}_$guestId', // Unique session ID
     );
   }
 
@@ -68,6 +72,7 @@ class OrderSession {
       'status': status,
       'paymentStatus': paymentStatus,
       'paymentMethod': paymentMethod,
+      'sessionId': sessionId,
     };
   }
 }

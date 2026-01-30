@@ -14,8 +14,12 @@ import 'package:uuid/uuid.dart';
 import '../providers/admin_auth_provider.dart';
 import '../providers/orders_provider.dart';
 import '../providers/tables_provider.dart';
+import '../providers/bills_provider.dart';
 import 'menu_selector_dialog.dart';
 import '../theme/admin_theme.dart';
+import '../../../models/table_status.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
+
 
 class TableOrdersDialog extends StatefulWidget {
   final String tenantId;
@@ -47,6 +51,12 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
   }
 
   Future<void> _startNewOrder() async {
+    final auth = context.read<AdminAuthProvider>();
+    if (auth.isKitchen) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kitchen staff cannot start orders')));
+      return;
+    }
+    
     final List<model.OrderItem>? selectedItems = await showDialog(
       context: context,
       builder: (context) => MenuSelectorDialog(tenantId: widget.tenantId),
@@ -80,7 +90,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
         final tablesProvider = context.read<TablesProvider>();
         final table = tablesProvider.tables.firstWhere((t) => t.id == widget.tableId);
         final updatedTable = table.copyWith(
-          status: 'occupied',
+          status: TableStatus.occupied,
           isAvailable: false,
           isOccupied: true,
           occupiedAt: DateTime.now(),
@@ -120,12 +130,15 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+    
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: EdgeInsets.all(isMobile ? 12 : 32),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(24),
+        width: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.8,
+        height: isMobile ? double.infinity : MediaQuery.of(context).size.height * 0.8,
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Consumer2<TablesProvider, OrdersProvider>(
           builder: (context, tablesProvider, ordersProvider, _) {
             final hasActiveOrders = ordersProvider.orders.any((o) => o.tableId == widget.tableId);
@@ -140,7 +153,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
             final status = table.status;
             
             // Unified occupied check for Admin UI
-            final showAsOccupied = isOccupied || status != 'available' || !isAvailable;
+            final showAsOccupied = isOccupied || status != TableStatus.available || !isAvailable;
             final isVacant = !showAsOccupied;
 
             return Column(
@@ -177,7 +190,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                         ],
                       ),
                     ),
-                    if (showAsOccupied && !hasActiveOrders)
+                    if (showAsOccupied && !hasActiveOrders && context.read<AdminAuthProvider>().isAdmin)
                       TextButton.icon(
                         onPressed: () async {
                           final confirm = await showDialog<bool>(
@@ -232,8 +245,11 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                             style: TextStyle(color: Colors.grey[600]),
                           ),
                           const SizedBox(height: 32),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          const SizedBox(height: 32),
+                          Wrap(
+                            spacing: 16.w,
+                            runSpacing: 16.h,
+                            alignment: WrapAlignment.center,
                             children: [
                               _buildActionCard(
                                 icon: Icons.print,
@@ -241,39 +257,19 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                                 color: AdminTheme.primaryColor,
                                 onTap: () => _printBill(context, _generatedBill!),
                               ),
-                              const SizedBox(width: 20),
                               _buildActionCard(
                                 icon: Icons.share,
                                 label: 'WhatsApp',
                                 color: Colors.green,
                                 onTap: () => _shareToWhatsApp(context, _generatedBill!),
                               ),
-                              const SizedBox(width: 20),
-                              _buildActionCard(
-                                icon: Icons.payments,
-                                label: 'Mark as Paid (Cash)',
-                                color: AdminTheme.success,
-                                 onTap: () async {
-                                   final provider = context.read<OrdersProvider>();
-                                   
-                                   try {
-                                     await provider.markTableAsPaid(widget.tableId);
-                                     
-                                     if (mounted) {
-                                       ScaffoldMessenger.of(context).showSnackBar(
-                                         const SnackBar(content: Text('Table settled successfully (Paid & Vacated)')),
-                                       );
-                                       Navigator.pop(context);
-                                     }
-                                   } catch (e) {
-                                     if (mounted) {
-                                       ScaffoldMessenger.of(context).showSnackBar(
-                                         SnackBar(content: Text('Error settling table: $e')),
-                                       );
-                                     }
-                                   }
-                                 },
-                              ),
+                              if (context.read<AdminAuthProvider>().isAdmin)
+                                _buildActionCard(
+                                  icon: Icons.payments,
+                                  label: 'Mark Paid (Cash)',
+                                  color: AdminTheme.success,
+                                  onTap: () => _showPaymentConfirmationDialog(context, ordersProvider.orders.where((o) => o.tableId == widget.tableId && !['completed', 'cancelled'].contains(o.status.name)).toList()),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 40),
@@ -285,6 +281,8 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                       ),
                     ),
                   )
+
+
 
                 else if (isVacant)
                   Expanded(
@@ -326,7 +324,11 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                             model.OrderStatus.preparing.name,
                             model.OrderStatus.ready.name,
                             model.OrderStatus.served.name,
+                            model.OrderStatus.billRequested.name,
+                            model.OrderStatus.paymentPending.name,
+
                           ])
+
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
@@ -510,7 +512,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                       Expanded(
                         child: Text('${item.quantity}x ${item.name}'),
                       ),
-                      if (item.status != 'served')
+                      if (item.status != 'served' && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain))
                         TextButton(
                           onPressed: () => context.read<OrdersProvider>().markItemAsServed(order.id, item.id),
                           child: const Text('SERVE', style: TextStyle(fontSize: 11)),
@@ -519,15 +521,16 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                         '₹${(item.price * item.quantity).toStringAsFixed(2)}',
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
-                      if (order.status == model.OrderStatus.pending)
+                      if (order.status == model.OrderStatus.pending && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain))
                         IconButton(
                           icon: const Icon(Icons.remove_circle_outline, size: 16, color: Colors.red),
                           onPressed: () => _handleRemoveItem(order.id, item.id),
                         ),
-                      IconButton(
-                        icon: Icon(item.notes != null ? Icons.note : Icons.note_add_outlined, size: 16, color: Colors.blue),
-                        onPressed: () => _showNoteDialog(order.id, item.id, item.notes ?? ''),
-                      ),
+                      if (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain)
+                        IconButton(
+                          icon: Icon(item.notes != null ? Icons.note : Icons.note_add_outlined, size: 16, color: Colors.blue),
+                          onPressed: () => _showNoteDialog(order.id, item.id, item.notes ?? ''),
+                        ),
                     ],
                   ),
                   if (item.notes != null && item.notes!.isNotEmpty)
@@ -626,7 +629,157 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     );
   }
 
+  Future<void> _showPaymentConfirmationDialog(BuildContext context, List<model.Order> orders) async {
+    final double subtotal = orders.fold(0.0, (sum, o) => sum + o.subtotal);
+    final double tax = orders.fold(0.0, (sum, o) => sum + o.tax);
+    final discount = double.tryParse(_discountController.text) ?? 0.0;
+    final discountAmount = subtotal * (discount / 100);
+    final currentTotal = subtotal + tax - discountAmount;
+
+    final amountController = TextEditingController(text: currentTotal.toStringAsFixed(2));
+    final reasonController = TextEditingController();
+    double correctionAmount = 0;
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.payments_outlined, color: AdminTheme.success),
+              const SizedBox(width: 12),
+              const Text('Confirm Settlement'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Please verify the final bill amount. You can apply corrections if necessary.'),
+                const SizedBox(height: 20),
+                const Text('Bill Total Amount', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  decoration: const InputDecoration(
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onChanged: (val) {
+                    final newTotal = double.tryParse(val) ?? currentTotal;
+                    setState(() {
+                      correctionAmount = newTotal - currentTotal;
+                    });
+                  },
+                ),
+                if (correctionAmount != 0) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: correctionAmount < 0 ? AdminTheme.success.withOpacity(0.05) : AdminTheme.critical.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          correctionAmount < 0 ? Icons.remove_circle_outline : Icons.add_circle_outline,
+                          size: 16,
+                          color: correctionAmount < 0 ? AdminTheme.success : AdminTheme.critical,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Correction: ₹${correctionAmount.abs().toStringAsFixed(2)} (${correctionAmount < 0 ? "Discount" : "Charge"})',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: correctionAmount < 0 ? AdminTheme.success : AdminTheme.critical,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Reason for Correction', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: reasonController,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. Rounding error, Item returned...',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                    autofocus: true,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (correctionAmount != 0 && reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Reason is required for amount correction')),
+                  );
+                  return;
+                }
+
+                final ordersProvider = context.read<OrdersProvider>();
+                final billsProvider = context.read<BillsProvider>();
+                
+                try {
+                  final finalAmount = double.tryParse(amountController.text) ?? currentTotal;
+                  
+                  // REQUIRED: Use BillsProvider flow to ensure Bill record is generated
+                  // and table is released in one atomic action.
+                  final orderIds = orders.map((o) => o.id).toList();
+                  final billId = await billsProvider.markAsPaid(widget.tableId, orderIds);
+
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close Confirmation Dialog
+                    Navigator.pop(context); // Close Table Orders Dialog
+                    
+                    if (billId != null) {
+                      _showSuccessAndSettlementDialog(context, billId);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Table settled successfully'), backgroundColor: AdminTheme.success),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error settling table: $e')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AdminTheme.success,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('CONFIRM PAYMENT & RELEASE'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showNoteDialog(String orderId, String itemId, String currentNote) async {
+
     final noteController = TextEditingController(text: currentNote);
     return showDialog<void>(
       context: context,
@@ -835,6 +988,45 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     }
   }
 
+  void _showSuccessAndSettlementDialog(BuildContext context, String billId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AdminTheme.success, size: 28),
+            SizedBox(width: 12),
+            Text('Settlement Complete'),
+          ],
+        ),
+        content: const Text('Table has been released and mark as PAID. Would you like to print the guest receipt now?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('DONE'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              final billData = await _billService.getBill(widget.tenantId, billId);
+              if (billData != null && context.mounted) {
+                _printBill(context, billData);
+              }
+            },
+            icon: const Icon(Icons.print),
+            label: const Text('PRINT RECEIPT'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionCard({
     required IconData icon,
     required String label,
@@ -853,15 +1045,17 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
           border: Border.all(color: color.withOpacity(0.3)),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 32),
             const SizedBox(height: 12),
             Text(
               label,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 12,
               ),
             ),
           ],

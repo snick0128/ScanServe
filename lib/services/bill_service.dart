@@ -16,28 +16,20 @@ class BillService {
     try {
       final billId = _uuid.v4();
       
-      // Calculate totals
       double subtotal = 0.0;
       double tax = 0.0;
-      double total = 0.0;
       
       for (final order in orders) {
         subtotal += order.subtotal;
         tax += order.tax;
-        total += order.total;
       }
       
-      // Apply discount on subtotal (Requirement 9)
       final discountAmount = subtotal * (discount / 100);
       final discountedSubtotal = subtotal - discountAmount;
-      
-      // Recalculate tax based on discounted subtotal
-      // (Assuming tax rate is proportional to subtotal)
       final taxRate = subtotal > 0 ? (tax / subtotal) : 0.05; 
       final newTax = discountedSubtotal * taxRate;
       final finalTotal = discountedSubtotal + newTax;
       
-      // Harvest customer info from orders
       String? customerName;
       String? customerPhone;
       for (final order in orders) {
@@ -46,7 +38,28 @@ class BillService {
         if (customerName != null && customerPhone != null) break;
       }
 
-      // Create bill document
+      final Map<String, Map<String, dynamic>> consolidatedItems = {};
+      for (final order in orders) {
+        for (final item in order.items) {
+          final String key = item.variantName != null 
+              ? '${item.name} (${item.variantName})' 
+              : item.name;
+          
+          if (consolidatedItems.containsKey(key)) {
+            final existing = consolidatedItems[key]!;
+            existing['quantity'] = (existing['quantity'] as int) + item.quantity;
+            existing['total'] = (existing['quantity'] as int) * (existing['price'] as double);
+          } else {
+            consolidatedItems[key] = {
+              'name': key,
+              'quantity': item.quantity,
+              'price': item.price,
+              'total': item.price * item.quantity,
+            };
+          }
+        }
+      }
+
       final billData = {
         'billId': billId,
         'tenantId': tenantId,
@@ -55,27 +68,15 @@ class BillService {
         'customerPhone': customerPhone,
         'orders': orders.map((model.Order o) => o.id).toList(),
         'subtotal': subtotal,
-        'tax': newTax, // Use recalculated tax
+        'tax': newTax,
         'discount': discount,
         'discountAmount': discountAmount,
-        'total': subtotal + tax, // Original total
+        'total': subtotal + tax,
         'finalTotal': finalTotal,
         'createdAt': FieldValue.serverTimestamp(),
-        'orderDetails': orders.map((model.Order o) => {
-          'orderId': o.id,
-          'items': o.items.map((item) => {
-            'name': item.name,
-            'quantity': item.quantity,
-            'price': item.price,
-            'total': item.price * item.quantity,
-          }).toList(),
-          'subtotal': o.subtotal,
-          'tax': o.tax,
-          'total': o.total,
-        }).toList(),
+        'orderDetails': consolidatedItems.values.toList(),
       };
       
-      // Save bill
       await _firestore
           .collection('tenants')
           .doc(tenantId)
@@ -83,7 +84,6 @@ class BillService {
           .doc(billId)
           .set(billData);
       
-      // Mark all orders as served (final state)
       final batch = _firestore.batch();
       for (final order in orders) {
         final orderRef = _firestore
@@ -93,29 +93,12 @@ class BillService {
             .doc(order.id);
         
         batch.update(orderRef, {
-          'status': model.OrderStatus.completed.toString().split('.').last,
+          'status': model.OrderStatus.completed.name,
           'updatedAt': FieldValue.serverTimestamp(),
           'billId': billId,
         });
       }
       await batch.commit();
-      
-      /* Table release moved to Mark Paid button in UI 
-      await _firestore
-          .collection('tenants')
-          .doc(tenantId)
-          .collection('tables')
-          .doc(tableId)
-          .update({
-        'isAvailable': true,
-        'status': 'available',
-        'isOccupied': false,
-        'currentSessionId': null,
-        'occupiedAt': null,
-        'lastBillId': billId,
-        'lastBillTime': FieldValue.serverTimestamp(),
-      });
-      */
       
       print('Bill generated successfully: $billId');
       return billId;

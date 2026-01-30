@@ -47,61 +47,87 @@ class _BillsScreenState extends State<BillsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 1100;
     return Scaffold(
       backgroundColor: AdminTheme.scaffoldBackground,
       body: Consumer<BillsProvider>(
         builder: (context, provider, _) {
           return Padding(
-            padding: EdgeInsets.all(16.w),
+            padding: EdgeInsets.all(isMobile ? 12.w : 16.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(provider),
-                SizedBox(height: 24.h),
+                _buildHeader(provider, isMobile),
+                SizedBox(height: isMobile ? 12.h : 24.h),
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // MAIN CONTENT (TABLE)
-                      Expanded(
-                        flex: 4,
+                  child: isMobile 
+                    ? SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _buildKPICards(provider, isMobile),
+                            SizedBox(height: 24.h),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text('Pending Settlement', 
-                                  style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                                  style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
                                 TextButton.icon(
                                   onPressed: () => _showHistoryDialog(context, provider),
-                                  icon: Icon(Ionicons.time_outline, size: 18.w),
-                                  label: Text('View All History', style: TextStyle(fontSize: 14.sp)),
+                                  icon: Icon(Ionicons.time_outline, size: 16.w),
+                                  label: Text('History', style: TextStyle(fontSize: 12.sp)),
                                   style: TextButton.styleFrom(foregroundColor: AdminTheme.primaryColor),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 16.h),
-                            Expanded(child: _buildPendingBillsTable(provider)),
+                            SizedBox(height: 12.h),
+                            _buildPendingBillsTable(provider),
                             SizedBox(height: 24.h),
-                            _buildBulkOperations(provider),
+                            _buildBulkOperations(provider, isMobile),
                           ],
                         ),
-                      ),
-                      SizedBox(width: 32.w),
-                      // RIGHT SIDE PANEL (KPIs & SUMMARY)
-                      SizedBox(
-                        width: 300.w,
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              _buildKPICards(provider),
-                            ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 4,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Pending Settlement', 
+                                      style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                                    TextButton.icon(
+                                      onPressed: () => _showHistoryDialog(context, provider),
+                                      icon: Icon(Ionicons.time_outline, size: 18.w),
+                                      label: Text('View All History', style: TextStyle(fontSize: 14.sp)),
+                                      style: TextButton.styleFrom(foregroundColor: AdminTheme.primaryColor),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 16.h),
+                                Expanded(child: _buildPendingBillsTable(provider)),
+                                SizedBox(height: 24.h),
+                                _buildBulkOperations(provider, false),
+                              ],
+                            ),
                           ),
-                        ),
+                          SizedBox(width: 32.w),
+                          SizedBox(
+                            width: 300.w,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  _buildKPICards(provider, false),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -111,7 +137,46 @@ class _BillsScreenState extends State<BillsScreen> {
     );
   }
 
-  Widget _buildHeader(BillsProvider provider) {
+  Widget _buildHeader(BillsProvider provider, bool isMobile) {
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Billing',
+                style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+              ),
+              IconButton(
+                onPressed: () => provider.refreshBills(),
+                icon: Icon(Ionicons.refresh_outline, size: 20.w),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Container(
+            height: 48.h,
+            decoration: BoxDecoration(
+              color: AdminTheme.cardBackground,
+              borderRadius: BorderRadius.circular(10.r),
+              border: Border.all(color: AdminTheme.dividerColor),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: 'Search table or bill ID...',
+                prefixIcon: Icon(Ionicons.search_outline, size: 18.w),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       children: [
         Column(
@@ -189,7 +254,34 @@ class _BillsScreenState extends State<BillsScreen> {
     );
   }
 
-  Widget _buildKPICards(BillsProvider provider) {
+  Widget _buildKPICards(BillsProvider provider, bool isMobile) {
+    if (isMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: _buildKPICard(
+              'Pending',
+              '₹${NumberFormat('#,##,###').format(provider.totalPendingAmount)}',
+              '${provider.activeSessionsCount} items',
+              Ionicons.wallet_outline,
+              AdminTheme.critical,
+              isMobile: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildKPICard(
+              'Sales',
+              '₹${NumberFormat('#,##,###').format(provider.completedTodayVolume)}',
+              '${provider.completedTodayCount} sets',
+              Ionicons.checkmark_circle_outline,
+              AdminTheme.success,
+              isMobile: true,
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       children: [
         _buildKPICard(
@@ -219,10 +311,10 @@ class _BillsScreenState extends State<BillsScreen> {
     );
   }
 
-  Widget _buildKPICard(String title, String value, String subtitle, IconData icon, Color color) {
+  Widget _buildKPICard(String title, String value, String subtitle, IconData icon, Color color, {bool isMobile = false}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 12 : 24),
       decoration: BoxDecoration(
         color: AdminTheme.cardBackground,
         borderRadius: BorderRadius.circular(16),
@@ -237,14 +329,17 @@ class _BillsScreenState extends State<BillsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 13, fontWeight: FontWeight.w600)),
-              Icon(icon, color: color, size: 22),
+              Text(title, style: TextStyle(color: AdminTheme.secondaryText, fontSize: isMobile ? 11 : 13, fontWeight: FontWeight.w600)),
+              Icon(icon, color: color, size: isMobile ? 18 : 22),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(color: AdminTheme.primaryText, fontSize: 32, fontWeight: FontWeight.bold)),
+          SizedBox(height: isMobile ? 8 : 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: TextStyle(color: AdminTheme.primaryText, fontSize: isMobile ? 24 : 32, fontWeight: FontWeight.bold)),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(color: subtitle.contains('+') ? AdminTheme.success : AdminTheme.secondaryText, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(subtitle, style: TextStyle(color: subtitle.contains('+') ? AdminTheme.success : AdminTheme.secondaryText, fontSize: isMobile ? 9 : 11, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -340,6 +435,100 @@ class _BillsScreenState extends State<BillsScreen> {
             const Text('No pending bills available', style: TextStyle(color: AdminTheme.secondaryText)),
           ],
         ),
+      );
+    }
+
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
+    if (isMobile) {
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: sessions.length,
+        itemBuilder: (context, index) {
+          final session = sessions[index];
+          final diff = _now.difference(session.sessionStartedAt);
+          final mins = diff.inMinutes;
+          
+          Color statusColor = AdminTheme.success;
+          if (mins > 30) statusColor = AdminTheme.critical;
+          else if (mins > 10) statusColor = AdminTheme.warning;
+
+          return Card(
+            margin: EdgeInsets.only(bottom: 12.h),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              side: BorderSide(color: AdminTheme.dividerColor),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8.w, height: 8.w,
+                            decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(session.tableName ?? 'T-#', 
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp)),
+                        ],
+                      ),
+                      Text('₹${NumberFormat('#,##,###.00').format(session.totalAmount)}', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryColor, fontSize: 16.sp)),
+                    ],
+                  ),
+                  Divider(height: 24.h),
+                  Row(
+                    children: [
+                      Icon(Ionicons.person_outline, size: 14.w, color: AdminTheme.secondaryText),
+                      SizedBox(width: 8.w),
+                      Text(session.customerName ?? 'Guest User', 
+                        style: TextStyle(fontSize: 13.sp, color: AdminTheme.primaryText)),
+                      const Spacer(),
+                      Icon(Ionicons.time_outline, size: 14.w, color: AdminTheme.secondaryText),
+                      SizedBox(width: 8.w),
+                      Text('$mins mins', 
+                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _handleMarkAsPaid(context, provider, session),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AdminTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                            elevation: 0,
+                          ),
+                          child: Text('Mark as Paid', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      IconButton(
+                        onPressed: () => _confirmCancelSession(context, provider, session),
+                        icon: Icon(Ionicons.close_circle_outline, color: AdminTheme.critical, size: 20.w),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AdminTheme.critical.withOpacity(0.1),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
     }
 
@@ -465,9 +654,36 @@ class _BillsScreenState extends State<BillsScreen> {
     );
   }
 
-  Widget _buildBulkOperations(BillsProvider provider) {
+  Widget _buildBulkOperations(BillsProvider provider, bool isMobile) {
     final isAdmin = context.read<AdminAuthProvider>().role == 'admin';
     
+    if (isMobile) {
+      return Column(
+        children: [
+          OutlinedButton.icon(
+            onPressed: isAdmin ? () => _confirmBulkClose(context, provider) : null,
+            icon: const Icon(Ionicons.layers_outline, size: 18),
+            label: const Text('Bulk Close All'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              foregroundColor: AdminTheme.critical,
+              side: const BorderSide(color: AdminTheme.critical),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () => _generateDailyReport(provider),
+            icon: const Icon(Ionicons.document_text_outline, size: 18),
+            label: const Text('Daily Report'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: AdminTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

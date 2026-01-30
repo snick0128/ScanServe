@@ -98,7 +98,7 @@ class _MenuItemCardState extends State<MenuItemCard>
                 LayoutBuilder(
                   builder: (context, constraints) {
                     return Container(
-                      height: constraints.maxWidth * 0.75, // Reduced from 0.85 to give text more room
+                      height: constraints.maxWidth * 0.70, // Reduced from 0.75 for tighter card (Requirement #9)
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
                       child: ClipRRect(
@@ -241,8 +241,8 @@ class _MenuItemCardState extends State<MenuItemCard>
 
   Widget _buildAddButton() {
     return Container(
-      height: 32, // More compact
-      width: 76,  // More compact
+      height: 38, // Increased from 32 for better touch target (Requirement #9)
+      width: 80,  // Slightly wider
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),

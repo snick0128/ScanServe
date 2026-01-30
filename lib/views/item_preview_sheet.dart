@@ -26,15 +26,14 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
   @override
   void initState() {
     super.initState();
-    if (widget.item.hasVariants && widget.item.variants.isNotEmpty) {
-      _selectedVariant = widget.item.variants.first;
-    }
+    // REQUIREMENT 8: Do not auto-select first variant silently. Force explicit user action.
   }
 
   @override
   Widget build(BuildContext context) {
     // Determine price to show
     final displayPrice = _selectedVariant?.price ?? widget.item.price;
+    final bool isVariantRequired = widget.item.hasVariants && _selectedVariant == null;
 
     return Container(
       // We wrap in a Stack so we can have the floating close button
@@ -63,23 +62,19 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                         // Large Food Image
                         Padding(
                           padding: const EdgeInsets.all(12.0),
-                          child: Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.network(
-                                  widget.item.imageUrl ?? 'https://via.placeholder.com/400x300',
-                                  width: double.infinity,
-                                  height: 280,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    height: 280,
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.fastfood, size: 80, color: Colors.grey),
-                                  ),
-                                ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.network(
+                              widget.item.imageUrl ?? 'https://via.placeholder.com/400x300',
+                              width: double.infinity,
+                              height: 280,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                height: 280,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.fastfood, size: 80, color: Colors.grey),
                               ),
-                            ],
+                            ),
                           ),
                         ),
 
@@ -202,15 +197,21 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                 width: double.infinity,
                 height: 54,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0F6D3F), Color(0xFF0B522F)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+                  gradient: isVariantRequired
+                    ? LinearGradient(
+                        colors: [Colors.grey[400]!, Colors.grey[600]!],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF0F6D3F), Color(0xFF0B522F)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF0F6D3F).withOpacity(0.3),
+                      color: (isVariantRequired ? Colors.grey : const Color(0xFF0F6D3F)).withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -219,7 +220,7 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () {
+                    onTap: isVariantRequired ? null : () {
                       HapticHelper.medium();
                       if (widget.item.hasVariants) {
                         if (_selectedVariant != null) {
@@ -233,10 +234,12 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                     borderRadius: BorderRadius.circular(16),
                     child: Center(
                       child: Text(
-                        'ADD TO PLATE - ₹${displayPrice.toInt()}',
+                        isVariantRequired 
+                          ? 'PLEASE SELECT A VARIANT'
+                          : 'ADD TO PLATE - ₹${displayPrice.toInt()}',
                         style: GoogleFonts.outfit(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
                         ),

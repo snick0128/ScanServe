@@ -12,6 +12,7 @@ import 'providers/inventory_provider.dart';
 import 'providers/bills_provider.dart';
 import 'providers/menu_provider.dart';
 import 'providers/analytics_provider.dart';
+import 'providers/background_print_provider.dart';
 import 'theme/admin_theme.dart';
 import '../theme/app_theme.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
@@ -92,6 +93,15 @@ class AdminApp extends StatelessWidget {
               analytics.initialize(auth.tenantId!);
             }
             return analytics ?? AnalyticsProvider();
+          },
+        ),
+        ChangeNotifierProxyProvider<AdminAuthProvider, BackgroundPrintProvider>(
+          create: (_) => BackgroundPrintProvider(),
+          update: (_, auth, printing) {
+            if (auth.tenantId != null && printing != null) {
+              printing.initialize(auth.tenantId!);
+            }
+            return printing ?? BackgroundPrintProvider();
           },
         ),
       ],

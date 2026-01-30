@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'inventory_item.dart';
+import 'table_status.dart';
 
 class Tenant {
   final String id;
@@ -281,10 +282,11 @@ class RestaurantTable {
   final String name;
   final int capacity;
   final bool isAvailable;
-  final String status; // 'vacant', 'occupied', 'billRequested', 'settled'
+  final TableStatus status;
   final bool isOccupied;
   final String? currentSessionId;
   final DateTime? occupiedAt;
+  final DateTime? lastReleasedAt; // For Bug #6 validation
   final String section; // 'AC', 'Non-AC', 'Garden', etc.
   final int orderIndex;
 
@@ -293,46 +295,35 @@ class RestaurantTable {
     required this.name,
     required this.capacity,
     this.isAvailable = true,
-    this.status = 'vacant',
+    this.status = TableStatus.available,
     this.isOccupied = false,
     this.currentSessionId,
     this.occupiedAt,
+    this.lastReleasedAt,
     this.section = 'General',
     this.orderIndex = 0,
   });
 
   factory RestaurantTable.fromMap(Map<String, dynamic> data, [String? docId]) {
-    DateTime? parseOccupiedAt(dynamic value) {
+    DateTime? parseDateTime(dynamic value) {
       if (value == null) return null;
-      
-      // Handle Firebase Timestamp
-      if (value is Timestamp) {
-        return value.toDate();
-      }
-      
-      // Handle String (ISO8601 format)
-      if (value is String) {
-        return DateTime.parse(value);
-      }
-      
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
       return null;
     }
 
-    String parseStatus(dynamic status) {
-      final s = (status ?? 'vacant').toString().toLowerCase();
-      if (s == 'available') return 'vacant';
-      return s;
-    }
+    final status = TableStatus.fromString(data['status']);
     
     return RestaurantTable(
       id: data['id'] ?? docId ?? '',
       name: data['name'] ?? '',
       capacity: data['capacity'] ?? 4,
-      isAvailable: data['isAvailable'] ?? true,
-      status: parseStatus(data['status']),
-      isOccupied: data['isOccupied'] ?? false,
+      isAvailable: data['isAvailable'] ?? status.canAcceptCustomers,
+      status: status,
+      isOccupied: data['isOccupied'] ?? status.hasActiveSession,
       currentSessionId: data['currentSessionId'],
-      occupiedAt: parseOccupiedAt(data['occupiedAt']),
+      occupiedAt: parseDateTime(data['occupiedAt']),
+      lastReleasedAt: parseDateTime(data['lastReleasedAt']),
       section: data['section'] ?? 'General',
       orderIndex: data['orderIndex'] ?? 0,
     );
@@ -344,10 +335,11 @@ class RestaurantTable {
       'name': name,
       'capacity': capacity,
       'isAvailable': isAvailable,
-      'status': status,
+      'status': status.value,
       'isOccupied': isOccupied,
       'currentSessionId': currentSessionId,
       'occupiedAt': occupiedAt != null ? Timestamp.fromDate(occupiedAt!) : null,
+      'lastReleasedAt': lastReleasedAt != null ? Timestamp.fromDate(lastReleasedAt!) : null,
       'section': section,
       'orderIndex': orderIndex,
     };
@@ -373,10 +365,11 @@ class RestaurantTable {
     String? name,
     int? capacity,
     bool? isAvailable,
-    String? status,
+    TableStatus? status,
     bool? isOccupied,
     String? currentSessionId,
     DateTime? occupiedAt,
+    DateTime? lastReleasedAt,
     String? section,
     int? orderIndex,
   }) {
@@ -389,6 +382,7 @@ class RestaurantTable {
       isOccupied: isOccupied ?? this.isOccupied,
       currentSessionId: currentSessionId ?? this.currentSessionId,
       occupiedAt: occupiedAt ?? this.occupiedAt,
+      lastReleasedAt: lastReleasedAt ?? this.lastReleasedAt,
       section: section ?? this.section,
       orderIndex: orderIndex ?? this.orderIndex,
     );

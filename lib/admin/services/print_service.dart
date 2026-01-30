@@ -16,8 +16,8 @@ class PrintService {
       // If it's an add-on print, we usually only print the new items. 
       // But for this mock, let's just list what's being "printed".
       if (isAddon && !item.isAddon) continue; 
-      
-      print('🖨️ [KOT PRINT]   - ${item.quantity}x ${item.name} ${item.notes != null ? "(${item.notes})" : ""}');
+      final variantSuffix = item.variantName != null ? ' [${item.variantName}]' : '';
+      print('🖨️ [KOT PRINT]   - ${item.quantity}x ${item.name}$variantSuffix ${item.notes != null ? "(${item.notes})" : ""}');
     }
     
     if (order.chefNote != null && order.chefNote!.isNotEmpty) {

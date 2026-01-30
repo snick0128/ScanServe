@@ -41,21 +41,34 @@ class OrderController extends ChangeNotifier {
   List<OrderDetails> get activeOrders => _activeOrders.toList();
   List<OrderDetails> get pastOrders => _pastOrders.toList();
 
-  void setSession(String tenantId, String? tableId) async {
+  void setSession(String tenantId, String? tableId, {String? sessionId}) async {
     // Get guest ID first
     final guestId = await _guestSession.getGuestId();
 
-    _currentSession = OrderSession.create(
-      guestId: guestId,
-      tenantId: tenantId,
-      type: _currentOrderType,
-      tableId: tableId,
-    );
+    if (sessionId != null) {
+      _currentSession = OrderSession(
+        orderId: DateTime.now().millisecondsSinceEpoch.toString(),
+        tableId: tableId,
+        tenantId: tenantId,
+        type: _currentOrderType,
+        timestamp: DateTime.now(),
+        guestId: guestId,
+        sessionId: sessionId,
+      );
+    } else {
+      _currentSession = OrderSession.create(
+        guestId: guestId,
+        tenantId: tenantId,
+        type: _currentOrderType,
+        tableId: tableId,
+      );
+    }
 
     // Initialize order tracking with proper session
     await _initializeOrderTracking();
     notifyListeners();
   }
+
 
   // Load last used order type from preferences
   Future<OrderType?> loadLastOrderType() async {
@@ -117,6 +130,7 @@ class OrderController extends ChangeNotifier {
       'subtotal': 0,
       'tax': 0,
       'total': 0,
+      'sessionId': _currentSession!.sessionId, // Persist session ID
     });
 
     await setOrderType(type);
@@ -149,6 +163,14 @@ class OrderController extends ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  bool _isPaymentCompleted = false;
+  bool get isPaymentCompleted => _isPaymentCompleted;
+
+  void acknowledgePayment() {
+    _isPaymentCompleted = false;
+    notifyListeners();
   }
 
   // Initialize real-time order tracking
@@ -198,10 +220,10 @@ class OrderController extends ChangeNotifier {
               final isPast = orderDetails.status == OrderStatus.cancelled || 
                              orderDetails.status == OrderStatus.completed;
               
-              // If we have a tableId filter, only show orders for this table (dine-in)
+              // If we have a tableId filter, only show orders for this table AND session (dine-in)
               // Otherwise show all orders for this guest
               if (tableId != null && orderDetails.type == OrderType.dineIn) {
-                if (orderDetails.tableId == tableId) {
+                if (orderDetails.tableId == tableId && orderDetails.sessionId == _currentSession?.sessionId) {
                   if (isPast) {
                     _pastOrders.add(orderDetails);
                   } else {
@@ -229,9 +251,24 @@ class OrderController extends ChangeNotifier {
           // Sort by timestamp, newest first
           _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           _pastOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+          // REQUIREMENT: Detect when all orders for this session are PAID
+          // Instead of silent clearing, we trigger a flag for the UI to show the prompt
+          if (tableId != null && _activeOrders.isEmpty && _pastOrders.isNotEmpty) {
+            final latestPastOrder = _pastOrders.first;
+            if (latestPastOrder.status == OrderStatus.completed) {
+              if (!_isPaymentCompleted) {
+                 debugPrint('💰 [GOAL] All orders PAID for table $tableId. Triggering customer prompt.');
+                 _isPaymentCompleted = true;
+              }
+            }
+          }
+
           notifyListeners();
         });
   }
+
+
 
   // Check if there are active orders for the current table
   bool hasActiveTableOrders(String tableId) {

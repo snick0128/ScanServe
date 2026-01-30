@@ -258,6 +258,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
             const SizedBox(height: 24),
             TextFormField(
               controller: _nameController,
+              autofocus: true,
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 labelText: 'Item Name',

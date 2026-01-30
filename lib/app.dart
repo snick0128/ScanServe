@@ -11,7 +11,9 @@ import 'controllers/auth_controller.dart';
 import 'services/guest_session_service.dart';
 import 'services/offline_service.dart';
 import 'services/tenant_service.dart';
+import 'models/customer_session.dart';
 import 'theme/app_theme.dart';
+
 import 'views/splash_screen.dart';
 import 'utils/screen_scale.dart';
 
@@ -86,12 +88,19 @@ class _InitializerState extends State<Initializer> {
     _isInitStarted = true;
 
     final startTime = DateTime.now();
-    final tenantId = widget.config.tenantId;
+    
+    // MANDATORY URL VALIDITY CHECK
+    if (!widget.config.isValid) {
+      _showError('Invalid or Partial URL detected. Please scan a valid QR code.');
+      return;
+    }
+
+    final tenantId = widget.config.tenantId!;
     final tableId = widget.config.tableId;
     final orderType = widget.config.orderType ?? 
         (tableId != null && tableId.isNotEmpty ? OrderType.dineIn : OrderType.parcel);
 
-    print('🚀 Starting Init - Tenant: $tenantId, Table: $tableId, Type: $orderType');
+    debugPrint('🚀 [INIT] Parsed URL - Tenant: "$tenantId", Table: "$tableId", Type: $orderType');
 
     try {
       final tenantService = TenantService();
@@ -114,7 +123,10 @@ class _InitializerState extends State<Initializer> {
       }
 
       // 3. Strict Logic for Dine-in
+      String? activeSessionId;
+      
       if (orderType == OrderType.dineIn) {
+
         if (tableId == null || tableId.isEmpty) {
           _showError('Table number is required for Dine-in.');
           return;
@@ -127,13 +139,51 @@ class _InitializerState extends State<Initializer> {
           return;
         }
 
-        // Lock Table / Check Active Session
-        final isLocked = await tenantService.lockTable(tenantId, tableId, guestId);
-        if (!isLocked) {
-          _showError('This table already has an active order.');
-          return;
+        // --- SESSION REJOIN LOGIC ---
+
+        final localSession = await guestSession.getCustomerSession();
+        
+        if (localSession != null && localSession.isValidFor(tenantId, tableId)) {
+          debugPrint('🔍 [INIT] Checking if local session ${localSession.sessionId} can rejoin...');
+          final canRejoin = await tenantService.verifySession(
+            tenantId: tenantId,
+            tableId: tableId,
+            sessionId: localSession.sessionId,
+          );
+
+          if (canRejoin) {
+            debugPrint('✅ [INIT] Rejoining existing session: ${localSession.sessionId}');
+            activeSessionId = localSession.sessionId;
+          } else {
+            debugPrint('⚠️ [INIT] Local session invalid or expired. Clearing...');
+            await guestSession.clearCustomerSession();
+          }
+        }
+
+        // Lock Table / Check Active Session if no valid re-join found
+        if (activeSessionId == null) {
+          // New session needed
+          final newSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
+          final isLocked = await tenantService.lockTable(tenantId, tableId, newSessionId);
+          
+          if (!isLocked) {
+            _showError('This table already has an active order.');
+            return;
+          }
+          
+          // Store new session locally
+          final newSession = CustomerSession(
+            tenantId: tenantId,
+            tableId: tableId,
+            sessionId: newSessionId,
+            guestId: guestId,
+            createdAt: DateTime.now().millisecondsSinceEpoch,
+          );
+          await guestSession.saveCustomerSession(newSession);
+          activeSessionId = newSessionId;
         }
       }
+
 
       // 4. Start Session
       await guestSession.startSession(
@@ -146,7 +196,8 @@ class _InitializerState extends State<Initializer> {
       
       final orderController = context.read<OrderController>();
       await orderController.setOrderType(orderType);
-      orderController.setSession(tenantId, tableId);
+      orderController.setSession(tenantId, tableId, sessionId: activeSessionId);
+
 
       // Initialize Cart Persistence
       final cartController = context.read<CartController>();
@@ -210,6 +261,19 @@ class _InitializerState extends State<Initializer> {
                   'Please scan a valid QR code.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init()))
+                  ),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('RETRY / RELOAD'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  ),
                 ),
               ],
             ),

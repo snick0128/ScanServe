@@ -87,10 +87,14 @@ class ExportService {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'ScanServe_Report_${DateFormat('yyyyMMdd').format(now)}.pdf',
-    );
+    try {
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'ScanServe_Report_${DateFormat('yyyyMMdd').format(now)}.pdf',
+      );
+    } catch (e) {
+      print('❌ Error generating PDF: $e');
+    }
   }
 
   static pw.Widget _buildKPICard(String label, String value) {

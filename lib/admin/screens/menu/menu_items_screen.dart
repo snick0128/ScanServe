@@ -4,6 +4,7 @@ import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import '../../../models/tenant_model.dart';
 import '../../providers/menu_provider.dart';
 import '../../providers/admin_auth_provider.dart';
+import 'package:scan_serve/utils/screen_scale.dart';
 import '../../theme/admin_theme.dart';
 import 'widgets/menu_item_dialog.dart';
 import 'widgets/category_management_dialog.dart';
@@ -100,6 +101,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return Scaffold(
       backgroundColor: Colors.white,
       body: Consumer<MenuProvider>(
@@ -107,13 +109,33 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(provider),
-              _buildFiltersBar(provider),
-              Expanded(
-                child: provider.isLoading 
-                    ? const Center(child: CircularProgressIndicator(color: AdminTheme.primaryColor))
-                    : _buildMenuTable(provider),
-              ),
+              isMobile 
+                ? Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildHeader(provider, isMobile),
+                          _buildFiltersBar(provider, isMobile),
+                          provider.isLoading 
+                              ? const Center(child: CircularProgressIndicator(color: AdminTheme.primaryColor))
+                              : _buildMobileItemList(provider),
+                        ],
+                      ),
+                    ),
+                  )
+                : Expanded(
+                    child: Column(
+                      children: [
+                        _buildHeader(provider, isMobile),
+                        _buildFiltersBar(provider, isMobile),
+                        Expanded(
+                          child: provider.isLoading 
+                              ? const Center(child: CircularProgressIndicator(color: AdminTheme.primaryColor))
+                              : _buildMenuTable(provider),
+                        ),
+                      ],
+                    ),
+                  ),
             ],
           );
         },
@@ -121,36 +143,26 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
     );
   }
 
-  Widget _buildHeader(MenuProvider provider) {
+  Widget _buildHeader(MenuProvider provider, bool isMobile) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Menu Management',
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Manage ${provider.allItems.length} digital menu items, categories, and availability.',
-                  style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
-                ),
-              ],
-            ),
-          ),
-          Row(
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 32, isMobile ? 16 : 32, isMobile ? 16 : 32, 0),
+      child: isMobile 
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildActionCircle(Ionicons.download_outline, 'Export CSV', () => _exportCsv(context, provider.allItems)),
-              const SizedBox(width: 16),
-              _buildActionCircle(Ionicons.grid_outline, 'Categories', () => _showCategoryManagement(context)),
-              const SizedBox(width: 16),
+              Text(
+                'Menu Management',
+                style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _buildActionCircle(Ionicons.download_outline, 'Export', () => _exportCsv(context, provider.allItems), isMobile)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildActionCircle(Ionicons.grid_outline, 'Categories', () => _showCategoryManagement(context), isMobile)),
+                ],
+              ),
+              const SizedBox(height: 8),
               ElevatedButton.icon(
                 onPressed: () => _showEditDialog(null, provider),
                 icon: const Icon(Ionicons.add_outline, size: 20),
@@ -158,35 +170,75 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AdminTheme.primaryColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                  minimumSize: const Size(double.infinity, 50),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
                 ),
               ),
             ],
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Menu Management',
+                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage ${provider.allItems.length} digital menu items, categories, and availability.',
+                      style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: [
+                  _buildActionCircle(Ionicons.download_outline, 'Export CSV', () => _exportCsv(context, provider.allItems), false),
+                  const SizedBox(width: 16),
+                  _buildActionCircle(Ionicons.grid_outline, 'Categories', () => _showCategoryManagement(context), false),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _showEditDialog(null, provider),
+                    icon: const Icon(Ionicons.add_outline, size: 20),
+                    label: const Text('Add New Item'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AdminTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
-  Widget _buildActionCircle(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildActionCircle(IconData icon, String label, VoidCallback onTap, bool isMobile) {
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 18),
-      label: Text(label),
+      label: Text(label, style: TextStyle(fontSize: isMobile ? 12 : 14)),
       style: OutlinedButton.styleFrom(
         foregroundColor: AdminTheme.primaryText,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 20, vertical: isMobile ? 12 : 18),
         side: BorderSide(color: Colors.grey[200]!),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  Widget _buildFiltersBar(MenuProvider provider) {
+  Widget _buildFiltersBar(MenuProvider provider, bool isMobile) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 16 : 32),
       child: Column(
         children: [
           Row(
@@ -202,7 +254,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                     controller: _searchController,
                     onChanged: (v) => provider.setSearchQuery(v),
                     decoration: const InputDecoration(
-                      hintText: 'Search by item name or category...',
+                      hintText: 'Search items...',
                       prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 12),
@@ -210,13 +262,20 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              _buildFilterCategoryDropdown(provider),
-              const SizedBox(width: 12),
-              _buildDietFilter(provider),
-              const SizedBox(width: 12),
-              _buildBestsellerToggle(provider),
             ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterCategoryDropdown(provider),
+                const SizedBox(width: 8),
+                _buildDietFilter(provider),
+                const SizedBox(width: 8),
+                _buildBestsellerToggle(provider),
+              ],
+            ),
           ),
         ],
       ),
@@ -325,7 +384,7 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
         // Table Body
         Expanded(
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 0),
             itemCount: items.length,
             separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
             itemBuilder: (context, index) {
@@ -336,6 +395,75 @@ class _MenuItemsScreenState extends State<MenuItemsScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildMobileItemList(MenuProvider provider) {
+    final items = provider.filteredItems;
+    if (items.isEmpty) return const Center(child: Text('No items found'));
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 60, height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey[100],
+                    image: item.imageUrl != null ? DecorationImage(image: NetworkImage(item.imageUrl!), fit: BoxFit.cover) : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('₹${item.price}', style: const TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold)),
+                      Text(item.category ?? '', style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    IconButton(onPressed: () => _editItem(context, item), icon: const Icon(Ionicons.create_outline, size: 20)),
+                    Transform.scale(
+                      scale: 0.8,
+                      child: Switch(
+                        value: !item.isOutOfStock, 
+                        onChanged: (v) => _toggleAvailability(context, item),
+                        activeColor: AdminTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _editItem(BuildContext context, MenuItem item) {
+    _showEditDialog(item, context.read<MenuProvider>());
+  }
+
+  void _toggleAvailability(BuildContext context, MenuItem item) async {
+    final provider = context.read<MenuProvider>();
+    final cat = provider.categories.firstWhere((c) => item.category != null && c.name == item.category, orElse: () => provider.categories.first);
+    await provider.toggleAvailability(cat.id, item.id);
   }
 
   void _showEditDialog(MenuItem? item, MenuProvider provider) async {

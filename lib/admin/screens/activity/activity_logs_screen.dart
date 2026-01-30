@@ -15,24 +15,9 @@ class ActivityLogsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(
-          tenantId == 'global' ? 'Global Activity Log' : 'Restaurant Activity',
-          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-        ),
         backgroundColor: Colors.white,
         elevation: 0,
-        centerTitle: false,
-        actions: [
-          if (tenantId != 'global')
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Chip(
-                label: Text(tenantId.length > 8 ? '${tenantId.substring(0, 8)}...' : tenantId.toUpperCase()),
-                backgroundColor: Colors.blue[50],
-                labelStyle: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ),
-        ],
+        leading: Navigator.canPop(context) ? const BackButton(color: Colors.black) : null,
       ),
       body: Consumer<ActivityProvider>(
         builder: (context, provider, _) {
@@ -58,15 +43,28 @@ class ActivityLogsScreen extends StatelessWidget {
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: () => provider.fetchLogs(),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.logs.length,
-              itemBuilder: (context, index) {
-                final log = provider.logs[index];
-                return _buildLogItem(context, log);
-              },
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  child: Text(
+                    tenantId == 'global' ? 'Global Activity Log' : 'Restaurant Activity',
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                ),
+              ),
+            ],
+            body: RefreshIndicator(
+              onRefresh: () => provider.fetchLogs(),
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: provider.logs.length,
+                itemBuilder: (context, index) {
+                  final log = provider.logs[index];
+                  return _buildLogItem(context, log);
+                },
+              ),
             ),
           );
         },

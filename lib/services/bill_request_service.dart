@@ -23,7 +23,9 @@ class BillRequestService {
     String? tableName,
     List<String> orderIds = const [],
     String? notes,
+    bool isCashAtCounter = false,
   }) async {
+
     try {
       final requestId = _uuid.v4();
       
@@ -38,8 +40,9 @@ class BillRequestService {
         requestedAt: DateTime.now(),
         status: BillRequestStatus.pending,
         orderIds: orderIds,
-        notes: notes,
+        notes: notes ?? (isCashAtCounter ? 'CASH_AT_COUNTER' : 'BILL_REQUEST'),
       );
+
 
       await _firestore
           .collection('tenants')
@@ -48,20 +51,44 @@ class BillRequestService {
           .doc(requestId)
           .set(billRequest.toMap());
 
-      // Update table status to 'billRequested' if tableId is provided
+      // Update table status
       if (tableId != null) {
         try {
+          final tableStatus = isCashAtCounter ? 'paymentPending' : 'billRequested';
           await _firestore
               .collection('tenants')
               .doc(tenantId)
               .collection('tables')
               .doc(tableId)
-              .update({'status': 'billRequested'});
-          print('📋 Table $tableId status updated to billRequested');
+              .update({'status': tableStatus});
+          
+          // Also update all active orders for this table
+          final ordersQuery = await _firestore
+              .collection('tenants')
+              .doc(tenantId)
+              .collection('orders')
+              .where('tableId', isEqualTo: tableId)
+              .where('status', whereNotIn: ['completed', 'cancelled'])
+              .get();
+              
+          final batch = _firestore.batch();
+          final orderStatus = isCashAtCounter ? 'paymentPending' : 'billRequested';
+          
+          for (var doc in ordersQuery.docs) {
+            batch.update(doc.reference, {
+              'status': orderStatus,
+              'paymentStatus': isCashAtCounter ? 'paymentPending' : 'pending',
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+          await batch.commit();
+          
+          print('📋 Table $tableId and orders status updated to $tableStatus');
         } catch (e) {
-          print('⚠️ Error updating table status: $e');
+          print('⚠️ Error updating table/orders status: $e');
         }
       }
+
 
       print('📝 Bill request created: $requestId for $customerName');
       return requestId;

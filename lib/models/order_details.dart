@@ -7,8 +7,11 @@ enum OrderStatus {
   preparing,
   ready,
   served,
+  billRequested,
+  paymentPending,
   completed,
   cancelled;
+
 
   String get displayName {
     switch (this) {
@@ -20,10 +23,15 @@ enum OrderStatus {
         return 'Ready to Serve';
       case OrderStatus.served:
         return 'Served';
+      case OrderStatus.billRequested:
+        return 'Bill Requested';
+      case OrderStatus.paymentPending:
+        return 'Payment Pending';
       case OrderStatus.completed:
         return 'Completed';
       case OrderStatus.cancelled:
         return 'Cancelled';
+
     }
   }
 }
@@ -87,6 +95,7 @@ class OrderDetails {
   final DateTime? paymentTimestamp;
   final String? chefNote;
   final String? cancellationReason;
+  final String? sessionId;
 
   OrderDetails({
     required this.orderId,
@@ -110,6 +119,7 @@ class OrderDetails {
     this.paymentTimestamp,
     this.chefNote,
     this.cancellationReason,
+    this.sessionId,
   });
 
   factory OrderDetails.fromCart({
@@ -181,6 +191,7 @@ class OrderDetails {
           : null,
       'chefNote': chefNote,
       'cancellationReason': cancellationReason,
+      'sessionId': sessionId,
     };
   }
 
@@ -195,7 +206,14 @@ class OrderDetails {
         return OrderStatus.pending;
       case 'ready_to_serve':
         return OrderStatus.ready;
+      case 'billrequested':
+      case 'bill_requested':
+        return OrderStatus.billRequested;
+      case 'paymentpending':
+      case 'payment_pending':
+        return OrderStatus.paymentPending;
       default:
+
         // Try to match current enum values
         return OrderStatus.values.firstWhere(
           (e) => e.name == statusStr,
@@ -261,6 +279,7 @@ class OrderDetails {
             : null,
         chefNote: map['chefNote']?.toString(),
         cancellationReason: map['cancellationReason']?.toString(),
+        sessionId: map['sessionId']?.toString(),
       );
     } catch (e) {
       print('Error parsing OrderDetails: $e');
@@ -295,6 +314,7 @@ class OrderDetails {
     paymentTimestamp: null,
     chefNote: null,
     cancellationReason: null,
+    sessionId: null,
   );
 }
 

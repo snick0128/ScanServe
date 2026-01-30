@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:scan_serve/utils/snackbar_helper.dart';
+import 'package:uuid/uuid.dart';
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../models/order.dart' as model;
@@ -8,6 +9,7 @@ import '../models/order_model.dart' as orm;
 import '../services/payment_service.dart';
 import '../services/order_service.dart';
 import '../services/guest_session_service.dart';
+import '../utils/order_confirmation_tracker.dart';
 
 class CheckoutPage extends StatefulWidget {
   final String tenantId;
@@ -36,6 +38,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   model.PaymentStatus _paymentStatus = model.PaymentStatus.pending;
   bool _isProcessing = false;
   String? _orderId;
+  double _taxRate = 0.05; // Default 5%
+  String _taxLabel = 'GST';
+  double _discount = 0;
 
   @override
   void initState() {
@@ -46,12 +51,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// Load saved guest profile and prefill form fields
   Future<void> _loadGuestProfile() async {
     final profile = await _guestSession.getGuestProfile();
-    if (profile != null && mounted) {
+    final settings = await _orderService.getTenantSettings(widget.tenantId);
+    
+    if (mounted) {
       setState(() {
-        _nameController.text = profile.name;
-        _phoneController.text = profile.phone ?? '';
+        if (profile != null) {
+          _nameController.text = profile.name;
+          _phoneController.text = profile.phone ?? '';
+        }
+        
+        // Load tax settings
+        final s = settings['settings'] ?? {};
+        _taxRate = (s['taxRate'] as num?)?.toDouble() ?? 0.05;
+        _taxLabel = s['taxLabel'] ?? 'Tax';
       });
-      print('✅ Prefilled customer details from saved profile');
+      print('✅ Prefilled customer details and settings');
     }
   }
 
@@ -76,8 +90,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     try {
       final guestId = await _guestSession.getGuestId();
+      final requestId = Uuid().v4(); // Generate UUID for deduplication
 
-      // Create order
+      // Create order with UUID
       _orderId = await _orderService.createOrder(
         tenantId: widget.tenantId,
         guestId: guestId,
@@ -88,6 +103,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         customerName: _nameController.text.trim(),
         customerPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
         paymentStatus: model.PaymentStatus.pending,
+        requestId: requestId,
+        sessionId: orderController.currentSession?.sessionId, // Pass session ID
       );
 
       // Trigger payment UI/logic
@@ -101,10 +118,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
         phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
       );
 
+      // CRITICAL: Mark order as confirmed BEFORE clearing cart
+      await OrderConfirmationTracker.markOrderConfirmed(
+        tenantId: widget.tenantId,
+        tableId: widget.tableId,
+        orderId: _orderId!,
+      );
+
+      // Clear cart after successful order
       cart.clear();
 
       if (mounted) {
-        SnackbarHelper.showTopSnackBar(context, 'Order placed successfully!');
+        final successMsg = widget.orderType == 'dineIn' 
+            ? 'Order received by kitchen! Preparing your meal...'
+            : 'Order received! We\'ll notify you when it\'s ready.';
+            
+        SnackbarHelper.showTopSnackBar(context, successMsg);
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
@@ -126,6 +155,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     try {
       final guestId = await _guestSession.getGuestId();
+      final requestId = Uuid().v4(); // Generate UUID for deduplication
 
       _orderId = await _orderService.createOrder(
         tenantId: widget.tenantId,
@@ -136,6 +166,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         notes: 'Dine-in order sent to kitchen',
         customerName: _nameController.text.trim(),
         customerPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        requestId: requestId,
+        sessionId: orderController.currentSession?.sessionId, // Pass session ID
       );
 
       await _guestSession.updateGuestProfile(
@@ -143,10 +175,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
         phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
       );
 
+      // CRITICAL: Mark order as confirmed BEFORE clearing cart
+      await OrderConfirmationTracker.markOrderConfirmed(
+        tenantId: widget.tenantId,
+        tableId: widget.tableId,
+        orderId: _orderId!,
+      );
+
+      // Clear cart after successful order
       cart.clear();
 
       if (mounted) {
-        SnackbarHelper.showTopSnackBar(context, 'Sent to kitchen!');
+        SnackbarHelper.showTopSnackBar(context, 'Order received! Cooking started.');
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
@@ -223,8 +263,37 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('₹${cart.totalAmount}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Subtotal'),
+                Text('₹${cart.totalAmount.toStringAsFixed(2)}'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$_taxLabel (${(_taxRate * 100).toInt()}%)'),
+                Text('₹${(cart.totalAmount * _taxRate).toStringAsFixed(2)}'),
+              ],
+            ),
+            if (_discount > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Discount', style: TextStyle(color: Colors.green)),
+                  Text('-₹${_discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
+                ],
+              ),
+            ],
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(
+                  '₹${(cart.totalAmount * (1 + _taxRate) - _discount).toStringAsFixed(2)}', 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)
+                ),
               ],
             ),
           ],

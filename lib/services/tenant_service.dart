@@ -61,6 +61,41 @@ class TenantService {
     }
   }
 
+  /// Verify if a sessionId is still active and assigned to this table
+  Future<bool> verifySession({
+    required String tenantId,
+    required String tableId,
+    required String sessionId,
+  }) async {
+    try {
+      final status = await getTableStatus(tenantId, tableId);
+      if (status == null) return false;
+
+      final isOccupied = status['isOccupied'] == true;
+      final currentSessionId = status['currentSessionId'];
+      final occupiedAt = status['occupiedAt'] as Timestamp?;
+
+      if (!isOccupied || currentSessionId != sessionId) return false;
+
+      // Check TTL (4 hours)
+      if (occupiedAt != null) {
+        final now = DateTime.now();
+        final diff = now.difference(occupiedAt.toDate()).inHours;
+        if (diff >= 4) {
+          print('⚠️ Session $sessionId expired (TTL 4h)');
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      print('Error verifying session: $e');
+      return false;
+    }
+  }
+
+
+
   /// Attempt to lock the table for the current session
   /// Returns true if successful or if already locked by THIS session
   /// Returns false if locked by ANOTHER session
@@ -89,26 +124,32 @@ class TenantService {
             return true;
           }
 
-          // ROBUST CHECK: Is there actually an active order for this table?
-          // If the admin panel is closed, the 'healing' logic doesn't run.
-          // We check the orders collection here.
-          final ordersSnapshot = await _firestore
-              .collection('tenants')
-              .doc(tenantId)
-              .collection('orders')
-              .where('tableId', isEqualTo: tableId)
-              .where('status', whereNotIn: ['completed', 'cancelled'])
-              .limit(1)
-              .get();
+          // TTL CHECK (4 hours fallback)
+          final occupiedAt = data?['occupiedAt'] as Timestamp?;
+          if (occupiedAt != null) {
+            final diff = DateTime.now().difference(occupiedAt.toDate()).inHours;
+            if (diff >= 4) {
+              print('🔁 TTL expired (4h) for table $tableId. Allowing new lock.');
+            } else {
+              // Not expired yet -> strictly check orders
+              final ordersSnapshot = await _firestore
+                  .collection('tenants')
+                  .doc(tenantId)
+                  .collection('orders')
+                  .where('tableId', isEqualTo: tableId)
+                  .where('status', whereNotIn: ['completed', 'cancelled'])
+                  .limit(1)
+                  .get();
 
-          if (ordersSnapshot.docs.isEmpty) {
-            // No active orders found! This is a ghost state. Heal it.
-            print('👻 Ghost state detected for table $tableId. Healing...');
-          } else {
-             // Real orders exist -> Block
-             return false;
+              if (ordersSnapshot.docs.isNotEmpty) {
+                // Real active orders exist -> Block
+                return false;
+              }
+              print('👻 Ghost state detected for table $tableId. Healing...');
+            }
           }
         }
+
 
         // Not occupied or Ghost State -> Lock it
         transaction.update(tableRef, {

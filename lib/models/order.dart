@@ -6,8 +6,11 @@ enum OrderStatus {
   preparing('Preparing', '👨‍🍳'),
   ready('Ready to Serve', '✅'),
   served('Served', '🍽️'),
+  billRequested('Bill Requested', '🧾'),
+  paymentPending('Payment Pending', '💰'),
   completed('Completed', '👍'),
   cancelled('Cancelled', '❌');
+
 
   final String displayName;
   final String emoji;
@@ -15,6 +18,7 @@ enum OrderStatus {
 
   static OrderStatus fromString(String status) {
     switch (status.toLowerCase()) {
+      case 'new':
       case 'confirmed':
       case 'ordered':
         return OrderStatus.pending;
@@ -25,10 +29,17 @@ enum OrderStatus {
         return OrderStatus.ready;
       case 'served':
         return OrderStatus.served;
+      case 'billrequested':
+      case 'bill_requested':
+        return OrderStatus.billRequested;
+      case 'paymentpending':
+      case 'payment_pending':
+        return OrderStatus.paymentPending;
       case 'completed':
         return OrderStatus.completed;
       case 'cancelled':
         return OrderStatus.cancelled;
+
       default:
         try {
           return OrderStatus.values.firstWhere(
@@ -63,17 +74,27 @@ enum OrderItemStatus {
 
 enum PaymentStatus {
   pending,
+  paymentPending,
   paid,
   failed,
   cancelled,
   refunded;
 
+
   static PaymentStatus fromString(String? status) {
     if (status == null) return PaymentStatus.pending;
-    return PaymentStatus.values.firstWhere(
-      (e) => e.name == status.toLowerCase(),
-      orElse: () => PaymentStatus.pending,
-    );
+    switch (status.toLowerCase()) {
+
+      case 'pending': return PaymentStatus.pending;
+      case 'paymentpending':
+      case 'payment_pending': return PaymentStatus.paymentPending;
+      case 'paid': return PaymentStatus.paid;
+      case 'failed': return PaymentStatus.failed;
+      case 'cancelled': return PaymentStatus.cancelled;
+      case 'refunded': return PaymentStatus.refunded;
+      default: return PaymentStatus.pending;
+    }
+
   }
 }
 
@@ -92,6 +113,8 @@ class OrderItem {
   final String? chefNote;
   final String? captainName;
   final String? variantName;
+  final bool printedToKOT;
+  final DateTime? printedAt;
 
   OrderItem({
     required this.id,
@@ -108,6 +131,8 @@ class OrderItem {
     this.chefNote,
     this.captainName,
     this.variantName,
+    this.printedToKOT = false,
+    this.printedAt,
   }) : this.timestamp = timestamp ?? DateTime.now();
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
@@ -132,6 +157,8 @@ class OrderItem {
       chefNote: data['chefNote'],
       captainName: data['captainName'],
       variantName: data['variantName'],
+      printedToKOT: data['printedToKOT'] ?? false,
+      printedAt: data['printedAt'] != null ? parseTime(data['printedAt']) : null,
     );
   }
 
@@ -151,6 +178,8 @@ class OrderItem {
       'chefNote': chefNote,
       'captainName': captainName,
       'variantName': variantName,
+      'printedToKOT': printedToKOT,
+      if (printedAt != null) 'printedAt': Timestamp.fromDate(printedAt!),
     };
   }
 
@@ -169,6 +198,8 @@ class OrderItem {
     String? chefNote,
     String? captainName,
     String? variantName,
+    bool? printedToKOT,
+    DateTime? printedAt,
   }) {
     return OrderItem(
       id: id ?? this.id,
@@ -185,6 +216,8 @@ class OrderItem {
       chefNote: chefNote ?? this.chefNote,
       captainName: captainName ?? this.captainName,
       variantName: variantName ?? this.variantName,
+      printedToKOT: printedToKOT ?? this.printedToKOT,
+      printedAt: printedAt ?? this.printedAt,
     );
   }
 
@@ -199,11 +232,12 @@ class Order {
   final String? customerName;
   final String? customerPhone;
   final List<OrderItem> items;
-  final double subtotal; // Before discount and tax
+  final double subtotal; // Line items subtotal (before any adjustments)
   final double discountAmount;
   final double discountPercentage;
   final double tax;
-  final double total;
+  final double total; // Final total (subtotal - discount + tax + adjustments)
+  final Map<String, double>? billAdjustments; // Admin-applied adjustments (rounding, manual tax, etc.)
   final OrderStatus status;
   final PaymentStatus paymentStatus;
   final DateTime createdAt;
@@ -218,6 +252,11 @@ class Order {
   final String type; // 'dineIn' or 'parcel'
   final String? captainId;
   final String? captainName;
+  final String? sessionId; // For session-based order grouping (Bug #6)
+  final bool printedToKOT;
+  final DateTime? printedAt;
+  final DateTime? paidAt;
+  final String? paidBy;
 
   Order({
     required this.id,
@@ -232,6 +271,7 @@ class Order {
     this.discountPercentage = 0,
     required this.tax,
     required this.total,
+    this.billAdjustments,
     required this.status,
     this.paymentStatus = PaymentStatus.pending,
     required this.createdAt,
@@ -246,6 +286,11 @@ class Order {
     this.type = 'dineIn',
     this.captainId,
     this.captainName,
+    this.sessionId,
+    this.printedToKOT = false,
+    this.printedAt,
+    this.paidAt,
+    this.paidBy,
   });
 
   factory Order.fromFirestore(DocumentSnapshot doc) {
@@ -276,6 +321,9 @@ class Order {
       discountPercentage: (data['discountPercentage'] ?? 0).toDouble(),
       tax: (data['tax'] ?? 0).toDouble(),
       total: (data['total'] ?? 0).toDouble(),
+      billAdjustments: data['billAdjustments'] != null 
+          ? Map<String, double>.from(data['billAdjustments'])
+          : null,
       status: data['status'] != null
           ? OrderStatus.fromString(data['status'])
           : OrderStatus.pending,
@@ -292,6 +340,11 @@ class Order {
       type: data['type'] ?? 'dineIn',
       captainId: data['captainId'],
       captainName: data['captainName'],
+      sessionId: data['sessionId'],
+      printedToKOT: data['printedToKOT'] ?? false,
+      printedAt: data['printedAt'] != null ? parseDateTime(data['printedAt']) : null,
+      paidAt: data['paidAt'] != null ? parseDateTime(data['paidAt']) : null,
+      paidBy: data['paidBy'],
     );
   }
 
@@ -309,6 +362,7 @@ class Order {
       'discountPercentage': discountPercentage,
       'tax': tax,
       'total': total,
+      if (billAdjustments != null) 'billAdjustments': billAdjustments,
       'status': status.name,
       'paymentStatus': paymentStatus.name,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -323,6 +377,11 @@ class Order {
       'type': type,
       'captainId': captainId,
       'captainName': captainName,
+      'sessionId': sessionId,
+      'printedToKOT': printedToKOT,
+      if (printedAt != null) 'printedAt': Timestamp.fromDate(printedAt!),
+      if (paidAt != null) 'paidAt': Timestamp.fromDate(paidAt!),
+      if (paidBy != null) 'paidBy': paidBy,
     };
   }
 
@@ -339,6 +398,7 @@ class Order {
     double? discountPercentage,
     double? tax,
     double? total,
+    Map<String, double>? billAdjustments,
     OrderStatus? status,
     PaymentStatus? paymentStatus,
     DateTime? createdAt,
@@ -353,6 +413,11 @@ class Order {
     String? type,
     String? captainId,
     String? captainName,
+    String? sessionId,
+    bool? printedToKOT,
+    DateTime? printedAt,
+    DateTime? paidAt,
+    String? paidBy,
   }) {
     return Order(
       id: id ?? this.id,
@@ -367,6 +432,7 @@ class Order {
       discountPercentage: discountPercentage ?? this.discountPercentage,
       tax: tax ?? this.tax,
       total: total ?? this.total,
+      billAdjustments: billAdjustments ?? this.billAdjustments,
       status: status ?? this.status,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       createdAt: createdAt ?? this.createdAt,
@@ -381,6 +447,11 @@ class Order {
       type: type ?? this.type,
       captainId: captainId ?? this.captainId,
       captainName: captainName ?? this.captainName,
+      sessionId: sessionId ?? this.sessionId,
+      printedToKOT: printedToKOT ?? this.printedToKOT,
+      printedAt: printedAt ?? this.printedAt,
+      paidAt: paidAt ?? this.paidAt,
+      paidBy: paidBy ?? this.paidBy,
     );
   }
 
@@ -391,8 +462,11 @@ class Order {
       case OrderStatus.ready: return 90;
       case OrderStatus.pending: return 80;
       case OrderStatus.served: return 70;
+      case OrderStatus.billRequested: return 110; // High priority for settlement
+      case OrderStatus.paymentPending: return 110; // High priority for settlement
       case OrderStatus.completed: return 0;
       case OrderStatus.cancelled: return 0;
+
     }
   }
 
@@ -416,15 +490,26 @@ class Order {
     return '$mins MINS AGO';
   }
 
-  // Derived status from items
+  // Derived status from items - Production logic
   OrderStatus get derivedStatus {
     if (status == OrderStatus.completed || status == OrderStatus.cancelled) return status;
     if (items.isEmpty) return status;
 
+    // 1. If any item is PREPARING, the whole order is PREPARING
     if (items.any((i) => i.status == OrderItemStatus.preparing)) return OrderStatus.preparing;
-    if (items.any((i) => i.status == OrderItemStatus.ready)) return OrderStatus.ready;
-    if (items.every((i) => i.status == OrderItemStatus.served)) return OrderStatus.served;
     
-    return OrderStatus.pending;
+    // 2. If no item is preparing, but some are PENDING, the order is PENDING
+    if (items.any((i) => i.status == OrderItemStatus.pending)) return OrderStatus.pending;
+
+    // 3. If all items are SERVED, the order is SERVED
+    if (items.every((i) => i.status == OrderItemStatus.served)) return OrderStatus.served;
+
+    // 4. If all items are at least READY (none are preparing/pending), the order is READY
+    // (This covers the case where some are READY and some are SERVED)
+    if (items.every((i) => i.status == OrderItemStatus.ready || i.status == OrderItemStatus.served)) {
+      return OrderStatus.ready;
+    }
+    
+    return status;
   }
 }

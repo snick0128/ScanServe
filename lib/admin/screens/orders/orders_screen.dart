@@ -3,11 +3,19 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import '../../../models/order.dart' as model;
+import '../../../models/tenant_model.dart';
 import '../../providers/orders_provider.dart';
+import '../../providers/tables_provider.dart';
 import '../../widgets/staff_order_dialog.dart';
 import '../../widgets/table_orders_dialog.dart';
 import '../../widgets/order_details_dialog.dart';
+import '../../providers/admin_auth_provider.dart';
+import '../../providers/bills_provider.dart';
 import '../../theme/admin_theme.dart';
+import '../../../services/bill_service.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class OrdersScreen extends StatefulWidget {
   final String tenantId;
@@ -27,7 +35,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   
   // Strict today boundaries
   late DateTimeRange _dateRange;
-  String _dateFilterType = 'Today'; // ALL, Today, Range
+  String _dateFilterType = 'ALL'; // ALL, Today, Range
 
   @override
   void initState() {
@@ -39,7 +47,13 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     );
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        // If tab is Past Orders (1) or Pending Payment (2), load past orders if needed
+        if (_tabController.index > 0) {
+          context.read<OrdersProvider>().loadPastOrders();
+        }
+      }
     });
   }
 
@@ -56,22 +70,19 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       backgroundColor: Colors.white,
       body: Consumer<OrdersProvider>(
         builder: (context, provider, _) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(provider),
-              _buildTabSection(provider),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildOrderList(provider, provider.currentOrders),
-                    _buildOrderList(provider, provider.pastOrders),
-                    _buildOrderList(provider, provider.pendingPaymentOrders),
-                  ],
-                ),
-              ),
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverToBoxAdapter(child: _buildHeader(provider)),
+              SliverToBoxAdapter(child: _buildTabSection(provider)),
             ],
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOrderList(provider, provider.currentOrders),
+                _buildOrderList(provider, provider.pastOrders),
+                _buildOrderList(provider, provider.pendingPaymentOrders),
+              ],
+            ),
           );
         },
       ),
@@ -79,46 +90,78 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   Widget _buildHeader(OrdersProvider provider) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+    
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 32, 24, isMobile ? 16 : 32, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Order Management',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Manage and track ${provider.currentOrdersCount} active table orders',
-                style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
-              ),
-            ],
-          ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildActionCircle(Ionicons.refresh_outline, 'Refresh Feed', () => provider.initialize(widget.tenantId)),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (context) => StaffOrderDialog(tenantId: widget.tenantId),
-                ),
-                icon: const Icon(Ionicons.add_outline, size: 20),
-                label: const Text('New Order'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AdminTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Orders',
+                      style: TextStyle(fontSize: isMobile ? 24 : 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${provider.currentOrdersCount} active',
+                      style: TextStyle(color: AdminTheme.secondaryText, fontSize: isMobile ? 14 : 16),
+                    ),
+                  ],
                 ),
               ),
+              if (!isMobile)
+                Row(
+                  children: [
+                    _buildActionCircle(Ionicons.refresh_outline, 'Refresh Feed', () => provider.initialize(widget.tenantId)),
+                    const SizedBox(width: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (context) => StaffOrderDialog(tenantId: widget.tenantId),
+                      ),
+                      icon: const Icon(Ionicons.add_outline, size: 20),
+                      label: const Text('New Order'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AdminTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
+          if (isMobile) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (context) => StaffOrderDialog(tenantId: widget.tenantId),
+                    ),
+                    icon: const Icon(Ionicons.add_outline, size: 18),
+                    label: const Text('New Order'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AdminTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -139,8 +182,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   Widget _buildTabSection(OrdersProvider provider) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 32, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -152,74 +196,117 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             unselectedLabelColor: AdminTheme.secondaryText,
             indicatorColor: AdminTheme.primaryColor,
             indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 15),
             dividerColor: Colors.grey[100],
             tabs: [
-              Tab(text: 'Current Orders (${provider.currentOrdersCount})'),
-              Tab(text: 'Past Orders (${provider.pastOrdersCount})'),
-              Tab(text: 'Pending Payment (${provider.pendingPaymentOrdersCount})'),
+              Tab(text: 'Current (${provider.currentOrdersCount})'),
+              Tab(text: 'Past (${provider.pastOrdersCount})'),
+              Tab(text: 'Unpaid (${provider.pendingPaymentOrdersCount})'),
             ],
           ),
-          const SizedBox(height: 24),
-          IntrinsicHeight(
-            child: _buildFilters(),
-          ),
+          const SizedBox(height: 16),
+          _buildFilters(),
         ],
       ),
     );
   }
 
   Widget _buildFilters() {
+    String getSelectedTableName(List<RestaurantTable> tables) {
+      if (_selectedTableId == null) return 'All Tables';
+      try {
+        return tables.firstWhere((t) => t.id == _selectedTableId).name;
+      } catch (e) {
+        return 'Table $_selectedTableId';
+      }
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 300,
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F3F4),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (v) => setState(() => _searchQuery = v),
-                decoration: const InputDecoration(
-                  hintText: 'Search by table, ID or item...',
-                  prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+      child: Consumer<TablesProvider>(
+        builder: (context, tablesProvider, _) {
+          final tables = tablesProvider.tables;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: MediaQuery.of(context).size.width < 900 ? 200 : 300,
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F3F4),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    decoration: const InputDecoration(
+                      hintText: 'Search...',
+                      prefixIcon: Icon(Ionicons.search_outline, size: 18, color: AdminTheme.secondaryText),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          _buildFilterChip(Ionicons.restaurant_outline, 'All Tables', _selectedTableId != null, () {}),
-          const SizedBox(width: 12),
-          _buildFilterChip(Ionicons.time_outline, 'Preparing', _selectedStatus == model.OrderStatus.preparing, () {
-            setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.preparing ? null : model.OrderStatus.preparing);
-          }),
-          const SizedBox(width: 12),
-          _buildFilterChip(Ionicons.checkmark_done_outline, 'Ready', _selectedStatus == model.OrderStatus.ready, () {
-            setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.ready ? null : model.OrderStatus.ready);
-          }),
-          if (_tabController.index == 1 || _tabController.index == 2) ...[
-            const SizedBox(width: 24),
-            const SizedBox(height: 44, child: VerticalDivider(width: 1, color: Color(0xFFE0E0E0))),
-            const SizedBox(width: 24),
-            _buildDateChip('ALL', _dateFilterType == 'ALL'),
-            const SizedBox(width: 12),
-            _buildDateChip('Today', _dateFilterType == 'Today'),
-            const SizedBox(width: 12),
-            _buildDateChip(
-              _dateFilterType != 'Range' ? 'Date range' : '${DateFormat('MMM dd').format(_dateRange.start)} - ${DateFormat('MMM dd').format(_dateRange.end)}',
-              _dateFilterType == 'Range',
-              isRange: true,
-            ),
-          ],
-        ],
+              const SizedBox(width: 16),
+              _buildFilterChip(
+                Ionicons.restaurant_outline, 
+                getSelectedTableName(tables), 
+                _selectedTableId != null, 
+                () async {
+                  final RenderBox button = context.findRenderObject() as RenderBox;
+                  final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+                  final RelativeRect position = RelativeRect.fromRect(
+                    Rect.fromPoints(
+                      button.localToGlobal(Offset.zero, ancestor: overlay),
+                      button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
+                    ),
+                    Offset.zero & overlay.size,
+                  );
+
+                  final selected = await showMenu<String>(
+                    context: context,
+                    position: position,
+                    items: [
+                      const PopupMenuItem(value: 'CLEAR', child: Text('Show All Tables')),
+                      const PopupMenuDivider(),
+                      ...tables.map((t) => PopupMenuItem(value: t.id, child: Text(t.name))),
+                    ],
+                  );
+                  
+                  if (selected == 'CLEAR') {
+                    setState(() => _selectedTableId = null);
+                  } else if (selected != null) {
+                    setState(() => _selectedTableId = selected);
+                  }
+                }
+              ),
+              const SizedBox(width: 12),
+              _buildFilterChip(Ionicons.time_outline, 'Preparing', _selectedStatus == model.OrderStatus.preparing, () {
+                setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.preparing ? null : model.OrderStatus.preparing);
+              }),
+              const SizedBox(width: 12),
+              _buildFilterChip(Ionicons.checkmark_done_outline, 'Ready', _selectedStatus == model.OrderStatus.ready, () {
+                setState(() => _selectedStatus = _selectedStatus == model.OrderStatus.ready ? null : model.OrderStatus.ready);
+              }),
+              if (_tabController.index == 1 || _tabController.index == 2) ...[
+                const SizedBox(width: 24),
+                const SizedBox(height: 44, child: VerticalDivider(width: 1, color: Color(0xFFE0E0E0))),
+                const SizedBox(width: 24),
+                _buildDateChip('ALL', _dateFilterType == 'ALL'),
+                const SizedBox(width: 12),
+                _buildDateChip('Today', _dateFilterType == 'Today'),
+                const SizedBox(width: 12),
+                _buildDateChip(
+                  _dateFilterType != 'Range' ? 'Date range' : '${DateFormat('MMM dd').format(_dateRange.start)} - ${DateFormat('MMM dd').format(_dateRange.end)}',
+                  _dateFilterType == 'Range',
+                  isRange: true,
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -346,6 +433,11 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       }
     }
 
+    // Apply Table Filter (Requirement fix)
+    if (_selectedTableId != null) {
+      list = list.where((o) => o.tableId == _selectedTableId).toList();
+    }
+
     // Apply Date Filter for Past Orders and Pending Payments
     if (_tabController.index == 1 || _tabController.index == 2) {
       if (_dateFilterType != 'ALL') {
@@ -371,6 +463,39 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     });
 
     if (list.isEmpty) {
+      final isPastTab = _tabController.index > 0;
+      if (isPastTab && provider.hasPastOrdersIndexError) {
+        return Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 500),
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Ionicons.alert_circle_outline, size: 64, color: AdminTheme.warning),
+                const SizedBox(height: 24),
+                const Text(
+                  'History requires a Firestore Index',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'To view past orders, you must create a composite index in the Firebase Console. This is a one-time setup.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AdminTheme.secondaryText, fontSize: 15),
+                ),
+                const SizedBox(height: 24),
+                const SelectableText(
+                  'Check your debug console logs for the auto-generated link to create the index.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryColor),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -383,13 +508,15 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       );
     }
 
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return GridView.builder(
-      padding: const EdgeInsets.all(32),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      padding: EdgeInsets.all(isMobile ? 12 : 32),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 420,
-        mainAxisExtent: 340,
-        crossAxisSpacing: 24,
-        mainAxisSpacing: 24,
+        mainAxisExtent: isMobile ? 310 : 340,
+        crossAxisSpacing: isMobile ? 12 : 24,
+        mainAxisSpacing: isMobile ? 12 : 24,
       ),
       itemCount: list.length,
       itemBuilder: (context, index) => _OrderCard(order: list[index]),
@@ -453,19 +580,44 @@ class _OrderCard extends StatelessWidget {
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
                       ),
                       const SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Ionicons.time_outline, size: 12, color: isUrgent ? AdminTheme.critical : AdminTheme.secondaryText),
                           const SizedBox(width: 4),
-                          Text(
-                            order.elapsedText,
-                            style: TextStyle(
-                              fontSize: 12, 
-                              fontWeight: FontWeight.bold, 
-                              color: isUrgent ? AdminTheme.critical : AdminTheme.secondaryText
-                            ),
-                          ),
-                          if (isUrgent) ...[
+                          Builder(builder: (context) {
+                            final diff = DateTime.now().difference(order.createdAt);
+                            final minutes = diff.inMinutes;
+                            
+                            String timeLabel;
+                            Color timeColor = isUrgent ? AdminTheme.critical : AdminTheme.secondaryText;
+                            
+                            if (order.status == model.OrderStatus.served || order.status == model.OrderStatus.completed) {
+                              timeLabel = 'Served at ${DateFormat('HH:mm').format(order.updatedAt ?? order.createdAt)}';
+                              timeColor = AdminTheme.success;
+                            } else if (minutes < 2) {
+                              timeLabel = 'Just ordered';
+                              timeColor = AdminTheme.info;
+                            } else if (minutes > 20) {
+                              timeLabel = 'Late – please check';
+                              timeColor = AdminTheme.critical;
+                            } else if (order.status == model.OrderStatus.preparing) {
+                              timeLabel = 'Cooking for ${minutes} mins';
+                              timeColor = AdminTheme.warning;
+                            } else {
+                              timeLabel = '${minutes}m ago';
+                            }
+
+                            return Text(
+                              timeLabel,
+                              style: TextStyle(
+                                fontSize: 12, 
+                                fontWeight: FontWeight.bold, 
+                                color: timeColor
+                              ),
+                            );
+                          }),
+                          if (isUrgent && order.status != model.OrderStatus.served) ...[
                             const SizedBox(width: 8),
                             const Text('• URGENT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AdminTheme.critical, letterSpacing: 0.5)),
                           ],
@@ -559,32 +711,38 @@ class _OrderCard extends StatelessWidget {
 
   Widget _buildActionButton(BuildContext context) {
     final provider = context.read<OrdersProvider>();
+    final auth = context.read<AdminAuthProvider>();
+    
     String label = 'Mark Served';
     Color color = AdminTheme.primaryColor;
     VoidCallback? action;
 
     if (order.status == model.OrderStatus.pending) {
+      if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Accept Order';
       color = AdminTheme.info;
       action = () => provider.updateOrderStatus(order.id, model.OrderStatus.preparing);
     } else if (order.status == model.OrderStatus.preparing) {
+      if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Ready to Serve';
       color = AdminTheme.warning;
       action = () => provider.updateOrderStatus(order.id, model.OrderStatus.ready);
     } else if (order.status == model.OrderStatus.ready) {
+      if (!auth.isAdmin && !auth.isCaptain) return const SizedBox.shrink();
       label = 'Mark Served';
       color = AdminTheme.success;
       action = () => _handleMarkServed(context, provider);
     } else if (order.status == model.OrderStatus.served) {
       if (order.paymentStatus == model.PaymentStatus.pending) {
+        if (!auth.isAdmin) return const SizedBox.shrink();
         label = 'Mark as Paid';
         color = AdminTheme.success;
-        action = () => provider.markAsPaid(order.id);
+        action = () => _handleTableSettlement(context);
       } else {
-        label = 'Already Served';
-        color = AdminTheme.secondaryText;
-        action = null;
+        return const SizedBox.shrink();
       }
+    } else {
+      return const SizedBox.shrink();
     }
 
     return ElevatedButton(
@@ -598,6 +756,125 @@ class _OrderCard extends StatelessWidget {
       ),
       child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
+  }
+
+  void _handleTableSettlement(BuildContext context) async {
+    final provider = context.read<OrdersProvider>();
+    final billsProvider = context.read<BillsProvider>();
+    
+    // Find all active orders for this table to settle together
+    final sessionOrders = provider.allOrders.where((o) => 
+      o.tableId == order.tableId && 
+      o.status != model.OrderStatus.completed && 
+      o.status != model.OrderStatus.cancelled
+    ).toList();
+
+    if (sessionOrders.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Settlement'),
+        content: Text('Marking table ${order.tableName} as PAID will settle ${sessionOrders.length} orders. Proceed?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success),
+            child: const Text('CONFIRM & RELEASE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final orderIds = sessionOrders.map((o) => o.id).toList();
+        final billId = await billsProvider.markAsPaid(order.tableId!, orderIds);
+        
+        if (context.mounted && billId != null) {
+          _showSettlementSuccessDialog(context, billId);
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Settlement failed: $e')));
+        }
+      }
+    }
+  }
+
+  void _showSettlementSuccessDialog(BuildContext context, String billId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Ionicons.checkmark_circle, color: AdminTheme.success),
+            SizedBox(width: 12),
+            Text('Success'),
+          ],
+        ),
+        content: const Text('Session settled and table released. Print receipt?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              final billService = BillService();
+              final billData = await billService.getBill(order.tenantId, billId);
+              if (billData != null) {
+                 _printBill(billData);
+              }
+            },
+            icon: const Icon(Ionicons.print_outline),
+            label: const Text('PRINT'),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.primaryColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _printBill(Map<String, dynamic> bill) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(child: pw.Text('SCAN & SERVE', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
+              pw.Divider(),
+              pw.Text('Bill ID: ${bill['billId'].toString().substring(0, 8)}'),
+              pw.Text('Table: ${bill['tableId']}'),
+              pw.Divider(),
+              pw.Table.fromTextArray(
+                context: context,
+                data: [
+                  ['Item', 'Qty', 'Amt'],
+                  ...(bill['orderDetails'] as List).expand((order) => (order['items'] as List).map((i) => [
+                    i['name'],
+                    i['quantity'].toString(),
+                    i['total'].toString(),
+                  ])),
+                ],
+              ),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Rs. ${bill['finalTotal']}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
   void _handleMarkServed(BuildContext context, OrdersProvider provider) async {

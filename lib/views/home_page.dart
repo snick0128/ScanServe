@@ -25,6 +25,9 @@ import 'filter_bottom_sheet.dart';
 import 'payment_page.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
 import 'package:scan_serve/admin/theme/admin_theme.dart';
+import '../models/customer_session.dart';
+import '../config/app_config.dart';
+import '../app.dart';
 
 class HomePage extends StatelessWidget {
   final String tenantId;
@@ -57,11 +60,160 @@ class _HomeContentState extends State<HomeContent> {
     super.initState();
     _initializeSession();
     _loadTenantInfo();
+    
+    // Listen for payment completion
+    final orderController = context.read<OrderController>();
+    orderController.addListener(_handlePaymentStatusChange);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final menuController = context.read<app_controller.MenuController>();
       menuController.loadMenuItems(widget.tenantId);
     });
+  }
+
+  @override
+  void dispose() {
+    // We need to be careful with context in dispose
+    // But since HomePage is long lived, this is generally okay
+    try {
+      context.read<OrderController>().removeListener(_handlePaymentStatusChange);
+    } catch (_) {}
+    super.dispose();
+  }
+
+  void _handlePaymentStatusChange() {
+    final orderController = context.read<OrderController>();
+    if (orderController.isPaymentCompleted) {
+      _showPostPaymentPrompt();
+    }
+  }
+
+  String _formatTableId(String? id) {
+    if (id == null) return '';
+    if (id.startsWith('table_')) {
+      return 'T${id.substring(6)}';
+    }
+    return id;
+  }
+
+  void _showPostPaymentPrompt() {
+    final orderController = context.read<OrderController>();
+    
+    // Reset the flag immediately so we don't show it twice
+    orderController.acknowledgePayment();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 12),
+            Text('Payment Received ✅'),
+          ],
+        ),
+        content: const Text(
+          'Your payment has been confirmed. Would you like to continue your session at this table or end it now?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          OutlinedButton(
+            onPressed: () async {
+              // END SESSION
+              Navigator.pop(context);
+              await _endSession();
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: const BorderSide(color: Colors.red),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('End Session'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // CONTINUE SESSION
+              Navigator.pop(context);
+              await _continueSession();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Continue Session'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _endSession() async {
+    final orderController = context.read<OrderController>();
+    final session = orderController.currentSession;
+    if (session == null) return;
+
+    // 1. Vacant table in backend
+    final tenantService = TenantService();
+    await tenantService.unlockTable(session.tenantId, session.tableId!);
+
+    // 2. Clear local session
+    final guestSession = GuestSessionService();
+    await guestSession.clearCustomerSession();
+
+    // 3. Reset app state - push back to Initializer to force a re-scan or fresh state
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init())),
+        (route) => false,
+      );
+    }
+  }
+
+  Future<void> _continueSession() async {
+    final orderController = context.read<OrderController>();
+    final session = orderController.currentSession;
+    if (session == null) return;
+
+    final tenantId = session.tenantId;
+    final tableId = session.tableId!;
+    final guestId = session.guestId;
+
+    // 1. Create a brand new session ID
+    final newSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
+
+    // 2. Lock table with new session in backend
+    final tenantService = TenantService();
+    final isLocked = await tenantService.lockTable(tenantId, tableId, newSessionId);
+
+    if (!isLocked) {
+       // Fallback if somehow failed
+       await _endSession();
+       return;
+    }
+
+    // 3. Save new session locally
+    final guestSession = GuestSessionService();
+    final newSession = CustomerSession(
+      tenantId: tenantId,
+      tableId: tableId,
+      sessionId: newSessionId,
+      guestId: guestId,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await guestSession.saveCustomerSession(newSession);
+
+    // 4. Update order controller
+    orderController.setSession(tenantId, tableId, sessionId: newSessionId);
+    
+    if (mounted) {
+      SnackbarHelper.showTopSnackBar(context, 'New session started. You can add more items!');
+    }
   }
 
   Future<void> _initializeSession() async {
@@ -139,11 +291,24 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: _selectedIndex == 2 ? null : _buildAppBar(),
-      body: _buildBody(),
-      bottomNavigationBar: _buildBottomNav(),
+    return PopScope(
+      canPop: _selectedIndex == 1, // Only allow system pop if we are on Menu
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        
+        // If we are on Orders (0) or Cart (2), go back to Menu (1)
+        if (_selectedIndex != 1) {
+          setState(() {
+            _selectedIndex = 1;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: _selectedIndex == 2 ? null : _buildAppBar(),
+        body: _buildBody(),
+        bottomNavigationBar: _buildBottomNav(),
+      ),
     );
   }
 
@@ -213,36 +378,43 @@ class _HomeContentState extends State<HomeContent> {
       actions: [
         Consumer<OrderController>(
           builder: (context, orderController, child) {
-            if (orderController.currentOrderType == OrderType.dineIn &&
-                orderController.currentSession?.tableId != null) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.table_restaurant, size: 14, color: AppTheme.primaryColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Table ${orderController.currentSession!.tableId}',
-                        style: GoogleFonts.outfit(
-                          color: AppTheme.primaryColor,
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+            final isDineIn = orderController.currentOrderType == OrderType.dineIn &&
+                orderController.currentSession?.tableId != null;
+            
+            return Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: (isDineIn ? AppTheme.primaryColor : Colors.orange).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (isDineIn ? AppTheme.primaryColor : Colors.orange).withOpacity(0.2),
                   ),
                 ),
-              );
-            }
-            return const SizedBox.shrink();
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isDineIn ? Icons.table_restaurant : Icons.shopping_bag_outlined,
+                      size: 14,
+                      color: isDineIn ? AppTheme.primaryColor : Colors.orange,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isDineIn 
+                          ? _formatTableId(orderController.currentSession!.tableId) 
+                          : 'Parcel Order',
+                      style: GoogleFonts.outfit(
+                        color: isDineIn ? AppTheme.primaryColor : Colors.orange,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
           },
         ),
       ],
@@ -579,7 +751,7 @@ class _HomeContentState extends State<HomeContent> {
                 }
               },
               child: Container(
-                height: 48.h, // Slightly taller for better touch target
+                height: 56.h, // Increased from 48.h for better touch target (Requirement #9)
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
                 decoration: const BoxDecoration(
                   color: AppTheme.primaryColor,

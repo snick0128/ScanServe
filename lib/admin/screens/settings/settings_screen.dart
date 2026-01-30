@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../providers/admin_auth_provider.dart';
+import '../../providers/orders_provider.dart';
+import '../subscription/subscription_plans_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String tenantId;
@@ -155,6 +157,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
             
+            // Subscription Plan Section
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.verified, color: Colors.green.shade700, size: 24),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Current Plan',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Demo Plan',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Active',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SubscriptionPlansScreen(tenantId: 'demo'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.upgrade, size: 18),
+                        label: const Text('View Plans'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -238,6 +314,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _captainRequiresApproval,
               onChanged: (val) => setState(() => _captainRequiresApproval = val),
               contentPadding: EdgeInsets.zero,
+            ),
+            const Divider(height: 32),
+            const Text(
+              'Notification Settings',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Consumer<OrdersProvider>(
+              builder: (context, ordersProvider, _) {
+                return SwitchListTile(
+                  title: const Text('Enable Sound Alerts'),
+                  subtitle: const Text('🔊 Play a sound when new orders arrive'),
+                  value: ordersProvider.isSoundEnabled,
+                  onChanged: (val) => ordersProvider.toggleSound(val),
+                  contentPadding: EdgeInsets.zero,
+                );
+              },
             ),
             const Divider(height: 32),
             const Text(

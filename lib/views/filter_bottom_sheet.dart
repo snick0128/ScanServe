@@ -114,33 +114,35 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       ],
                     ),
                     const SizedBox(height: 16), // Intersection spacing 16px
-                    _buildSectionTitle('Food Type'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _buildChip(
-                          'Veg',
-                          _tempVegOnly,
-                          () => setState(() {
-                            _tempVegOnly = !_tempVegOnly;
-                            if (_tempVegOnly) _tempNonVegOnly = false;
-                          }),
-                          isVeg: true,
-                        ),
-                        _buildChip(
-                          'Non-Veg',
-                          _tempNonVegOnly,
-                          () => setState(() {
-                            _tempNonVegOnly = !_tempNonVegOnly;
-                            if (_tempNonVegOnly) _tempVegOnly = false;
-                          }),
-                          isNonVeg: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16), // Intersection spacing 16px
+                    if (!menuController.isStrictVeg) ...[
+                      _buildSectionTitle('Food Type'),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildChip(
+                            'Veg',
+                            _tempVegOnly,
+                            () => setState(() {
+                              _tempVegOnly = !_tempVegOnly;
+                              if (_tempVegOnly) _tempNonVegOnly = false;
+                            }),
+                            isVeg: true,
+                          ),
+                          _buildChip(
+                            'Non-Veg',
+                            _tempNonVegOnly,
+                            () => setState(() {
+                              _tempNonVegOnly = !_tempNonVegOnly;
+                              if (_tempNonVegOnly) _tempVegOnly = false;
+                            }),
+                            isNonVeg: true,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _buildSectionTitle('Top Picks'),
                     const SizedBox(height: 8),
                     _buildChip(

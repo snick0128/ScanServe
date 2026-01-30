@@ -26,15 +26,15 @@ class _PaymentPageState extends State<PaymentPage> {
   final _guestSession = GuestSessionService();
   bool _isRequestingBill = false;
   String? _selectedMethod;
+  // Feature toggle for online payments
+  static const bool _enableOnlinePayments = false;
 
   final List<Map<String, dynamic>> _paymentMethods = [
-    {'id': 'upi', 'name': 'UPI', 'icon': Icons.account_balance_wallet_outlined},
-    {'id': 'cards', 'name': 'Credit / Debit Cards', 'icon': Icons.credit_card_outlined},
-    {'id': 'wallets', 'name': 'Wallets', 'icon': Icons.account_balance_wallet_outlined},
-    {'id': 'netbanking', 'name': 'Net Banking', 'icon': Icons.account_balance_outlined},
+    {'id': 'cash', 'name': 'Cash at Counter', 'icon': Icons.store_outlined},
+    {'id': 'bill', 'name': 'Request Bill', 'icon': Icons.receipt_long_outlined},
   ];
 
-  Future<void> _handleRequestBill() async {
+  Future<void> _handleRequestBill({bool isCashAtCounter = false}) async {
     final orderController = context.read<OrderController>();
     if (orderController.activeOrders.isEmpty) {
       SnackbarHelper.showTopSnackBar(context, 'No active orders found.');
@@ -44,7 +44,6 @@ class _PaymentPageState extends State<PaymentPage> {
     final isParcel = orderController.activeOrders.first.type == OrderType.parcel;
 
     try {
-      final profile = await _guestSession.getGuestProfile();
       final session = await _guestSession.getCurrentSession();
       final tenantId = session['tenantId'];
       final tableId = session['tableId'];
@@ -55,8 +54,9 @@ class _PaymentPageState extends State<PaymentPage> {
       }
 
       final guestId = await _guestSession.getGuestId();
+      final profile = await _guestSession.getGuestProfile();
       
-      // Only check for pending requests if it's Dine-in "Request Bill"
+      // Only check for pending requests if it's Dine-in
       if (!isParcel) {
         final hasPending = await _billRequestService.hasPendingBillRequest(
           tenantId: tenantId,
@@ -64,20 +64,10 @@ class _PaymentPageState extends State<PaymentPage> {
         );
 
         if (hasPending) {
-          SnackbarHelper.showTopSnackBar(context, 'You already have a pending bill request');
+          SnackbarHelper.showTopSnackBar(context, 'You already have a pending request');
           return;
         }
       }
-
-      final customerDetails = await CustomerDetailsBottomSheet.show(
-        context: context,
-        existingProfile: profile,
-        orderType: orderController.activeOrders.first.type,
-        title: isParcel ? 'Pay at Counter' : 'Request Bill',
-        submitButtonText: isParcel ? 'Confirm' : 'Request Bill',
-      );
-
-      if (customerDetails == null) return;
 
       setState(() => _isRequestingBill = true);
 
@@ -93,18 +83,14 @@ class _PaymentPageState extends State<PaymentPage> {
         await _billRequestService.createBillRequest(
           tenantId: tenantId,
           guestId: guestId,
-          customerName: customerDetails.name,
-          customerPhone: customerDetails.phone,
+          customerName: profile?.name ?? 'Guest',
+          customerPhone: profile?.phone,
           tableId: tableId,
           tableName: tableName,
           orderIds: orderIds,
+          isCashAtCounter: isCashAtCounter,
         );
       }
-
-      await _guestSession.updateGuestProfile(
-        name: customerDetails.name,
-        phone: customerDetails.phone,
-      );
 
       if (mounted) {
         showDialog(
@@ -114,21 +100,21 @@ class _PaymentPageState extends State<PaymentPage> {
             title: Column(
               children: [
                 Icon(
-                  isParcel ? Icons.store_outlined : Icons.person_outline, 
+                  isCashAtCounter ? Icons.store_outlined : Icons.receipt_long_outlined, 
                   color: AppTheme.primaryColor, 
                   size: 48
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isParcel ? 'Visit Counter' : 'Bill Requested!',
+                  isCashAtCounter ? 'Cash at Counter' : 'Bill Requested',
                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             content: Text(
-              isParcel
-                  ? 'Please visit the counter to pay. The staff will mark your order as paid after receiving the payment.'
-                  : 'Our waiter will be at your table shortly with the bill. You can pay them directly in cash.',
+              isCashAtCounter
+                  ? 'Please pay at the counter. Admin has been notified of your request.'
+                  : 'Bill requested. Please wait for confirmation. A staff member will assist you shortly.',
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(fontSize: 16),
             ),
@@ -181,7 +167,7 @@ class _PaymentPageState extends State<PaymentPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Payment Options',
+          'Settlement Options',
           style: GoogleFonts.outfit(
             color: Colors.black,
             fontSize: 20,
@@ -190,137 +176,93 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _paymentMethods.length,
-              itemBuilder: (context, index) {
-                final method = _paymentMethods[index];
-                final isSelected = _selectedMethod == method['id'];
+      body: _isRequestingBill 
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: _paymentMethods.length,
+            itemBuilder: (context, index) {
+              final method = _paymentMethods[index];
+              final isSelected = _selectedMethod == method['id'];
 
-                return GestureDetector(
-                  onTap: () {
-                    HapticHelper.light();
-                    setState(() {
-                      _selectedMethod = method['id'];
-                    });
-                    
-                    // Navigate to dedicated screen
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => UPIPaymentPage(methodName: method['name']),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
-                        width: isSelected ? 2 : 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+              return GestureDetector(
+                onTap: () {
+                  HapticHelper.light();
+                  setState(() {
+                    _selectedMethod = method['id'];
+                  });
+                  _handleRequestBill(isCashAtCounter: method['id'] == 'cash');
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
+                      width: isSelected ? 2 : 1,
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
                           method['icon'],
-                          color: isSelected ? AppTheme.primaryColor : AppTheme.secondaryText,
+                          color: AppTheme.primaryColor,
                           size: 28,
                         ),
-                        const SizedBox(width: 16),
-                        Text(
-                          method['name'],
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? AppTheme.primaryColor : AppTheme.primaryText,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (isSelected)
-                          const Icon(
-                            Icons.check_circle,
-                            color: AppTheme.primaryColor,
-                          )
-                        else
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppTheme.borderColor, width: 2),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          _buildBottomCTA(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomCTA() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: _isRequestingBill ? null : _handleRequestBill,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 0,
-          ),
-          child: _isRequestingBill
-              ? const CircularProgressIndicator(color: Colors.white)
-              : Consumer<OrderController>(
-                  builder: (context, orderController, child) {
-                    final isParcel = orderController.activeOrders.isNotEmpty && 
-                        orderController.activeOrders.first.type == OrderType.parcel;
-                    return Text(
-                      isParcel ? 'Pay at Counter' : 'Request Bill',
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              method['name'],
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              method['id'] == 'cash' 
+                                ? 'Pay directly at the bill counter' 
+                                : 'Request bill at your table',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                color: AppTheme.secondaryText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: AppTheme.borderColor,
+                      ),
+                    ],
+                  ),
                 ),
-        ),
-      ),
+              );
+            },
+          ),
     );
   }
 }
+
+

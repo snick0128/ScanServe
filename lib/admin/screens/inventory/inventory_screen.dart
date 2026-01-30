@@ -36,6 +36,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 1100;
     return Scaffold(
       backgroundColor: Colors.white,
       body: Consumer<InventoryProvider>(
@@ -45,66 +46,93 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
           }
 
           return Padding(
-            padding: EdgeInsets.all(16.w),
+            padding: EdgeInsets.all(isMobile ? 12.w : 16.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(context, provider),
-                SizedBox(height: 16.h),
-                TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: AdminTheme.primaryColor,
-                  unselectedLabelColor: AdminTheme.secondaryText,
-                  indicatorColor: AdminTheme.primaryColor,
-                  indicatorWeight: 3.h,
-                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp),
-                  tabs: const [
-                    Tab(text: 'Stock Console'),
-                    Tab(text: 'Audit History'),
-                  ],
-                ),
-                SizedBox(height: 24.h),
+                _buildHeader(context, provider, isMobile),
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // MAIN CONTENT AREA
-                      Expanded(
-                        flex: 4,
-                        child: TabBarView(
-                          controller: _tabController,
+                  child: NestedScrollView(
+                    headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                      SliverToBoxAdapter(
+                        child: Column(
                           children: [
-                            // TAB 1: STOCK CONSOLE
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildFilters(context, provider),
-                                SizedBox(height: 24.h),
-                                Expanded(child: _buildInventoryTable(context, provider)),
+                            if (isMobile) ...[
+                              _buildSummaryCards(provider, isMobile),
+                              SizedBox(height: 16.h),
+                            ],
+                            TabBar(
+                              controller: _tabController,
+                              isScrollable: true,
+                              tabAlignment: TabAlignment.start,
+                              labelColor: AdminTheme.primaryColor,
+                              unselectedLabelColor: AdminTheme.secondaryText,
+                              indicatorColor: AdminTheme.primaryColor,
+                              indicatorWeight: 3.h,
+                              labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12.sp : 14.sp),
+                              tabs: const [
+                                Tab(text: 'Stock Console'),
+                                Tab(text: 'Audit History'),
                               ],
                             ),
-                            // TAB 2: AUDIT HISTORY
-                            _InventoryAuditLogs(),
                           ],
                         ),
                       ),
-                      SizedBox(width: 32.w),
-                      // RIGHT SIDE PANEL
-                      SizedBox(
-                        width: 300.w,
-                        child: SingleChildScrollView(
+                    ],
+                    body: isMobile 
+                      ? SingleChildScrollView(
                           child: Column(
                             children: [
-                              _buildSummaryCards(provider),
+                              SizedBox(height: 16.h),
+                              if (_tabController.index == 0)
+                                Column(
+                                  children: [
+                                    _buildFilters(context, provider, isMobile),
+                                    SizedBox(height: 16.h),
+                                    _buildInventoryTable(context, provider),
+                                  ],
+                                )
+                              else
+                                _InventoryAuditLogs(),
                               SizedBox(height: 24.h),
-                              _buildQuickActions(context, provider),
+                              _buildQuickActions(context, provider, isMobile),
                             ],
                           ),
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: TabBarView(
+                                controller: _tabController,
+                                children: [
+                                  Column(
+                                    children: [
+                                      _buildFilters(context, provider, false),
+                                      SizedBox(height: 24.h),
+                                      Expanded(child: _buildInventoryTable(context, provider)),
+                                    ],
+                                  ),
+                                  _InventoryAuditLogs(),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 32.w),
+                            SizedBox(
+                              width: 300.w,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: [
+                                    _buildSummaryCards(provider, false),
+                                    SizedBox(height: 24.h),
+                                    _buildQuickActions(context, provider, false),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -115,23 +143,67 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildHeader(BuildContext context, InventoryProvider provider) {
+  Widget _buildHeader(BuildContext context, InventoryProvider provider, bool isMobile) {
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Inventory Management',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => provider.refresh(),
+                  icon: const Icon(Ionicons.refresh_outline, size: 16),
+                  label: const Text('Refresh'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showAddIngredientDialog(context, provider),
+                  icon: const Icon(Ionicons.add_outline, size: 16),
+                  label: const Text('Add New'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AdminTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Inventory Management',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
-            ),
-            SizedBox(height: 4),
-            Text(
-              'Monitor stock levels, track ingredients, and manage audit logs.',
-              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
-            ),
-          ],
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Inventory Management',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                overflow: TextOverflow.ellipsis,
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Monitor stock levels, track ingredients, and manage audit logs.',
+                style: TextStyle(color: AdminTheme.secondaryText, fontSize: 16),
+              ),
+            ],
+          ),
         ),
         Row(
           children: [
@@ -172,7 +244,49 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildFilters(BuildContext context, InventoryProvider provider) {
+  Widget _buildFilters(BuildContext context, InventoryProvider provider, bool isMobile) {
+    if (isMobile) {
+      return Column(
+        children: [
+          Container(
+            height: 48,
+            decoration: BoxDecoration(color: const Color(0xFFF8F9FA), borderRadius: BorderRadius.circular(8)),
+            child: TextField(
+              controller: _searchController,
+              onChanged: provider.setSearchQuery,
+              decoration: const InputDecoration(
+                hintText: 'Search ingredients...',
+                prefixIcon: Icon(Ionicons.search_outline, size: 20),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterDropdown<String>(
+                  label: 'Category',
+                  icon: Ionicons.grid_outline,
+                  value: provider.selectedCategory,
+                  items: ['Meat', 'Produce', 'Dairy', 'Spices', 'Bakery', 'General'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: provider.setCategory,
+                ),
+                const SizedBox(width: 8),
+                _buildFilterDropdown<StockStatus>(
+                  label: 'Status',
+                  icon: Ionicons.list_outline,
+                  value: provider.selectedStatus,
+                  items: StockStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s.label))).toList(),
+                  onChanged: provider.setStatus,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       children: [
         Expanded(
@@ -273,6 +387,8 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     final verticalController = ScrollController();
     final horizontalController = ScrollController();
 
+    final isMobile = MediaQuery.of(context).size.width < 1100;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -281,37 +397,27 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       ),
       clipBehavior: Clip.antiAlias,
       child: Scrollbar(
-        controller: verticalController,
-        thumbVisibility: true,
-        child: Scrollbar(
+        controller: horizontalController,
+        child: SingleChildScrollView(
           controller: horizontalController,
-          thumbVisibility: true,
-          notificationPredicate: (notification) => notification.depth == 1,
-          child: SingleChildScrollView(
-            controller: verticalController,
-            scrollDirection: Axis.vertical,
-            child: SingleChildScrollView(
-              controller: horizontalController,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: 1200, // Fixed width to allow horizontal scrolling if needed, or use constraints
-                child: DataTable(
-                  headingRowHeight: 56,
-                  dataRowHeight: 64,
-                  horizontalMargin: 24,
-                  columnSpacing: 56,
-                  headingRowColor: MaterialStateProperty.all(const Color(0xFFFBFBFB)),
-                  columns: const [
-                    DataColumn(label: Text('ITEM NAME', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('CATEGORY', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('CURRENT STOCK', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('LOW STOCK ALERT', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                    DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                  ],
-                  rows: provider.items.map((item) => _buildDataRow(context, provider, item)).toList(),
-                ),
-              ),
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: isMobile ? 800 : 1200, 
+            child: DataTable(
+              headingRowHeight: 56,
+              dataRowHeight: 64,
+              horizontalMargin: 24,
+              columnSpacing: isMobile ? 24 : 56,
+              headingRowColor: MaterialStateProperty.all(const Color(0xFFFBFBFB)),
+              columns: const [
+                DataColumn(label: Text('ITEM NAME', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                DataColumn(label: Text('CATEGORY', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                DataColumn(label: Text('CURRENT STOCK', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                DataColumn(label: Text('LOW STOCK ALERT', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                DataColumn(label: Text('STATUS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                DataColumn(label: Text('ACTIONS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+              ],
+              rows: provider.items.map((item) => _buildDataRow(context, provider, item)).toList(),
             ),
           ),
         ),
@@ -387,7 +493,32 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     ]);
   }
 
-  Widget _buildSummaryCards(InventoryProvider provider) {
+  Widget _buildSummaryCards(InventoryProvider provider, bool isMobile) {
+    if (isMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: _SummaryCard(
+              label: 'CRITICAL',
+              value: '${provider.lowStockItems.length + provider.outOfStockItems.length}',
+              icon: Ionicons.information_circle_outline,
+              color: AdminTheme.warning,
+              isMobile: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _SummaryCard(
+              label: 'TOTAL',
+              value: '${provider.items.length}',
+              icon: Ionicons.cube_outline,
+              color: AdminTheme.success,
+              isMobile: true,
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       children: [
         _SummaryCard(
@@ -407,9 +538,9 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildQuickActions(BuildContext context, InventoryProvider provider) {
+  Widget _buildQuickActions(BuildContext context, InventoryProvider provider, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 12 : 24),
       decoration: BoxDecoration(
         color: AdminTheme.cardBackground,
         borderRadius: BorderRadius.circular(16),
@@ -658,113 +789,107 @@ class _InventoryAuditLogs extends StatelessWidget {
           );
         }
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[100]!),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: ListView.separated(
-            padding: const EdgeInsets.all(24),
-            itemCount: provider.recentLogs.length,
-            separatorBuilder: (context, index) => const Divider(height: 32, color: AdminTheme.dividerColor),
-            itemBuilder: (context, index) {
-              final log = provider.recentLogs[index];
-              final isPositive = log.type == InventoryChangeType.stockIn || log.type == InventoryChangeType.adjustment && log.quantityChanged > 0;
-              
-              return Row(
-                children: [
-                   Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: isPositive ? AdminTheme.success.withOpacity(0.1) : AdminTheme.critical.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isPositive ? Ionicons.arrow_up_outline : Ionicons.arrow_down_outline,
-                      color: isPositive ? AdminTheme.success : AdminTheme.critical,
-                      size: 20,
-                    ),
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          itemCount: provider.recentLogs.length,
+          separatorBuilder: (context, index) => const Divider(height: 32, color: AdminTheme.dividerColor),
+          itemBuilder: (context, index) {
+            final log = provider.recentLogs[index];
+            final isPositive = log.type == InventoryChangeType.stockIn || log.type == InventoryChangeType.adjustment && log.quantityChanged > 0;
+            
+            return Row(
+              children: [
+                 Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: isPositive ? AdminTheme.success.withOpacity(0.1) : AdminTheme.critical.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              log.itemName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AdminTheme.primaryText),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                log.type.label,
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Reason: ${log.reason.label} • By: ${log.performedBy} ${log.sourceId != null ? "• Ref: ${log.sourceId}" : ""}',
-                          style: const TextStyle(fontSize: 13, color: AdminTheme.secondaryText),
-                        ),
-                      ],
-                    ),
+                  child: Icon(
+                    isPositive ? Ionicons.arrow_up_outline : Ionicons.arrow_down_outline,
+                    color: isPositive ? AdminTheme.success : AdminTheme.critical,
+                    size: 20,
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${isPositive ? "+" : ""}${log.quantityChanged}',
-                        style: TextStyle(
-                          fontSize: 18, 
-                          fontWeight: FontWeight.bold, 
-                          color: isPositive ? AdminTheme.success : AdminTheme.critical
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            log.itemName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AdminTheme.primaryText),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              log.type.label,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        'Stock: ${log.quantityAfter}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AdminTheme.secondaryText),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        DateFormat('MMM d, h:mm a').format(log.timestamp),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                        'Reason: ${log.reason.label} • By: ${log.performedBy} ${log.sourceId != null ? "• Ref: ${log.sourceId}" : ""}',
+                        style: const TextStyle(fontSize: 13, color: AdminTheme.secondaryText),
                       ),
                     ],
                   ),
-                ],
-              );
-            },
-          ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${isPositive ? "+" : ""}${log.quantityChanged}',
+                      style: TextStyle(
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold, 
+                        color: isPositive ? AdminTheme.success : AdminTheme.critical
+                      ),
+                    ),
+                    Text(
+                      'Stock: ${log.quantityAfter}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AdminTheme.secondaryText),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('MMM d, h:mm a').format(log.timestamp),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 }
-
 class _SummaryCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
+  final bool isMobile;
 
-  const _SummaryCard({required this.label, required this.value, required this.icon, required this.color});
+  const _SummaryCard({required this.label, required this.value, required this.icon, required this.color, this.isMobile = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 12 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -774,18 +899,18 @@ class _SummaryCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isMobile ? 8 : 12),
             decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: isMobile ? 18 : 24),
           ),
-          const SizedBox(width: 20),
+          SizedBox(width: isMobile ? 12 : 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
+                Text(label, style: TextStyle(fontSize: isMobile ? 8 : 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                Text(value, style: TextStyle(fontSize: isMobile ? 18 : 26, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
               ],
             ),
           ),

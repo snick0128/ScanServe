@@ -12,6 +12,7 @@ import '../../providers/orders_provider.dart';
 import '../../providers/notifications_provider.dart';
 import '../../widgets/admin_sidebar.dart';
 import '../../providers/tables_provider.dart';
+import '../../providers/background_print_provider.dart';
 import '../inventory/inventory_screen.dart';
 import '../orders/orders_screen.dart';
 import '../menu/menu_items_screen.dart';
@@ -73,6 +74,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onToggleCollapse: () {},
             )
           : null,
+      bottomNavigationBar: (isMobile && !context.read<AdminAuthProvider>().isKitchen) 
+          ? BottomNavigationBar(
+              currentIndex: _selectedIndex == 0 ? 0 : (_selectedIndex == 2 ? 1 : (_selectedIndex == 3 ? 2 : 0)), 
+              onTap: (index) {
+                if (index == 0) _onItemTapped(0);
+                else if (index == 1) _onItemTapped(2);
+                else if (index == 2) _onItemTapped(3);
+                else {
+                  Builder(builder: (context) {
+                    Scaffold.of(context).openDrawer();
+                    return const SizedBox.shrink();
+                  });
+                }
+              },
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: AdminTheme.primaryColor,
+              unselectedItemColor: AdminTheme.secondaryText,
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Ionicons.grid_outline), label: 'Home'),
+                BottomNavigationBarItem(icon: Icon(Ionicons.restaurant_outline), label: 'Tables'),
+                BottomNavigationBarItem(icon: Icon(Ionicons.list_outline), label: 'Orders'),
+                BottomNavigationBarItem(icon: Icon(Ionicons.menu_outline), label: 'More'),
+              ],
+            ) 
+          : null,
       body: Row(
         children: [
           if (!isMobile)
@@ -87,6 +113,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               children: [
                 _buildTopBar(isMobile),
+                _buildPrinterErrorBanner(),
                 Expanded(
                   child: _buildContent(isTablet),
                 ),
@@ -118,9 +145,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           Expanded(
             child: Text(
-              auth.isKitchen ? 'Kitchen Display System' : 'Dashboard',
+              auth.isKitchen ? 'Kitchen Display' : (auth.isCaptain ? 'Service Portal' : 'Admin Dashboard'),
               style: TextStyle(
-                fontSize: 22.sp,
+                fontSize: 18.sp, // Reduced for mobile
                 fontWeight: FontWeight.bold,
                 color: AdminTheme.primaryText,
               ),
@@ -128,6 +155,113 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           SizedBox(width: 12.w),
+          Consumer<OrdersProvider>(
+            builder: (context, provider, _) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: (provider.isSynced ? AdminTheme.success : AdminTheme.warning).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: (provider.isSynced ? AdminTheme.success : AdminTheme.warning).withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: provider.isSynced ? AdminTheme.success : AdminTheme.warning,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    provider.isSynced ? 'LIVE' : 'SYNCING',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.bold,
+                      color: provider.isSynced ? AdminTheme.success : AdminTheme.warning,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Consumer<BackgroundPrintProvider>(
+            builder: (context, printProvider, _) {
+              final isReady = printProvider.isPrinterReady;
+              final color = isReady ? AdminTheme.success : AdminTheme.critical;
+              
+              return PopupMenuButton(
+                offset: const Offset(0, 50),
+                tooltip: 'Printer Status',
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: color.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Ionicons.print_outline, size: 16, color: color),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isReady ? 'PRINTER READY' : 'PRINTER ERROR',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                itemBuilder: (context) => <PopupMenuEntry<dynamic>>[
+                  PopupMenuItem(
+                    enabled: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isReady ? 'Printer is connected' : 'Printer Issue Detected', 
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                        if (!isReady && printProvider.lastFailureAt != null)
+                          Text('Failed at: ${DateFormat('HH:mm:ss').format(printProvider.lastFailureAt!)}', 
+                            style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
+                        if (!isReady && printProvider.lastError != null)
+                          Text(printProvider.lastError!, 
+                            style: const TextStyle(fontSize: 11, color: AdminTheme.critical)),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    onTap: () => printProvider.checkPrinter(),
+                    child: const Row(
+                      children: [
+                        Icon(Ionicons.refresh_outline, size: 18),
+                        SizedBox(width: 8),
+                        Text('Test Print / Re-check'),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          SizedBox(width: 16.w),
           CircleAvatar(
             radius: 18.r,
             backgroundColor: AdminTheme.dividerColor,
@@ -135,6 +269,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPrinterErrorBanner() {
+    return Consumer<BackgroundPrintProvider>(
+      builder: (context, printProvider, _) {
+        if (printProvider.isPrinterReady) return const SizedBox.shrink();
+        
+        return Container(
+          width: double.infinity,
+          color: AdminTheme.critical.withOpacity(0.9),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+          child: Row(
+            children: [
+              const Icon(Ionicons.warning_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Printer not detected or printing failed. Automatic KOTs may be missed.',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+              TextButton(
+                onPressed: () => printProvider.checkPrinter(),
+                child: const Text('RETRY TEST PRINT', style: TextStyle(color: Colors.white, decoration: TextDecoration.underline)),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -209,7 +373,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         double aspectRatio = 1.3;
         
         final width = MediaQuery.of(context).size.width;
-        if (width < 1100) {
+        if (width < 600) {
+          crossAxisCount = 2;
+          aspectRatio = 0.85; // Taller cards for mobile to avoid overflow
+        } else if (width < 1100) {
           crossAxisCount = 2;
           aspectRatio = 1.8;
         } else if (width < 1500) {
@@ -272,11 +439,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildKPICard(String title, String value, String trend, IconData icon, Color color, {VoidCallback? onTap}) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16.r),
       child: Container(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.all(isMobile ? 12.w : 20.w),
         decoration: BoxDecoration(
           color: AdminTheme.cardBackground,
           borderRadius: BorderRadius.circular(16.r),
@@ -284,27 +452,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(child: Text(title, style: TextStyle(color: AdminTheme.secondaryText, fontSize: 15.sp, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-              Icon(icon, color: color, size: 24.w),
-            ],
-          ),
-          const Spacer(),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: TextStyle(color: AdminTheme.primaryText, fontSize: 32.sp, fontWeight: FontWeight.bold)),
-          ),
-          SizedBox(height: 4.h),
-          Text(trend, style: TextStyle(color: trend.contains('+') ? AdminTheme.success : AdminTheme.critical, fontSize: 13.sp, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-        ],
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text(title, style: TextStyle(color: AdminTheme.secondaryText, fontSize: isMobile ? 12.sp : 15.sp, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                Icon(icon, color: color, size: isMobile ? 20.w : 24.w),
+              ],
+            ),
+            const Expanded(child: SizedBox()), // Use Expanded instead of Spacer or fixed gap
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: TextStyle(color: AdminTheme.primaryText, fontSize: isMobile ? 24.sp : 32.sp, fontWeight: FontWeight.bold)),
+            ),
+            SizedBox(height: 4.h),
+            Text(trend, style: TextStyle(color: (trend.contains('+') || trend.contains('Live')) ? AdminTheme.success : AdminTheme.critical, fontSize: isMobile ? 11.sp : 13.sp, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildLiveOrdersSection() {
     return Column(
@@ -329,15 +497,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 16),
         Container(
-          height: 500.h, // Fixed height or expanded to use available space
+          height: MediaQuery.of(context).size.width < 900 ? null : 500.h, 
           decoration: BoxDecoration(
-            color: AdminTheme.cardBackground,
+            color: MediaQuery.of(context).size.width < 900 ? Colors.transparent : AdminTheme.cardBackground,
             borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(color: AdminTheme.dividerColor),
+            border: MediaQuery.of(context).size.width < 900 ? null : Border.all(color: AdminTheme.dividerColor),
           ),
           child: Consumer<OrdersProvider>(
             builder: (context, provider, _) {
               final orders = provider.orders.take(10).toList();
+              if (MediaQuery.of(context).size.width < 900) {
+                // MOBILE CARD VIEW
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final order = orders[index];
+                    return _buildMobileOrderCard(order);
+                  },
+                );
+              }
+              // DESKTOP TABLE VIEW
               return SingleChildScrollView(
                 scrollDirection: Axis.vertical,
                 child: SingleChildScrollView(
@@ -358,15 +539,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           DataColumn(label: Text('TIME', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
                           DataColumn(label: Text('ACTION', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
                         ],
-                        rows: orders.map((order) => DataRow(
-                          onSelectChanged: (_) => _showLiveOrderDetails(context, order),
-                          cells: [
-                            DataCell(Text(order.tableName ?? 'T-#', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 16.sp))),
-                            DataCell(Text(order.items.map((i) => '${i.quantity}x ${i.name}').join(', '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AdminTheme.primaryText, fontSize: 15.sp))),
-                            DataCell(Text('${DateTime.now().difference(order.createdAt).inMinutes}m', style: TextStyle(color: AdminTheme.primaryText, fontSize: 15.sp))),
-                            DataCell(_buildActionButton(order)),
-                          ],
-                        )).toList(),
+                        rows: orders.map((order) {
+                          final diff = DateTime.now().difference(order.createdAt);
+                          final minutes = diff.inMinutes;
+                          
+                          String timeLabel;
+                          Color timeColor = AdminTheme.primaryText;
+                          
+                          if (order.status == model.OrderStatus.served || order.status == model.OrderStatus.completed) {
+                            timeLabel = 'Served at ${DateFormat('HH:mm').format(order.updatedAt ?? order.createdAt)}';
+                            timeColor = AdminTheme.success;
+                          } else if (minutes < 2) {
+                            timeLabel = 'Just ordered';
+                            timeColor = AdminTheme.info;
+                          } else if (minutes > 20) {
+                            timeLabel = 'Late – please check';
+                            timeColor = AdminTheme.critical;
+                          } else if (order.status == model.OrderStatus.preparing) {
+                            timeLabel = 'Cooking for ${minutes} mins';
+                            timeColor = AdminTheme.warning;
+                          } else {
+                            timeLabel = '${minutes}m ago';
+                          }
+
+                          return DataRow(
+                            onSelectChanged: (_) => _showLiveOrderDetails(context, order),
+                            cells: [
+                              DataCell(Text(order.tableName ?? 'T-#', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 16.sp))),
+                              DataCell(Text(order.items.map((i) => '${i.quantity}x ${i.name}').join(', '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AdminTheme.primaryText, fontSize: 15.sp))),
+                              DataCell(Text(timeLabel, style: TextStyle(color: timeColor, fontSize: 15.sp, fontWeight: minutes > 20 ? FontWeight.bold : FontWeight.normal))),
+                              DataCell(_buildActionButton(order)),
+                            ],
+                          );
+                        }).toList(),
                       ),
                     ),
                   ),
@@ -431,6 +636,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildMobileOrderCard(model.Order order) {
+    final diff = DateTime.now().difference(order.createdAt);
+    final minutes = diff.inMinutes;
+    final timeColor = minutes > 20 ? AdminTheme.critical : AdminTheme.secondaryText;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: AdminTheme.cardBackground,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AdminTheme.dividerColor),
+      ),
+      child: InkWell(
+        onTap: () => _showLiveOrderDetails(context, order),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(order.tableName ?? 'T-#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp)),
+                _buildStatusBadge(order.status),
+              ],
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              order.items.map((i) => '${i.quantity}x ${i.name}').join(', '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 14.sp),
+            ),
+            SizedBox(height: 12.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${minutes}m ago',
+                  style: TextStyle(color: timeColor, fontSize: 12.sp, fontWeight: FontWeight.bold),
+                ),
+                _buildActionButton(order),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatusBadge(model.OrderStatus status) {
     Color color;
     String label;
@@ -463,14 +717,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String label;
     Color color = AdminTheme.primaryColor;
     VoidCallback? onPressed;
-
+    final auth = context.read<AdminAuthProvider>();
+    
     if (order.status == model.OrderStatus.pending) {
+      if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Accept';
       onPressed = () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.preparing);
     } else if (order.status == model.OrderStatus.preparing) {
+      if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Complete';
       onPressed = () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.ready);
     } else if (order.status == model.OrderStatus.ready) {
+      if (!auth.isAdmin && !auth.isCaptain) return const SizedBox.shrink();
       label = 'Served';
       onPressed = () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.served);
     } else {

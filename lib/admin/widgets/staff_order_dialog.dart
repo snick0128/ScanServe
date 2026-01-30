@@ -8,6 +8,7 @@ import '../providers/orders_provider.dart';
 import '../providers/tables_provider.dart';
 import 'menu_selector_dialog.dart';
 import '../theme/admin_theme.dart';
+import '../../../models/table_status.dart';
 
 class StaffOrderDialog extends StatefulWidget {
   final String tenantId;
@@ -119,15 +120,17 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _selectedTableId == null ? null : _selectMenu,
+                onPressed: (_selectedTableId == null || _isCreating) ? null : _selectMenu,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AdminTheme.primaryColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: Text(
-                  widget.preselectedTableId != null ? 'Start Ordering' : 'Next: Select Menu Items', 
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-                ),
+                child: _isCreating 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(
+                      widget.preselectedTableId != null ? 'Start Ordering' : 'Next: Select Menu Items', 
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                    ),
               ),
             ),
           ],
@@ -178,7 +181,7 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
       // Update table status
       final table = tablesProvider.tables.firstWhere((t) => t.id == _selectedTableId);
       await tablesProvider.updateTable(table.copyWith(
-        status: 'occupied',
+        status: TableStatus.occupied,
         isAvailable: false,
         isOccupied: true,
         occupiedAt: DateTime.now(),

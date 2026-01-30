@@ -89,7 +89,7 @@ class AdminSidebar extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.symmetric(horizontal: 12.w),
               children: [
-                if (role != 'kitchen') ...[
+                if (role == 'admin' || role == 'superadmin') ...[
                   _buildNavItem(
                     context: context,
                     index: 0,
@@ -106,16 +106,14 @@ class AdminSidebar extends StatelessWidget {
                     label: 'Orders',
                     isCollapsed: isCollapsed,
                   ),
-                ],
-                _buildNavItem(
-                  context: context,
-                  index: 9,
-                  icon: Ionicons.desktop_outline,
-                  activeIcon: Ionicons.desktop,
-                  label: 'KDS',
-                  isCollapsed: isCollapsed,
-                ),
-                if (role != 'kitchen') ...[
+                  _buildNavItem(
+                    context: context,
+                    index: 9,
+                    icon: Ionicons.desktop_outline,
+                    activeIcon: Ionicons.desktop,
+                    label: 'KDS',
+                    isCollapsed: isCollapsed,
+                  ),
                   _buildNavItem(
                     context: context,
                     index: 1,
@@ -132,15 +130,14 @@ class AdminSidebar extends StatelessWidget {
                     label: 'Tables',
                     isCollapsed: isCollapsed,
                   ),
-                  if (role != 'captain')
-                    _buildNavItem(
-                      context: context,
-                      index: 8,
-                      icon: Ionicons.cube_outline,
-                      activeIcon: Ionicons.cube,
-                      label: 'Inventory',
-                      isCollapsed: isCollapsed,
-                    ),
+                  _buildNavItem(
+                    context: context,
+                    index: 8,
+                    icon: Ionicons.cube_outline,
+                    activeIcon: Ionicons.cube,
+                    label: 'Inventory',
+                    isCollapsed: isCollapsed,
+                  ),
                   _buildNavItem(
                     context: context,
                     index: 4,
@@ -149,21 +146,70 @@ class AdminSidebar extends StatelessWidget {
                     label: 'Billing',
                     isCollapsed: isCollapsed,
                   ),
-                  if (role != 'captain')
-                    _buildNavItem(
-                      context: context,
-                      index: 5,
-                      icon: Ionicons.stats_chart_outline,
-                      activeIcon: Ionicons.stats_chart,
-                      label: 'Reports',
-                      isCollapsed: isCollapsed,
-                    ),
+                  _buildNavItem(
+                    context: context,
+                    index: 5,
+                    icon: Ionicons.stats_chart_outline,
+                    activeIcon: Ionicons.stats_chart,
+                    label: 'Reports',
+                    isCollapsed: isCollapsed,
+                  ),
                   _buildNavItem(
                     context: context,
                     index: 7,
                     icon: Ionicons.settings_outline,
                     activeIcon: Ionicons.settings,
                     label: 'Settings',
+                    isCollapsed: isCollapsed,
+                  ),
+                ] else if (role == 'captain') ...[
+                  _buildNavItem(
+                    context: context,
+                    index: 0,
+                    icon: Ionicons.grid_outline,
+                    activeIcon: Ionicons.grid,
+                    label: 'Dashboard',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 2,
+                    icon: Ionicons.tablet_landscape_outline,
+                    activeIcon: Ionicons.tablet_landscape,
+                    label: 'Tables',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 3,
+                    icon: Ionicons.list_outline,
+                    activeIcon: Ionicons.list,
+                    label: 'Orders',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 4,
+                    icon: Ionicons.receipt_outline,
+                    activeIcon: Ionicons.receipt,
+                    label: 'Billing',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 7,
+                    icon: Ionicons.settings_outline,
+                    activeIcon: Ionicons.settings,
+                    label: 'Settings',
+                    isCollapsed: isCollapsed,
+                  ),
+                ] else if (role == 'kitchen') ...[
+                  _buildNavItem(
+                    context: context,
+                    index: 9,
+                    icon: Ionicons.desktop_outline,
+                    activeIcon: Ionicons.desktop,
+                    label: 'KDS',
                     isCollapsed: isCollapsed,
                   ),
                 ],

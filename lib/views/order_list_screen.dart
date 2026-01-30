@@ -209,25 +209,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
               child: SizedBox(
                 height: 50,
                 child: OutlinedButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        backgroundColor: Colors.white,
-                        title: Text('Pay at Counter', style: TextStyle(color: AppTheme.primaryText)),
-                        content: Text(
-                          'Please proceed to the billing counter to complete your payment.',
-                          style: TextStyle(color: AppTheme.secondaryText),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text('OK', style: TextStyle(color: AppTheme.primaryColor)),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                  onPressed: _isRequestingBill
+                      ? null
+                      : () => _handleRequestBill(orderController, isCashAtCounter: true),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: AppTheme.primaryColor, width: 1.5),
                     shape: RoundedRectangleBorder(
@@ -235,7 +219,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     ),
                   ),
                   child: Text(
-                    'Pay at Counter',
+                    'Cash at Counter',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -243,6 +227,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     ),
                   ),
                 ),
+
               ),
             ),
             const SizedBox(width: 16),
@@ -285,9 +270,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  Future<void> _handleRequestBill(OrderController orderController) async {
+  Future<void> _handleRequestBill(OrderController orderController, {bool isCashAtCounter = false}) async {
     try {
-      final profile = await _guestSession.getGuestProfile();
       final session = await _guestSession.getCurrentSession();
       final tenantId = session['tenantId'];
       final tableId = session['tableId'];
@@ -301,6 +285,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
       }
 
       final guestId = await _guestSession.getGuestId();
+      final profile = await _guestSession.getGuestProfile();
+      
       final hasPending = await _billRequestService.hasPendingBillRequest(
         tenantId: tenantId,
         guestId: guestId,
@@ -309,22 +295,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
       if (hasPending) {
         SnackbarHelper.showTopSnackBar(
           context,
-          'You already have a pending bill request',
+          'You already have a pending request',
         );
         return;
       }
 
-      final customerDetails = await CustomerDetailsBottomSheet.show(
-        context: context,
-        existingProfile: profile,
-        orderType: orderController.activeOrders.first.type,
-        title: 'Request Bill',
-        submitButtonText: 'Request Bill',
-      );
-
-      if (customerDetails == null) return;
-
       setState(() => _isRequestingBill = true);
+
 
       final orderIds = orderController.activeOrders
           .map((order) => order.orderId)
@@ -337,41 +314,76 @@ class _OrderListScreenState extends State<OrderListScreen> {
       await _billRequestService.createBillRequest(
         tenantId: tenantId,
         guestId: guestId,
-        customerName: customerDetails.name,
-        customerPhone: customerDetails.phone,
+        customerName: profile?.name ?? 'Guest',
+        customerPhone: profile?.phone,
         tableId: tableId,
         tableName: tableName,
         orderIds: orderIds,
+        isCashAtCounter: isCashAtCounter,
       );
 
-      await _guestSession.updateGuestProfile(
-        name: customerDetails.name,
-        phone: customerDetails.phone,
-      );
 
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BillView(
-              orders: orderController.activeOrders,
-              tableName: tableName,
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.white,
+            title: Column(
+              children: [
+                Icon(
+                  isCashAtCounter ? Icons.store_outlined : Icons.receipt_long_outlined, 
+                  color: AppTheme.primaryColor, 
+                  size: 48
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isCashAtCounter ? 'Cash at Counter' : 'Bill Requested',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
+            content: Text(
+              isCashAtCounter
+                  ? 'Please pay at the counter. Admin has been notified of your request.'
+                  : 'Bill requested. Please wait for confirmation. A staff member will assist you shortly.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BillView(
+                        orders: orderController.activeOrders,
+                        tableName: tableName,
+                      ),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Got it',
+                  style: GoogleFonts.outfit(
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-        SnackbarHelper.showTopSnackBar(
-          context,
-          '✅ Bill requested — staff notified',
-          duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
       if (mounted) {
         SnackbarHelper.showTopSnackBar(
           context,
-          'Error requesting bill: $e',
+          'Error: $e',
         );
       }
+
     } finally {
       if (mounted) {
         setState(() => _isRequestingBill = false);
