@@ -113,6 +113,17 @@ class OrderDetailsDialog extends StatelessWidget {
                 Text('₹${order.total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AdminTheme.primaryColor)),
               ],
             ),
+            if (order.paymentNote != null && order.paymentNote!.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Text('SETTLEMENT NOTE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+                child: Text(order.paymentNote ?? '', style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Colors.blue)),
+              ),
+            ],
             const SizedBox(height: 32),
             Row(
               children: [
@@ -130,9 +141,12 @@ class OrderDetailsDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('PAYMENT METHOD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+                      const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
                       const SizedBox(height: 4),
-                      Text(order.paymentMethod?.toUpperCase() ?? 'NOT PAID', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text(
+                        '${order.paymentMethod?.toUpperCase() ?? 'PENDING'}${order.status == OrderStatus.completed ? ' • OK' : ''}', 
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: order.status == OrderStatus.completed ? AdminTheme.success : AdminTheme.secondaryText)
+                      ),
                     ],
                   ),
                 ),

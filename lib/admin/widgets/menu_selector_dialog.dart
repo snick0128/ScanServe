@@ -174,6 +174,7 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
                           price: menuParam.price,
                           quantity: qty,
                           status: OrderItemStatus.pending,
+                          category: menuParam.category,
                         ));
                       }
                     });

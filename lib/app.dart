@@ -201,7 +201,11 @@ class _InitializerState extends State<Initializer> {
 
       // Initialize Cart Persistence
       final cartController = context.read<CartController>();
-      await cartController.initialize(tenantId, tableId);
+      await cartController.initialize(
+        tenantId, 
+        tableId, 
+        isParcel: orderType == OrderType.parcel
+      );
 
       final menuController = context.read<app_controller.MenuController>();
       await menuController.loadMenuItems(tenantId);

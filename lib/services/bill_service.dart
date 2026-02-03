@@ -12,6 +12,8 @@ class BillService {
     required String tableId,
     required List<model.Order> orders,
     double discount = 0.0,
+    String? paymentMethod,
+    String? note,
   }) async {
     try {
       final billId = _uuid.v4();
@@ -73,6 +75,8 @@ class BillService {
         'discountAmount': discountAmount,
         'total': subtotal + tax,
         'finalTotal': finalTotal,
+        'paymentMethod': paymentMethod ?? 'Cash',
+        'note': note,
         'createdAt': FieldValue.serverTimestamp(),
         'orderDetails': consolidatedItems.values.toList(),
       };
@@ -96,6 +100,8 @@ class BillService {
           'status': model.OrderStatus.completed.name,
           'updatedAt': FieldValue.serverTimestamp(),
           'billId': billId,
+          'paymentMethod': paymentMethod ?? 'Cash',
+          'paymentNote': note,
         });
       }
       await batch.commit();

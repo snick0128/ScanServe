@@ -560,20 +560,22 @@ class OrdersProvider with ChangeNotifier {
             });
           }
 
-          final tableRef = _firestore
-            .collection('tenants')
-            .doc(_tenantId)
-            .collection('tables')
-            .doc(tableId);
-        
-        transaction.update(tableRef, {
-          'status': 'available',
-          'isAvailable': true,
-          'isOccupied': false,
-          'currentSessionId': null,
-          'occupiedAt': null,
-          'lastReleasedAt': FieldValue.serverTimestamp(),
-        });
+          if (tableId != 'PARCEL') {
+            final tableRef = _firestore
+              .collection('tenants')
+              .doc(_tenantId)
+              .collection('tables')
+              .doc(tableId);
+          
+            transaction.update(tableRef, {
+              'status': 'available',
+              'isAvailable': true,
+              'isOccupied': false,
+              'currentSessionId': null,
+              'occupiedAt': null,
+              'lastReleasedAt': FieldValue.serverTimestamp(),
+            });
+          }
       });
 
       // Log activity
@@ -775,6 +777,8 @@ class OrdersProvider with ChangeNotifier {
 
   /// 4️⃣ Item-level status control (P0)
   Future<void> updateOrderItemStatus(String orderId, String itemId, model.OrderItemStatus newStatus) async {
+    debugPrint('🔄 OrdersProvider: updateOrderItemStatus called - Order: ${orderId.substring(0, 8)}, Item: $itemId, Status: ${newStatus.name}');
+    
     if (newStatus == model.OrderItemStatus.preparing || newStatus == model.OrderItemStatus.ready) {
       _checkPermission(['admin', 'superadmin', 'kitchen'], action: 'Kitchen preparation');
     }
@@ -782,28 +786,43 @@ class OrdersProvider with ChangeNotifier {
       _checkPermission(['admin', 'superadmin', 'captain'], action: 'Serving items');
     }
 
-    await _updateOrderItemsAtomic(orderId, (currentItems) {
-      final index = currentItems.indexWhere((i) => i.id == itemId);
-      if (index == -1) return currentItems; // Or throw
+    try {
+      await _updateOrderItemsAtomic(orderId, (currentItems) {
+        final index = currentItems.indexWhere((i) => i.id == itemId);
+        if (index == -1) {
+          debugPrint('❌ OrdersProvider: Item $itemId not found in order ${orderId.substring(0, 8)}');
+          return currentItems; // Item not found
+        }
 
-      final updatedItem = currentItems[index].copyWith(
-        status: newStatus,
-        servedAt: newStatus == model.OrderItemStatus.served ? DateTime.now() : currentItems[index].servedAt,
+        debugPrint('📝 OrdersProvider: Updating item ${currentItems[index].name} from ${currentItems[index].status.name} to ${newStatus.name}');
+
+        final updatedItem = currentItems[index].copyWith(
+          status: newStatus,
+          servedAt: newStatus == model.OrderItemStatus.served ? DateTime.now() : currentItems[index].servedAt,
+        );
+        
+        final newItems = List<model.OrderItem>.from(currentItems);
+        newItems[index] = updatedItem;
+        
+        debugPrint('✅ OrdersProvider: Item status updated successfully');
+        return newItems;
+      });
+
+      // Log activity (non-critical, can be done outside transaction)
+      _logItemAction(
+        'Item Status Updated', 
+        'Marked item as ${newStatus.displayName}', 
+        orderId, 
+        ActivityType.orderItemStatusUpdate, 
+        {'itemId': itemId, 'status': newStatus.name}
       );
       
-      final newItems = List<model.OrderItem>.from(currentItems);
-      newItems[index] = updatedItem;
-      return newItems;
-    });
-
-    // Log activity (non-critical, can be done outside transaction)
-    _logItemAction(
-      'Item Status Updated', 
-      'Marked item as ${newStatus.displayName}', 
-      orderId, 
-      ActivityType.orderItemStatusUpdate, 
-      {'itemId': itemId, 'status': newStatus.name}
-    );
+      debugPrint('✅ OrdersProvider: updateOrderItemStatus completed successfully');
+    } catch (e, stackTrace) {
+      debugPrint('❌ OrdersProvider: Error in updateOrderItemStatus: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<void> markItemAsServed(String orderId, String itemId) async {
@@ -1031,7 +1050,7 @@ class OrdersProvider with ChangeNotifier {
       final data = doc.data() as Map<String, dynamic>?;
       final tableId = data?['tableId'];
       
-      if (tableId != null) {
+      if (tableId != null && tableId != 'PARCEL') {
         // Check if there are ANY other active orders for this table before releasing
         final otherActiveOrders = await _tenantOrdersCollection
             .where('tableId', isEqualTo: tableId)

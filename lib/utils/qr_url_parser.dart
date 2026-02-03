@@ -4,21 +4,32 @@ class QrUrlParser {
       final uri = Uri.parse(url);
       
       // 1. Try standard query parameters
-      String? tenantId = uri.queryParameters['tenantId'];
-      String? tableId = uri.queryParameters['tableId'];
+      String? tenantId = uri.queryParameters['tenantId'] ?? uri.queryParameters['store'];
+      String? tableId = uri.queryParameters['tableId'] ?? uri.queryParameters['table'];
 
-      // 2. If not found, check the fragment (Hash routing: /#/?tenantId=...)
+      // 2. If not found, check the fragment
       if (tenantId == null && uri.fragment.isNotEmpty) {
-        // Handle cases like "ScanServe/#/?tenantId=..." or "ScanServe/#/pages?tenantId=..."
         final fragment = uri.fragment;
-        final queryIndex = fragment.indexOf('?');
         
+        // Check for query params in fragment (Hash routing: /#/?tenantId=...)
+        final queryIndex = fragment.indexOf('?');
         if (queryIndex != -1) {
           final queryStr = fragment.substring(queryIndex + 1);
           final queryParams = Uri.splitQueryString(queryStr);
           
-          tenantId = queryParams['tenantId'];
-          tableId = queryParams['tableId'];
+          tenantId = tenantId ?? queryParams['tenantId'] ?? queryParams['store'];
+          tableId = tableId ?? queryParams['tableId'] ?? queryParams['table'];
+        } 
+        
+        // Check for path segments in fragment (Hash routing: /#/demo_tenant/table1)
+        if (tenantId == null) {
+          final pathSegments = fragment.split('/').where((s) => s.isNotEmpty && s != '#').toList();
+          if (pathSegments.length >= 1) {
+            tenantId = pathSegments[0];
+            if (pathSegments.length >= 2) {
+              tableId = pathSegments[1];
+            }
+          }
         }
       }
 

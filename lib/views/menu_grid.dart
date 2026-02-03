@@ -5,6 +5,9 @@ import '../controllers/cart_controller.dart';
 import 'menu_item_card.dart';
 import 'shimmer_loading.dart';
 import 'package:scan_serve/utils/snackbar_helper.dart';
+import 'package:scan_serve/utils/session_validator.dart';
+import 'package:scan_serve/app.dart';
+import 'package:scan_serve/config/app_config.dart';
 import '../models/tenant_model.dart';
 
 class MenuGrid extends StatelessWidget {
@@ -139,13 +142,35 @@ class MenuGrid extends StatelessWidget {
         final item = actualItems[index];
         return MenuItemCard(
           item: item,
-          onAddPressed: () {
-            context.read<CartController>().addItem(item);
-            SnackbarHelper.showTopSnackBar(
-              context,
-              '${item.name} added to cart',
-              duration: const Duration(seconds: 1),
-            );
+          onAddPressed: () async {
+            try {
+              context.read<CartController>().addItem(item);
+              SnackbarHelper.showTopSnackBar(
+                context,
+                '${item.name} added to cart',
+                duration: const Duration(seconds: 1),
+              );
+            } catch (e) {
+              final cart = context.read<CartController>();
+              final validation = SessionValidator.validateForCart(
+                tenantId: cart.tenantId,
+                tableId: cart.tableId,
+                isParcelOrder: cart.isParcelOrder,
+              );
+              
+              if (!validation.isValid) {
+                SessionValidator.showValidationDialog(
+                  context: context,
+                  result: validation,
+                  onScanQR: () => Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init())),
+                    (route) => false,
+                  ),
+                );
+              } else {
+                SnackbarHelper.showTopSnackBar(context, 'Error: $e');
+              }
+            }
           },
         );
       },

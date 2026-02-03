@@ -797,9 +797,21 @@ class _BillsScreenState extends State<BillsScreen> {
   }
 
   void _handleMarkAsPaid(BuildContext context, BillsProvider provider, dynamic session) async {
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => _MarkAsPaidDialog(tableName: session.tableName ?? 'Table'),
+    );
+
+    if (result == null) return;
+
     setState(() => _processingTableId = session.tableId);
     try {
-      final billId = await provider.markAsPaid(session.tableId, session.orderIds);
+      final billId = await provider.markAsPaid(
+        session.tableId, 
+        session.orderIds,
+        paymentMethod: result['method'],
+        note: result['note'],
+      );
       if (mounted && billId != null) {
         _showSuccessAndPrintDialog(context, billId);
       }
@@ -916,5 +928,71 @@ class _BillsScreenState extends State<BillsScreen> {
     );
 
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+  }
+}
+
+class _MarkAsPaidDialog extends StatefulWidget {
+  final String tableName;
+  const _MarkAsPaidDialog({required this.tableName});
+
+  @override
+  State<_MarkAsPaidDialog> createState() => _MarkAsPaidDialogState();
+}
+
+class _MarkAsPaidDialogState extends State<_MarkAsPaidDialog> {
+  String _selectedMethod = 'Cash';
+  final TextEditingController _noteController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Settle ${widget.tableName}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Row(
+            children: ['Cash', 'UPI', 'Card'].map((m) {
+              final isSelected = _selectedMethod == m;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(m),
+                  selected: isSelected,
+                  onSelected: (val) => setState(() => _selectedMethod = m),
+                  selectedColor: AdminTheme.primaryColor.withOpacity(0.2),
+                  labelStyle: TextStyle(color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          const Text('Settlement Note (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _noteController,
+            decoration: const InputDecoration(
+              hintText: 'Add internal note...',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            maxLines: 2,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, {
+            'method': _selectedMethod,
+            'note': _noteController.text,
+          }),
+          style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
+          child: const Text('Mark as Paid'),
+        ),
+      ],
+    );
   }
 }

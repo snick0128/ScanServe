@@ -113,6 +113,7 @@ class OrderItem {
   final String? chefNote;
   final String? captainName;
   final String? variantName;
+  final String? category;
   final bool printedToKOT;
   final DateTime? printedAt;
 
@@ -131,6 +132,7 @@ class OrderItem {
     this.chefNote,
     this.captainName,
     this.variantName,
+    this.category,
     this.printedToKOT = false,
     this.printedAt,
   }) : this.timestamp = timestamp ?? DateTime.now();
@@ -157,6 +159,7 @@ class OrderItem {
       chefNote: data['chefNote'],
       captainName: data['captainName'],
       variantName: data['variantName'],
+      category: data['category'],
       printedToKOT: data['printedToKOT'] ?? false,
       printedAt: data['printedAt'] != null ? parseTime(data['printedAt']) : null,
     );
@@ -178,6 +181,7 @@ class OrderItem {
       'chefNote': chefNote,
       'captainName': captainName,
       'variantName': variantName,
+      'category': category,
       'printedToKOT': printedToKOT,
       if (printedAt != null) 'printedAt': Timestamp.fromDate(printedAt!),
     };
@@ -198,6 +202,7 @@ class OrderItem {
     String? chefNote,
     String? captainName,
     String? variantName,
+    String? category,
     bool? printedToKOT,
     DateTime? printedAt,
   }) {
@@ -216,6 +221,7 @@ class OrderItem {
       chefNote: chefNote ?? this.chefNote,
       captainName: captainName ?? this.captainName,
       variantName: variantName ?? this.variantName,
+      category: category ?? this.category,
       printedToKOT: printedToKOT ?? this.printedToKOT,
       printedAt: printedAt ?? this.printedAt,
     );
@@ -257,6 +263,7 @@ class Order {
   final DateTime? printedAt;
   final DateTime? paidAt;
   final String? paidBy;
+  final String? paymentNote;
 
   Order({
     required this.id,
@@ -291,6 +298,7 @@ class Order {
     this.printedAt,
     this.paidAt,
     this.paidBy,
+    this.paymentNote,
   });
 
   factory Order.fromFirestore(DocumentSnapshot doc) {
@@ -345,6 +353,7 @@ class Order {
       printedAt: data['printedAt'] != null ? parseDateTime(data['printedAt']) : null,
       paidAt: data['paidAt'] != null ? parseDateTime(data['paidAt']) : null,
       paidBy: data['paidBy'],
+      paymentNote: data['paymentNote'],
     );
   }
 
@@ -382,6 +391,7 @@ class Order {
       if (printedAt != null) 'printedAt': Timestamp.fromDate(printedAt!),
       if (paidAt != null) 'paidAt': Timestamp.fromDate(paidAt!),
       if (paidBy != null) 'paidBy': paidBy,
+      'paymentNote': paymentNote,
     };
   }
 
@@ -418,6 +428,7 @@ class Order {
     DateTime? printedAt,
     DateTime? paidAt,
     String? paidBy,
+    String? paymentNote,
   }) {
     return Order(
       id: id ?? this.id,
@@ -452,6 +463,7 @@ class Order {
       printedAt: printedAt ?? this.printedAt,
       paidAt: paidAt ?? this.paidAt,
       paidBy: paidBy ?? this.paidBy,
+      paymentNote: paymentNote ?? this.paymentNote,
     );
   }
 

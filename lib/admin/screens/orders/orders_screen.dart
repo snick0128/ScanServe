@@ -544,8 +544,8 @@ class _OrderCard extends StatelessWidget {
             ? OrderDetailsDialog(order: order)
             : TableOrdersDialog(
                 tenantId: order.tenantId, 
-                tableId: order.tableId ?? '', 
-                tableName: order.tableName ?? 'Table'
+                tableId: order.tableId ?? (order.type == 'parcel' ? 'PARCEL' : ''),
+                tableName: order.tableName ?? (order.type == 'parcel' ? 'Parcel' : 'Table')
               ),
         );
       },
@@ -686,8 +686,8 @@ class _OrderCard extends StatelessWidget {
                             ? OrderDetailsDialog(order: order)
                             : TableOrdersDialog(
                                 tenantId: order.tenantId, 
-                                tableId: order.tableId ?? '', 
-                                tableName: order.tableName ?? 'Table'
+                                tableId: order.tableId ?? (order.type == 'parcel' ? 'PARCEL' : ''),
+                                tableName: order.tableName ?? (order.type == 'parcel' ? 'Parcel' : 'Table')
                               ),
                         );
                       },

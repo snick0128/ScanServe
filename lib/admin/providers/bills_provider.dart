@@ -167,7 +167,7 @@ class BillsProvider with ChangeNotifier {
     return '${trend > 0 ? '+' : ''}${trend.toStringAsFixed(1)}%';
   }
 
-  Future<String?> markAsPaid(String tableId, List<String> orderIds) async {
+  Future<String?> markAsPaid(String tableId, List<String> orderIds, {String? paymentMethod, String? note}) async {
     if (_tenantId == null || _ordersProvider == null) return null;
     
     try {
@@ -184,6 +184,8 @@ class BillsProvider with ChangeNotifier {
         tenantId: _tenantId!,
         tableId: tableId,
         orders: orders,
+        paymentMethod: paymentMethod,
+        note: note,
       );
 
       // 3. Close the table session

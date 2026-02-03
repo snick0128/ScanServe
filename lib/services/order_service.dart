@@ -117,6 +117,7 @@ class OrderService {
               isAddon: true, // Mark as add-on (Requirement 4)
               chefNote: chefNote,
               variantName: cartItem.selectedVariant?.name,
+              category: cartItem.item.category,
             ));
           }
 
@@ -174,6 +175,7 @@ class OrderService {
           timestamp: DateTime.now(),
           isAddon: false,
           variantName: c.selectedVariant?.name,
+          category: c.item.category,
         );
       }).toList();
 

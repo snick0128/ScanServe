@@ -534,32 +534,95 @@ class _KDSScreenState extends State<KDSScreen> {
     });
   }
 
+
   Future<void> _markCheckedItemsReady(String orderId, List<model.OrderItem> allItems) async {
     final provider = context.read<OrdersProvider>();
     final checkedItemIds = _checkedItems[orderId] ?? {};
     
-    if (checkedItemIds.isEmpty) return;
+    if (checkedItemIds.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No items selected'), backgroundColor: AdminTheme.warning),
+        );
+      }
+      return;
+    }
+
+    // Show loading indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+              SizedBox(width: 16),
+              Text('Updating items...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
 
     try {
+      int updatedCount = 0;
+      List<String> errors = [];
+
       for (var item in allItems) {
         if (checkedItemIds.contains(item.id) && item.status != model.OrderItemStatus.ready) {
-          await provider.updateOrderItemStatus(orderId, item.id, model.OrderItemStatus.ready);
+          try {
+            await provider.updateOrderItemStatus(orderId, item.id, model.OrderItemStatus.ready);
+            updatedCount++;
+            debugPrint('✅ KDS: Marked item ${item.name} as READY');
+          } catch (itemError) {
+            debugPrint('❌ KDS: Failed to update item ${item.name}: $itemError');
+            errors.add(item.name);
+          }
         }
       }
       
+      // Clear checked items for this order
       setState(() {
         _checkedItems.remove(orderId);
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Selected items marked as READY'), backgroundColor: AdminTheme.success),
-        );
+        ScaffoldMessenger.of(context).clearSnackBars();
+        
+        if (errors.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✓ $updatedCount item${updatedCount > 1 ? 's' : ''} marked as READY'),
+              backgroundColor: AdminTheme.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠ Updated $updatedCount items, ${errors.length} failed: ${errors.join(', ')}'),
+              backgroundColor: AdminTheme.warning,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     } catch (e) {
+      debugPrint('❌ KDS: Critical error in _markCheckedItemsReady: $e');
+      
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AdminTheme.critical),
+          SnackBar(
+            content: Text('Error updating items: ${e.toString()}'),
+            backgroundColor: AdminTheme.critical,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'RETRY',
+              textColor: Colors.white,
+              onPressed: () => _markCheckedItemsReady(orderId, allItems),
+            ),
+          ),
         );
       }
     }
@@ -658,15 +721,31 @@ class _KDSScreenState extends State<KDSScreen> {
   }
 
   List<model.Order> _filterOrdersForStation(List<model.Order> orders, List<MenuItem> menuItems) {
-    if (_currentStation?.id == 'pass_expo') return orders;
+    var filtered = orders.toList();
     
-    return orders.where((order) {
-      // Logic: Show order ONLY if it contains items belonging to THIS station's categories
-      return order.items.any((item) {
-        final menuItem = menuItems.firstWhere((mi) => mi.id == item.id || mi.name == item.name, orElse: () => MenuItem(id: '', name: '', category: '', price: 0, description: '', imageUrl: '', isManualAvailable: true, itemType: 'veg'));
-        return _currentStation?.categories.contains(menuItem.category) ?? true;
-      });
-    }).toList();
+    if (_currentStation?.id != 'pass_expo') {
+      filtered = filtered.where((order) {
+        return order.items.any((item) {
+          final menuItem = menuItems.firstWhere(
+            (mi) => mi.id == item.id || mi.name == item.name, 
+            orElse: () => MenuItem(id: '', name: '', category: '', price: 0, description: '', imageUrl: '', isManualAvailable: true, itemType: 'veg')
+          );
+          if (menuItem.id.isEmpty) return true; // Show in all if unknown
+          return _currentStation?.categories.contains(menuItem.category) ?? true;
+        });
+      }).toList();
+    }
+
+    // Robust Sorting logic: 
+    // 1. Urgency Score (System score)
+    // 2. Age (Oldest first)
+    filtered.sort((a, b) {
+      if (a.isUrgent && !b.isUrgent) return -1;
+      if (!a.isUrgent && b.isUrgent) return 1;
+      return a.createdAt.compareTo(b.createdAt);
+    });
+
+    return filtered;
   }
 
   List<model.OrderItem> _filterItemsForStation(List<model.OrderItem> items, List<MenuItem> menuItems) {

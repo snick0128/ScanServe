@@ -5,6 +5,10 @@ import '../models/tenant_model.dart';
 import '../theme/app_theme.dart';
 import '../utils/haptic_helper.dart';
 import '../controllers/cart_controller.dart';
+import '../utils/snackbar_helper.dart';
+import '../utils/session_validator.dart';
+import '../app.dart';
+import '../config/app_config.dart';
 
 class ItemPreviewSheet extends StatefulWidget {
   final MenuItem item;
@@ -220,16 +224,43 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: isVariantRequired ? null : () {
+                    onTap: isVariantRequired ? null : () async {
                       HapticHelper.medium();
-                      if (widget.item.hasVariants) {
-                        if (_selectedVariant != null) {
-                          context.read<CartController>().addItem(widget.item, _selectedVariant);
+                      try {
+                        if (widget.item.hasVariants) {
+                          if (_selectedVariant != null) {
+                            context.read<CartController>().addItem(widget.item, _selectedVariant);
+                            SnackbarHelper.showTopSnackBar(
+                              context,
+                              '${widget.item.name} (${_selectedVariant!.name}) added to cart',
+                              duration: const Duration(seconds: 1),
+                            );
+                          }
+                        } else {
+                          widget.onAdd();
                         }
-                      } else {
-                        widget.onAdd();
+                        Navigator.pop(context);
+                      } catch (e) {
+                        final cart = context.read<CartController>();
+                        final validation = SessionValidator.validateForCart(
+                          tenantId: cart.tenantId,
+                          tableId: cart.tableId,
+                          isParcelOrder: cart.isParcelOrder,
+                        );
+                        
+                        if (!validation.isValid) {
+                          SessionValidator.showValidationDialog(
+                            context: context,
+                            result: validation,
+                            onScanQR: () => Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init())),
+                              (route) => false,
+                            ),
+                          );
+                        } else {
+                          SnackbarHelper.showTopSnackBar(context, 'Error: $e');
+                        }
                       }
-                      Navigator.pop(context);
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Center(

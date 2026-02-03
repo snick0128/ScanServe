@@ -9,6 +9,7 @@ import '../providers/tables_provider.dart';
 import 'menu_selector_dialog.dart';
 import '../theme/admin_theme.dart';
 import '../../../models/table_status.dart';
+import '../../../models/order_model.dart';
 
 class StaffOrderDialog extends StatefulWidget {
   final String tenantId;
@@ -30,6 +31,7 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
   String? _selectedTableId;
   String? _selectedTableName;
   bool _isCreating = false;
+  OrderType _selectedOrderType = OrderType.dineIn;
 
   @override
   void initState() {
@@ -57,7 +59,34 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
               ],
             ),
             const SizedBox(height: 24),
-            if (widget.preselectedTableId == null) ...[
+            
+            // Order Type Selection
+            const Text('Order Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTypeOption(
+                    'Dine-in', 
+                    Icons.restaurant, 
+                    _selectedOrderType == OrderType.dineIn,
+                    () => setState(() => _selectedOrderType = OrderType.dineIn),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTypeOption(
+                    'Parcel', 
+                    Icons.shopping_bag, 
+                    _selectedOrderType == OrderType.parcel,
+                    () => setState(() => _selectedOrderType = OrderType.parcel),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            if (_selectedOrderType == OrderType.dineIn && widget.preselectedTableId == null) ...[
               const Text('1. Select Table', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
               Consumer<TablesProvider>(
@@ -95,7 +124,7 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                 },
               ),
               const SizedBox(height: 32),
-            ] else ...[
+            ] else if (_selectedOrderType == OrderType.dineIn && widget.preselectedTableId != null) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -115,12 +144,32 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                 ),
               ),
               const SizedBox(height: 24),
+            ] else if (_selectedOrderType == OrderType.parcel) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AdminTheme.primaryColor.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.2)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.shopping_bag, color: AdminTheme.primaryColor),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Creating Parcel / Takeaway Order',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
             ],
             SizedBox(
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: (_selectedTableId == null || _isCreating) ? null : _selectMenu,
+                onPressed: ((_selectedOrderType == OrderType.dineIn && _selectedTableId == null) || _isCreating) ? null : _selectMenu,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AdminTheme.primaryColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -150,6 +199,37 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
     }
   }
 
+  Widget _buildTypeOption(String label, IconData icon, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? AdminTheme.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AdminTheme.primaryColor : Colors.grey[300]!,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.grey[600]),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _createOrder(List<model.OrderItem> items) async {
     setState(() => _isCreating = true);
     try {
@@ -164,8 +244,8 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
       final newOrder = model.Order(
         id: const Uuid().v4(),
         tenantId: widget.tenantId,
-        tableId: _selectedTableId,
-        tableName: _selectedTableName,
+        tableId: _selectedOrderType == OrderType.parcel ? 'PARCEL' : _selectedTableId,
+        tableName: _selectedOrderType == OrderType.parcel ? 'Parcel' : _selectedTableName,
         items: items,
         status: model.OrderStatus.pending,
         subtotal: subtotal,
@@ -174,18 +254,21 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
         createdAt: DateTime.now(),
         customerName: 'Staff Created',
         captainName: auth.userName ?? 'Staff',
+        type: _selectedOrderType == OrderType.parcel ? 'parcel' : 'dineIn',
       );
 
       await ordersProvider.createOrder(newOrder);
 
-      // Update table status
-      final table = tablesProvider.tables.firstWhere((t) => t.id == _selectedTableId);
-      await tablesProvider.updateTable(table.copyWith(
-        status: TableStatus.occupied,
-        isAvailable: false,
-        isOccupied: true,
-        occupiedAt: DateTime.now(),
-      ));
+      // Update table status if it's a Dine-in order
+      if (_selectedOrderType == OrderType.dineIn && _selectedTableId != null) {
+        final table = tablesProvider.tables.firstWhere((t) => t.id == _selectedTableId);
+        await tablesProvider.updateTable(table.copyWith(
+          status: TableStatus.occupied,
+          isAvailable: false,
+          isOccupied: true,
+          occupiedAt: DateTime.now(),
+        ));
+      }
 
       if (mounted) {
         Navigator.pop(context);

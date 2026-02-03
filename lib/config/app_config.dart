@@ -24,26 +24,13 @@ class AppConfig {
 
     if (kIsWeb) {
       final uri = Uri.base;
-      var params = Map<String, String>.from(uri.queryParameters);
-
-      // Robust check: if main query params are empty or missing tenantId, check fragment (Hash Routing)
-      // Standard Flutter Web often moves query params after the '#'
-      if (params['tenantId'] == null && params['store'] == null && uri.fragment.contains('?')) {
-        try {
-          final fragQuery = uri.fragment.split('?').last;
-          final fragParams = Uri.splitQueryString(fragQuery);
-          params.addAll(fragParams);
-          print('🔗 Detected parameters in URL fragment (Hash Routing)');
-        } catch (e) {
-          print('❌ Error parsing URL fragment: $e');
-        }
-      }
-
-      // 1. tenantId (modern) or store (legacy)
-      tenantId = params['tenantId'] ?? params['store'];
-
-      // 2. tableId (modern) or table (legacy)
-      tableId = params['tableId'] ?? params['table'];
+      final params = QrUrlParser.parseUrl(uri.toString());
+      
+      tenantId = params['tenantId'];
+      tableId = params['tableId'];
+      
+      // Fallback to manual check for explicit 'type' or other params not in QrUrlParser
+      final queryParams = uri.queryParameters;
       
       // 3. Determine OrderType (Table ID presence usually implies Dine-In)
       if (tableId != null && tableId.isNotEmpty) {
@@ -53,8 +40,8 @@ class AppConfig {
       }
 
       // 4. Explicit override if 'type' param exists
-      if (params.containsKey('type')) {
-        final typeStr = params['type']?.toLowerCase();
+      if (queryParams.containsKey('type')) {
+        final typeStr = queryParams['type']?.toLowerCase();
         if (typeStr == 'dinein') {
           orderType = OrderType.dineIn;
         } else if (typeStr == 'parcel') {
