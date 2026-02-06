@@ -48,8 +48,15 @@ class FirebaseService {
   }
 
   static Future<void> clearCache() async {
-    // Method to clear Firestore cache if needed
-    await FirebaseFirestore.instance.clearPersistence();
+    try {
+      // NOTE: clearPersistence() will fail if there are active listeners.
+      // Callers should ensure providers/controllers are disposed before calling this.
+      await FirebaseFirestore.instance.clearPersistence();
+      print('🗑️ Firestore cache cleared successfully.');
+    } catch (e) {
+      print('⚠️ Failed to clear Firestore cache (possibly due to active listeners): $e');
+      // Don't rethrow to prevent app crash on web
+    }
   }
 
   static bool get isPersistenceEnabled {

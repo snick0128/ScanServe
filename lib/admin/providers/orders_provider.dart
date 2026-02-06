@@ -1034,11 +1034,20 @@ class OrdersProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _ordersSubscription?.cancel();
+    _pastOrdersSubscription?.cancel();
+    for (var sub in _orderSubscriptions.values) {
+      sub.cancel();
+    }
+    _orderSubscriptions.clear();
+    
     // Cancel all timers
     for (var timer in _prepTimers.values) {
       timer.cancel();
     }
     _prepTimers.clear();
+    
+    _audioPlayer.dispose();
     super.dispose();
   }
 

@@ -91,7 +91,7 @@ class _InitializerState extends State<Initializer> {
     
     // MANDATORY URL VALIDITY CHECK
     if (!widget.config.isValid) {
-      _showError('Invalid or Partial URL detected. Please scan a valid QR code.');
+      _showError(widget.config.errorMessage ?? 'Invalid or Partial URL detected. Please scan a valid QR code.');
       return;
     }
 
@@ -196,7 +196,7 @@ class _InitializerState extends State<Initializer> {
       
       final orderController = context.read<OrderController>();
       await orderController.setOrderType(orderType);
-      orderController.setSession(tenantId, tableId, sessionId: activeSessionId);
+      await orderController.setSession(tenantId, tableId, sessionId: activeSessionId);
 
 
       // Initialize Cart Persistence

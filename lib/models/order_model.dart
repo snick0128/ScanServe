@@ -1,16 +1,6 @@
-enum OrderType {
-  dineIn,
-  parcel;
+import 'order_enums.dart';
 
-  String get displayName {
-    switch (this) {
-      case OrderType.dineIn:
-        return 'Dine-in';
-      case OrderType.parcel:
-        return 'Parcel';
-    }
-  }
-}
+export 'order_enums.dart';
 
 class OrderSession {
   final String orderId;

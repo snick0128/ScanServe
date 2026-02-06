@@ -6,7 +6,7 @@ import 'services/firebase_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scan_serve/admin/admin_app.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseService.initialize();
   

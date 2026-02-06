@@ -7,55 +7,47 @@ class MenuService {
   Future<List<MenuItem>> getMenuItems(String tenantId) async {
     try {
       print('🔥 FETCHING MENU ITEMS: Starting for tenant $tenantId');
-      // Get categories subcollection
-      final categoriesCollection = await _firestore
+      final categoriesSnapshot = await _firestore
           .collection('tenants')
           .doc(tenantId)
           .collection('categories')
           .get();
 
-      print('🔥 FOUND CATEGORIES: ${categoriesCollection.docs.length} categories');
-
-      if (categoriesCollection.docs.isEmpty) {
-        print('❌ NO CATEGORIES FOUND for tenant $tenantId');
-        return [];
-      }
-
       List<MenuItem> allMenuItems = [];
 
-      for (var categoryDoc in categoriesCollection.docs) {
+      for (var categoryDoc in categoriesSnapshot.docs) {
         final categoryData = categoryDoc.data();
         final categoryName = categoryData['name'] as String? ?? categoryDoc.id;
 
-        print('Processing category: ${categoryDoc.id}');
-        print('Category data: ${categoryDoc.data()}');
-
-        final menuItems = categoryData['menu_items'] as List<dynamic>? ?? [];
-        print('Found ${menuItems.length} items in category ${categoryDoc.id}');
-
-        for (var item in menuItems) {
-          final itemData = item as Map<String, dynamic>;
-
-          // Add category field based on the category document ID
+        // Fetch items from subcollection: tenants/{tenantId}/categories/{categoryId}/items
+        final itemsSnapshot = await categoryDoc.reference.collection('items').get();
+        
+        for (var itemDoc in itemsSnapshot.docs) {
+          final itemData = itemDoc.data();
+          
+          // Add category field if missing
           if (!itemData.containsKey('category')) {
-            final categoryId = categoryDoc.id.toLowerCase();
-            // Include both 'lunch' and 'dinner' in the 'Meals' category
-            if (categoryId == 'meals' || categoryId == 'lunch' || categoryId == 'dinner') {
-              itemData['category'] = 'Meals';
-            } else {
-              itemData['category'] = categoryName;
-            }
+            itemData['category'] = categoryName;
           }
-
-          print('🔍 RAW ITEM DATA: ${itemData.toString()}');
+          
           try {
-            final menuItem = MenuItem.fromMap(itemData);
-            print(
-              '📝 CREATED: ${menuItem.name} | Category: "${menuItem.category}" | Subcategory: "${menuItem.subcategory}"',
-            );
-            allMenuItems.add(menuItem);
+            allMenuItems.add(MenuItem.fromMap(itemData));
           } catch (e) {
-            print('❌ Error parsing menu item: $e');
+            print('❌ Error parsing menu item ${itemDoc.id}: $e');
+          }
+        }
+
+        // BACKWARD COMPATIBILITY: Also check the old 'menu_items' array
+        final legacyItems = categoryData['menu_items'] as List<dynamic>? ?? [];
+        if (legacyItems.isNotEmpty) {
+          print('⚠️ Found ${legacyItems.length} legacy items in category ${categoryDoc.id}');
+          for (var item in legacyItems) {
+            final itemData = item as Map<String, dynamic>;
+            if (!allMenuItems.any((i) => i.id == itemData['id'])) {
+              try {
+                allMenuItems.add(MenuItem.fromMap(itemData));
+              } catch (e) { /* ignore legacy errors */ }
+            }
           }
         }
       }
@@ -63,11 +55,9 @@ class MenuService {
       return allMenuItems;
     } catch (e) {
       print('❌ ERROR FETCHING MENU ITEMS: $e');
-      print('Stack trace: ${StackTrace.current}');
       return [];
     }
   }
-
   Future<List> loadMenuItemsForTenant(String tenantId) async {
     try {
       final menuItems = await getMenuItems(tenantId);
@@ -98,23 +88,14 @@ class MenuService {
 
   Future<void> addMenuItem(String tenantId, String categoryId, MenuItem item) async {
     try {
-      final categoryRef = _firestore
+      await _firestore
           .collection('tenants')
           .doc(tenantId)
           .collection('categories')
-          .doc(categoryId);
-
-      await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(categoryRef);
-        if (!snapshot.exists) throw Exception('Category not found');
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final items = List<Map<String, dynamic>>.from(data['menu_items'] ?? []);
-        
-        items.add(item.toMap());
-        
-        transaction.update(categoryRef, {'menu_items': items});
-      });
+          .doc(categoryId)
+          .collection('items')
+          .doc(item.id)
+          .set(item.toMap());
     } catch (e) {
       print('Error adding menu item: $e');
       rethrow;
@@ -123,27 +104,14 @@ class MenuService {
 
   Future<void> updateMenuItem(String tenantId, String categoryId, MenuItem item) async {
     try {
-      final categoryRef = _firestore
+      await _firestore
           .collection('tenants')
           .doc(tenantId)
           .collection('categories')
-          .doc(categoryId);
-
-      await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(categoryRef);
-        if (!snapshot.exists) throw Exception('Category not found');
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final items = List<Map<String, dynamic>>.from(data['menu_items'] ?? []);
-        
-        final index = items.indexWhere((i) => i['id'] == item.id);
-        if (index != -1) {
-          items[index] = item.toMap();
-          transaction.update(categoryRef, {'menu_items': items});
-        } else {
-          throw Exception('Item not found in category');
-        }
-      });
+          .doc(categoryId)
+          .collection('items')
+          .doc(item.id)
+          .update(item.toMap());
     } catch (e) {
       print('Error updating menu item: $e');
       rethrow;
@@ -152,23 +120,14 @@ class MenuService {
 
   Future<void> deleteMenuItem(String tenantId, String categoryId, String itemId) async {
     try {
-      final categoryRef = _firestore
+      await _firestore
           .collection('tenants')
           .doc(tenantId)
           .collection('categories')
-          .doc(categoryId);
-
-      await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(categoryRef);
-        if (!snapshot.exists) throw Exception('Category not found');
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final items = List<Map<String, dynamic>>.from(data['menu_items'] ?? []);
-        
-        items.removeWhere((i) => i['id'] == itemId);
-        
-        transaction.update(categoryRef, {'menu_items': items});
-      });
+          .doc(categoryId)
+          .collection('items')
+          .doc(itemId)
+          .delete();
     } catch (e) {
       print('Error deleting menu item: $e');
       rethrow;

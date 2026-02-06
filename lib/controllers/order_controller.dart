@@ -41,7 +41,7 @@ class OrderController extends ChangeNotifier {
   List<OrderDetails> get activeOrders => _activeOrders.toList();
   List<OrderDetails> get pastOrders => _pastOrders.toList();
 
-  void setSession(String tenantId, String? tableId, {String? sessionId}) async {
+  Future<void> setSession(String tenantId, String? tableId, {String? sessionId}) async {
     // Get guest ID first
     final guestId = await _guestSession.getGuestId();
 
@@ -347,5 +347,15 @@ class OrderController extends ChangeNotifier {
       _activeOrders[orderIndex] = updatedOrder;
       notifyListeners();
     }
+  }
+  @override
+  void dispose() {
+    _ordersSubscription?.cancel();
+    _tableOrdersSubscription?.cancel();
+    for (var sub in _orderStatusSubscriptions.values) {
+      sub.cancel();
+    }
+    _orderStatusSubscriptions.clear();
+    super.dispose();
   }
 }

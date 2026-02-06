@@ -14,6 +14,7 @@ class OfflineService {
   OfflineService._internal();
 
   final Connectivity _connectivity = Connectivity();
+  StreamSubscription? _connectivitySubscription;
   final StreamController<bool> _connectionStatusController =
       StreamController<bool>.broadcast();
 
@@ -35,7 +36,7 @@ class OfflineService {
       _connectionStatusController.add(_isOnline);
 
       // Listen for connectivity changes
-      _connectivity.onConnectivityChanged.listen((result) {
+      _connectivitySubscription = _connectivity.onConnectivityChanged.listen((result) {
         final wasOnline = _isOnline;
         _isOnline = result != ConnectivityResult.none;
 
@@ -54,6 +55,8 @@ class OfflineService {
   }
 
   void dispose() {
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
     _connectionStatusController.close();
   }
 

@@ -1,77 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../controllers/cart_controller.dart';
-import 'order_model.dart';
+import 'order_enums.dart';
 
-enum OrderStatus {
-  pending,
-  preparing,
-  ready,
-  served,
-  billRequested,
-  paymentPending,
-  completed,
-  cancelled;
-
-
-  String get displayName {
-    switch (this) {
-      case OrderStatus.pending:
-        return 'Pending';
-      case OrderStatus.preparing:
-        return 'Preparing';
-      case OrderStatus.ready:
-        return 'Ready to Serve';
-      case OrderStatus.served:
-        return 'Served';
-      case OrderStatus.billRequested:
-        return 'Bill Requested';
-      case OrderStatus.paymentPending:
-        return 'Payment Pending';
-      case OrderStatus.completed:
-        return 'Completed';
-      case OrderStatus.cancelled:
-        return 'Cancelled';
-
-    }
-  }
-}
-
-enum PaymentStatus {
-  pending,
-  paid,
-  failed,
-  cancelled,
-  refunded;
-
-  String get displayName {
-    switch (this) {
-      case PaymentStatus.pending:
-        return 'Pending';
-      case PaymentStatus.paid:
-        return 'Paid';
-      case PaymentStatus.failed:
-        return 'Payment Failed';
-      case PaymentStatus.cancelled:
-        return 'Payment Cancelled';
-      case PaymentStatus.refunded:
-        return 'Refunded';
-    }
-  }
-}
-
-enum PaymentMethod {
-  upi,
-  cash;
-
-  String get displayName {
-    switch (this) {
-      case PaymentMethod.upi:
-        return 'UPI';
-      case PaymentMethod.cash:
-        return 'Cash';
-    }
-  }
-}
+export 'order_enums.dart';
 
 class OrderDetails {
   final String orderId;
@@ -197,29 +128,8 @@ class OrderDetails {
 
   /// Parse order status from database with legacy migration support
   static OrderStatus _parseOrderStatus(dynamic status) {
-    final statusStr = status.toString().toLowerCase();
-    
-    // Handle legacy statuses from database migration
-    switch (statusStr) {
-      case 'confirmed':
-      case 'ordered':
-        return OrderStatus.pending;
-      case 'ready_to_serve':
-        return OrderStatus.ready;
-      case 'billrequested':
-      case 'bill_requested':
-        return OrderStatus.billRequested;
-      case 'paymentpending':
-      case 'payment_pending':
-        return OrderStatus.paymentPending;
-      default:
-
-        // Try to match current enum values
-        return OrderStatus.values.firstWhere(
-          (e) => e.name == statusStr,
-          orElse: () => OrderStatus.pending,
-        );
-    }
+    if (status == null) return OrderStatus.pending;
+    return OrderStatus.fromString(status.toString());
   }
 
   factory OrderDetails.fromMap(Map<String, dynamic> map) {

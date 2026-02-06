@@ -88,25 +88,13 @@ class PaymentService {
         updateData['status'] = tableId != null ? OrderStatus.preparing.name : OrderStatus.pending.name;
       }
 
-      if (tableId != null) {
-        // Update dine-in order
-        await _firestore
-            .collection('tenants')
-            .doc(tenantId)
-            .collection('tables')
-            .doc(tableId)
-            .collection('orders')
-            .doc(orderId)
-            .update(updateData);
-      } else {
-        // Update parcel order
-        await _firestore
-            .collection('tenants')
-            .doc(tenantId)
-            .collection('orders')
-            .doc(orderId)
-            .update(updateData);
-      }
+      // Always update order at the canonical path: tenants/{tenantId}/orders/{orderId}
+      await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('orders')
+          .doc(orderId)
+          .update(updateData);
     } catch (e) {
       print('Error updating order payment status: $e');
       rethrow;

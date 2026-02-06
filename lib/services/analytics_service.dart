@@ -35,12 +35,14 @@ class AnalyticsService {
     }
   }
 
-  Future<Map<String, int>> getTopSellingItems(String tenantId, {int limit = 5}) async {
+  Future<Map<String, int>> getTopSellingItems(String tenantId, {int days = 30, int limit = 5}) async {
     try {
+      final startDate = DateTime.now().subtract(Duration(days: days));
       final snapshot = await _firestore
           .collection('tenants')
           .doc(tenantId)
           .collection('orders')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('status', whereIn: ['completed', 'served'])
           .get();
 
@@ -69,12 +71,14 @@ class AnalyticsService {
     }
   }
 
-  Future<Map<String, dynamic>> getOverallStats(String tenantId) async {
+  Future<Map<String, dynamic>> getOverallStats(String tenantId, {int days = 30}) async {
     try {
+      final startDate = DateTime.now().subtract(Duration(days: days));
       final snapshot = await _firestore
           .collection('tenants')
           .doc(tenantId)
           .collection('orders')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .get();
 
       int totalOrders = snapshot.docs.length;
@@ -97,6 +101,7 @@ class AnalyticsService {
         'totalRevenue': totalRevenue,
         'completedOrders': completedOrders,
         'averageOrderValue': totalOrders > 0 ? totalRevenue / totalOrders : 0,
+        'periodDays': days,
       };
     } catch (e) {
       print('Error fetching overall stats: $e');
