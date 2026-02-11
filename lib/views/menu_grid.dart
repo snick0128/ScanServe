@@ -85,8 +85,16 @@ class MenuGrid extends StatelessWidget {
         width: double.infinity,
         height: 200,
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E5EA)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Center(
           child: Column(
@@ -97,7 +105,7 @@ class MenuGrid extends StatelessWidget {
                     ? Icons.search_off
                     : Icons.restaurant_menu,
                 size: 48,
-                color: Colors.grey[700],
+                color: const Color(0xFF8E8E93),
               ),
               const SizedBox(height: 12),
               Text(
@@ -105,9 +113,9 @@ class MenuGrid extends StatelessWidget {
                     ? 'No search results found'
                     : 'No items found',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: const Color(0xFF1C1C1E),
                   fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               if (menuController.isSearching)
@@ -115,7 +123,7 @@ class MenuGrid extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Try searching with different keywords',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 14),
                   ),
                 ),
             ],

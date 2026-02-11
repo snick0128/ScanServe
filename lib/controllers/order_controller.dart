@@ -165,6 +165,14 @@ class OrderController extends ChangeNotifier {
     });
   }
 
+  void _pruneOrderStatusSubscriptions(Set<String> activeOrderIds) {
+    final stale = _orderStatusSubscriptions.keys.where((id) => !activeOrderIds.contains(id)).toList();
+    for (final id in stale) {
+      _orderStatusSubscriptions[id]?.cancel();
+      _orderStatusSubscriptions.remove(id);
+    }
+  }
+
   bool _isPaymentCompleted = false;
   bool get isPaymentCompleted => _isPaymentCompleted;
 
@@ -251,6 +259,7 @@ class OrderController extends ChangeNotifier {
           // Sort by timestamp, newest first
           _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           _pastOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          _pruneOrderStatusSubscriptions(_activeOrders.map((o) => o.orderId).toSet());
 
           // REQUIREMENT: Detect when all orders for this session are PAID
           // Instead of silent clearing, we trigger a flag for the UI to show the prompt

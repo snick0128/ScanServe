@@ -79,12 +79,12 @@ class _MenuItemCardState extends State<MenuItemCard>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E5EA)),
+          border: Border.all(color: AppTheme.borderColor),
           boxShadow: [
-            const BoxShadow(
-              color: Color.fromRGBO(0, 0, 0, 0.08),
-              blurRadius: 12,
-              offset: Offset(0, 4),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -98,7 +98,7 @@ class _MenuItemCardState extends State<MenuItemCard>
                 LayoutBuilder(
                   builder: (context, constraints) {
                     return Container(
-                      height: constraints.maxWidth * 0.70, // Reduced from 0.75 for tighter card (Requirement #9)
+                      height: constraints.maxWidth * 0.74, // Slightly taller for richer card fill
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
                       child: ClipRRect(
@@ -114,6 +114,25 @@ class _MenuItemCardState extends State<MenuItemCard>
                       ),
                     );
                   }
+                ),
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: 0,
+                  child: Container(
+                    height: 24,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withOpacity(0.0),
+                          Colors.black.withOpacity(0.18),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
                 ),
                 // Veg/Non-veg indicator overlay
                 Positioned(
@@ -157,28 +176,29 @@ class _MenuItemCardState extends State<MenuItemCard>
                           _buildTag('Non-Veg', AppTheme.lightOrange, Colors.red),
                       ],
                     ),
-                    const SizedBox(height: 8), // Reduced from 10
+                    const SizedBox(height: 6),
                     Text(
                       widget.item.name,
                       style: GoogleFonts.outfit(
                         color: AppTheme.primaryText,
-                        fontSize: 14.5,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4), // Reduced from 6
+                    const SizedBox(height: 4),
                     Text(
                       widget.item.description,
                       style: GoogleFonts.outfit(
                         color: AppTheme.secondaryText,
-                        fontSize: 12,
-                        height: 1.1,
+                        fontSize: 12.5,
+                        height: 1.2,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 8),
                     const Spacer(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -246,7 +266,14 @@ class _MenuItemCardState extends State<MenuItemCard>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1C1C1E), width: 1.5),
+        border: Border.all(color: AppTheme.primaryColor, width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withOpacity(0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: _onAddPressed,
@@ -256,7 +283,7 @@ class _MenuItemCardState extends State<MenuItemCard>
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1C1C1E),
+              color: AppTheme.primaryColor,
             ),
           ),
         ),

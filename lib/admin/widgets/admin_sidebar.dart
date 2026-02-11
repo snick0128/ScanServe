@@ -295,7 +295,17 @@ class AdminSidebar extends StatelessWidget {
           CircleAvatar(
             radius: 18.r,
             backgroundColor: AdminTheme.primaryColor.withOpacity(0.2),
-            backgroundImage: const NetworkImage('https://i.pravatar.cc/150?u=manager'),
+            child: ClipOval(
+              child: Image.network(
+                'https://i.pravatar.cc/150?u=manager',
+                width: 36.w,
+                height: 36.w,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Ionicons.person_outline, size: 18.w, color: AdminTheme.secondaryText);
+                },
+              ),
+            ),
           ),
           if (!isCollapsed) ...[
             SizedBox(width: 12.w),
@@ -363,4 +373,3 @@ class AdminSidebar extends StatelessWidget {
     );
   }
 }
-

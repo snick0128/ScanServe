@@ -55,11 +55,17 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isCompact = size.width < 600;
+    final dialogWidth = isCompact ? size.width - 16 : size.width * 0.8;
+    final dialogHeight = size.height < 700 ? size.height - 16 : size.height * 0.8;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
+        width: dialogWidth,
+        height: dialogHeight,
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -90,8 +96,8 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 200,
+                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: isCompact ? 160 : 200,
                         childAspectRatio: 0.75,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,

@@ -17,17 +17,28 @@ class SearchBar extends StatefulWidget {
 
 class _SearchBarState extends State<SearchBar> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _isFocused = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChange);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (!mounted) return;
+    setState(() => _isFocused = _focusNode.hasFocus);
   }
   @override
   Widget build(BuildContext context) {
@@ -37,18 +48,24 @@ class _SearchBarState extends State<SearchBar> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.black, width: 2.r), // Highly visible border
+        border: Border.all(
+          color: _isFocused ? AppTheme.primaryColor : AppTheme.borderColor,
+          width: _isFocused ? 1.8.r : 1.2.r,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: _isFocused
+                ? AppTheme.primaryColor.withOpacity(0.18)
+                : Colors.black.withOpacity(0.08),
+            blurRadius: _isFocused ? 12 : 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4), 
       child: TextField(
         controller: _controller,
+        focusNode: _focusNode,
         onChanged: (value) {
           context.read<app_controller.MenuController>().setSearchQuery(value);
         },

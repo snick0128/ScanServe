@@ -42,49 +42,55 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxWidth = size.width < 600 ? size.width - 24 : 500.0;
+    final maxHeight = size.height * 0.9;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Create New Staff Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-              ],
-            ),
-            const SizedBox(height: 24),
-            
-            // Order Type Selection
-            const Text('Order Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTypeOption(
-                    'Dine-in', 
-                    Icons.restaurant, 
-                    _selectedOrderType == OrderType.dineIn,
-                    () => setState(() => _selectedOrderType = OrderType.dineIn),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Create New Staff Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Order Type Selection
+              const Text('Order Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTypeOption(
+                      'Dine-in', 
+                      Icons.restaurant, 
+                      _selectedOrderType == OrderType.dineIn,
+                      () => setState(() => _selectedOrderType = OrderType.dineIn),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildTypeOption(
-                    'Parcel', 
-                    Icons.shopping_bag, 
-                    _selectedOrderType == OrderType.parcel,
-                    () => setState(() => _selectedOrderType = OrderType.parcel),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildTypeOption(
+                      'Parcel', 
+                      Icons.shopping_bag, 
+                      _selectedOrderType == OrderType.parcel,
+                      () => setState(() => _selectedOrderType = OrderType.parcel),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
+                ],
+              ),
+              const SizedBox(height: 32),
 
             if (_selectedOrderType == OrderType.dineIn && widget.preselectedTableId == null) ...[
               const Text('1. Select Table', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -165,24 +171,25 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
               ),
               const SizedBox(height: 24),
             ],
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: ((_selectedOrderType == OrderType.dineIn && _selectedTableId == null) || _isCreating) ? null : _selectMenu,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AdminTheme.primaryColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: ((_selectedOrderType == OrderType.dineIn && _selectedTableId == null) || _isCreating) ? null : _selectMenu,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AdminTheme.primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: _isCreating 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        widget.preselectedTableId != null ? 'Start Ordering' : 'Next: Select Menu Items', 
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                      ),
                 ),
-                child: _isCreating 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(
-                      widget.preselectedTableId != null ? 'Start Ordering' : 'Next: Select Menu Items', 
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-                    ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -605,40 +605,48 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Add New Ingredient'),
-          content: SizedBox(
-            width: 500,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Ingredient Name (Required)')),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedCategory,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: ['Meat', 'Produce', 'Dairy', 'Spices', 'Bakery', 'General'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (v) => setDialogState(() => selectedCategory = v!),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: selectedUnit,
-                        decoration: const InputDecoration(labelText: 'Unit'),
-                        items: ['kg', 'Liter', 'Units', 'Grams', 'ml'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                        onChanged: (v) => setDialogState(() => selectedUnit = v!),
+          content: Builder(
+            builder: (context) {
+              final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(280.0, 500.0);
+              final maxHeight = MediaQuery.of(context).size.height * 0.7;
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Ingredient Name (Required)')),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: selectedCategory,
+                        decoration: const InputDecoration(labelText: 'Category'),
+                        items: ['Meat', 'Produce', 'Dairy', 'Spices', 'Bakery', 'General'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                        onChanged: (v) => setDialogState(() => selectedCategory = v!),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Initial Stock'), keyboardType: TextInputType.number),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: selectedUnit,
+                              decoration: const InputDecoration(labelText: 'Unit'),
+                              items: ['kg', 'Liter', 'Units', 'Grams', 'ml'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                              onChanged: (v) => setDialogState(() => selectedUnit = v!),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextField(controller: stockController, decoration: const InputDecoration(labelText: 'Initial Stock'), keyboardType: TextInputType.number),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(controller: reorderController, decoration: const InputDecoration(labelText: 'Low Stock Alert Level'), keyboardType: TextInputType.number),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextField(controller: reorderController, decoration: const InputDecoration(labelText: 'Low Stock Alert Level'), keyboardType: TextInputType.number),
-              ],
-            ),
+              );
+            },
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -685,49 +693,57 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text('Adjust Stock: ${item.name}'),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Current Stock: ${item.currentStock} ${item.unit}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<String>(
-                        value: adjustmentMode,
-                        decoration: const InputDecoration(labelText: 'Action', border: OutlineInputBorder()),
-                        items: ['Add', 'Remove'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                        onChanged: (v) => setDialogState(() => adjustmentMode = v!),
+          content: Builder(
+            builder: (context) {
+              final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(280.0, 420.0);
+              final maxHeight = MediaQuery.of(context).size.height * 0.7;
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Current Stock: ${item.currentStock} ${item.unit}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: DropdownButtonFormField<String>(
+                              value: adjustmentMode,
+                              decoration: const InputDecoration(labelText: 'Action', border: OutlineInputBorder()),
+                              items: ['Add', 'Remove'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                              onChanged: (v) => setDialogState(() => adjustmentMode = v!),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: qtyController,
+                              decoration: InputDecoration(
+                                labelText: 'Quantity',
+                                hintText: 'e.g. 5, 10',
+                                suffixText: item.unit,
+                                border: const OutlineInputBorder(),
+                              ),
+                              keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: true),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 3,
-                      child: TextField(
-                        controller: qtyController,
-                        decoration: InputDecoration(
-                          labelText: 'Quantity',
-                          hintText: 'e.g. 5, 10',
-                          suffixText: item.unit,
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(signed: false, decimal: true),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<InventoryChangeReason>(
+                        value: selectedReason,
+                        decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
+                        items: InventoryChangeReason.values.map((r) => DropdownMenuItem(value: r, child: Text(r.label))).toList(),
+                        onChanged: (v) => setDialogState(() => selectedReason = v!),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<InventoryChangeReason>(
-                  value: selectedReason,
-                  decoration: const InputDecoration(labelText: 'Reason', border: OutlineInputBorder()),
-                  items: InventoryChangeReason.values.map((r) => DropdownMenuItem(value: r, child: Text(r.label))).toList(),
-                  onChanged: (v) => setDialogState(() => selectedReason = v!),
-                ),
-              ],
-            ),
+              );
+            },
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

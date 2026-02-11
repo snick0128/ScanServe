@@ -115,30 +115,15 @@ class _HomeContentState extends State<HomeContent> {
           ],
         ),
         content: const Text(
-          'Your payment has been confirmed. Would you like to continue your session at this table or end it now?',
+          'Your payment has been confirmed. Your session is now closed. Please scan the QR again to start a new order.',
           style: TextStyle(fontSize: 16),
         ),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
-          OutlinedButton(
-            onPressed: () async {
-              // END SESSION
-              Navigator.pop(context);
-              await _endSession();
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
-              side: const BorderSide(color: Colors.red),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('End Session'),
-          ),
           ElevatedButton(
             onPressed: () async {
-              // CONTINUE SESSION
               Navigator.pop(context);
-              await _continueSession();
+              await _endSession();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
@@ -146,7 +131,7 @@ class _HomeContentState extends State<HomeContent> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Continue Session'),
+            child: const Text('Scan Again'),
           ),
         ],
       ),
@@ -158,9 +143,11 @@ class _HomeContentState extends State<HomeContent> {
     final session = orderController.currentSession;
     if (session == null) return;
 
-    // 1. Vacant table in backend
-    final tenantService = TenantService();
-    await tenantService.unlockTable(session.tenantId, session.tableId!);
+    // 1. Vacant table in backend (dine-in only)
+    if (session.tableId != null && session.tableId!.isNotEmpty) {
+      final tenantService = TenantService();
+      await tenantService.unlockTable(session.tenantId, session.tableId!);
+    }
 
     // 2. Clear local session
     final guestSession = GuestSessionService();
@@ -181,15 +168,18 @@ class _HomeContentState extends State<HomeContent> {
     if (session == null) return;
 
     final tenantId = session.tenantId;
-    final tableId = session.tableId!;
+    final tableId = session.tableId;
     final guestId = session.guestId;
 
     // 1. Create a brand new session ID
     final newSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
 
-    // 2. Lock table with new session in backend
-    final tenantService = TenantService();
-    final isLocked = await tenantService.lockTable(tenantId, tableId, newSessionId);
+    // 2. Lock table with new session in backend (dine-in only)
+    bool isLocked = true;
+    if (tableId != null && tableId.isNotEmpty) {
+      final tenantService = TenantService();
+      isLocked = await tenantService.lockTable(tenantId, tableId, newSessionId);
+    }
 
     if (!isLocked) {
        // Fallback if somehow failed
@@ -201,7 +191,7 @@ class _HomeContentState extends State<HomeContent> {
     final guestSession = GuestSessionService();
     final newSession = CustomerSession(
       tenantId: tenantId,
-      tableId: tableId,
+      tableId: tableId ?? '',
       sessionId: newSessionId,
       guestId: guestId,
       createdAt: DateTime.now().millisecondsSinceEpoch,
@@ -336,6 +326,13 @@ class _HomeContentState extends State<HomeContent> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20.r),
       ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(
+          height: 1,
+          color: AppTheme.borderColor.withOpacity(0.6),
+        ),
+      ),
       title: Row(
         children: [
           Expanded(
@@ -360,6 +357,13 @@ class _HomeContentState extends State<HomeContent> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.primaryColor, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.12),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Text(
                     'OPEN',
@@ -530,13 +534,18 @@ class _HomeContentState extends State<HomeContent> {
         height: 48.h,
         padding: EdgeInsets.symmetric(horizontal: 16.w),
         decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E), // Black background
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1C1C1E), Color(0xFF2C2C2E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -626,7 +635,8 @@ class _HomeContentState extends State<HomeContent> {
           menuController.toggleBestsellerOnly();
         }
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
@@ -636,6 +646,21 @@ class _HomeContentState extends State<HomeContent> {
             color: isActive ? AppTheme.primaryColor : AppTheme.borderColor,
             width: 1.w,
           ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.18),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -691,18 +716,34 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 24.h),
-        child: Text(
-          title.toUpperCase(),
-          style: GoogleFonts.outfit(
-            color: AdminTheme.secondaryText, // Better contrast
-            fontSize: 15.sp, // Slightly increased
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.8,
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 24.h),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            height: 1,
+            margin: EdgeInsets.symmetric(horizontal: 16.w),
+            color: AppTheme.borderColor.withOpacity(0.8),
           ),
-        ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderColor.withOpacity(0.7)),
+            ),
+            child: Text(
+              title.toUpperCase(),
+              style: GoogleFonts.outfit(
+                color: AdminTheme.secondaryText,
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -753,8 +794,15 @@ class _HomeContentState extends State<HomeContent> {
               child: Container(
                 height: 56.h, // Increased from 48.h for better touch target (Requirement #9)
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppTheme.primaryColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withOpacity(0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

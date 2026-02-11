@@ -58,8 +58,10 @@ class MenuItemPreview extends StatelessWidget {
     final theme = Theme.of(context);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
+    final maxHeight = mediaQuery.size.height * 0.92;
 
-    return IntrinsicHeight(
+    return SafeArea(
+      top: false,
       child: Container(
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
@@ -72,9 +74,10 @@ class MenuItemPreview extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: Column(
+            children: [
           // IMAGE FIRST (touches top)
           if (item.imageUrl != null)
             ClipRRect(
@@ -141,14 +144,13 @@ class MenuItemPreview extends StatelessWidget {
           ),
 
           // CONTENT
-          Flexible(
+          Expanded(
             child: SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 16)
                     .copyWith(bottom: 16 + bottomPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // ITEM HEADER WITH PRICE AND ADD BUTTON
                     Padding(
@@ -292,7 +294,8 @@ class MenuItemPreview extends StatelessWidget {
               ),
             ),
           ),
-          ],
+            ],
+          ),
         ),
       ),
     );

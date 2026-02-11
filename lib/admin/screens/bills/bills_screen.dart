@@ -350,68 +350,73 @@ class _BillsScreenState extends State<BillsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Billing History'),
-        content: SizedBox(
-          width: 650,
-          height: 500,
-          child: provider.allBills.isEmpty 
-              ? const Center(child: Text('No history found'))
-              : ListView.builder(
-                  itemCount: provider.allBills.length,
-                  itemBuilder: (context, index) {
-                    final bill = provider.allBills[index];
-                    return InkWell(
-                      onTap: () {
-                        Navigator.pop(context); // Close dialog
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => BillDetailsScreen(bill: bill, tenantId: widget.tenantId),
+        content: Builder(
+          builder: (context) {
+            final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(300.0, 700.0);
+            final maxHeight = MediaQuery.of(context).size.height * 0.7;
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+              child: provider.allBills.isEmpty 
+                  ? const Center(child: Text('No history found'))
+                  : ListView.builder(
+                      itemCount: provider.allBills.length,
+                      itemBuilder: (context, index) {
+                        final bill = provider.allBills[index];
+                        return InkWell(
+                          onTap: () {
+                            Navigator.pop(context); // Close dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => BillDetailsScreen(bill: bill, tenantId: widget.tenantId),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                            decoration: const BoxDecoration(
+                              border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AdminTheme.primaryColor.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Ionicons.receipt_outline, color: AdminTheme.primaryColor, size: 20),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Bill #${bill['billId']?.toString().substring(0, 8) ?? 'N/A'}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                                      ),
+                                      Text(
+                                        'Table: ${bill['tableId']} • ${DateFormat('MMM d, h:mm a').format((bill['createdAt'] as Timestamp).toDate())}',
+                                        style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '₹${bill['finalTotal']}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AdminTheme.primaryText),
+                                ),
+                                const SizedBox(width: 12),
+                                const Icon(Ionicons.chevron_forward, size: 16, color: AdminTheme.secondaryText),
+                              ],
+                            ),
                           ),
                         );
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AdminTheme.primaryColor.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Ionicons.receipt_outline, color: AdminTheme.primaryColor, size: 20),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Bill #${bill['billId']?.toString().substring(0, 8) ?? 'N/A'}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
-                                  ),
-                                  Text(
-                                    'Table: ${bill['tableId']} • ${DateFormat('MMM d, h:mm a').format((bill['createdAt'] as Timestamp).toDate())}',
-                                    style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              '₹${bill['finalTotal']}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AdminTheme.primaryText),
-                            ),
-                            const SizedBox(width: 12),
-                            const Icon(Ionicons.chevron_forward, size: 16, color: AdminTheme.secondaryText),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                    ),
+            );
+          },
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
@@ -945,54 +950,89 @@ class _MarkAsPaidDialogState extends State<_MarkAsPaidDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Settle ${widget.tableName}'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Row(
-            children: ['Cash', 'UPI', 'Card'].map((m) {
-              final isSelected = _selectedMethod == m;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(m),
-                  selected: isSelected,
-                  onSelected: (val) => setState(() => _selectedMethod = m),
-                  selectedColor: AdminTheme.primaryColor.withOpacity(0.2),
-                  labelStyle: TextStyle(color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText),
+    final size = MediaQuery.of(context).size;
+    final isCompact = size.width < 480;
+    final maxWidth = (size.width - 24).clamp(300.0, 520.0);
+    final maxHeight = size.height * 0.7;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Settle ${widget.tableName}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ['Cash', 'UPI', 'Card'].map((m) {
+                  final isSelected = _selectedMethod == m;
+                  return ChoiceChip(
+                    label: Text(m),
+                    selected: isSelected,
+                    onSelected: (val) => setState(() => _selectedMethod = m),
+                    selectedColor: AdminTheme.primaryColor.withOpacity(0.2),
+                    labelStyle: TextStyle(color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              const Text('Settlement Note (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _noteController,
+                decoration: const InputDecoration(
+                  hintText: 'Add internal note...',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-              );
-            }).toList(),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 20),
+              if (isCompact)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, {
+                        'method': _selectedMethod,
+                        'note': _noteController.text,
+                      }),
+                      style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
+                      child: const Text('Mark as Paid'),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, {
+                        'method': _selectedMethod,
+                        'note': _noteController.text,
+                      }),
+                      style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
+                      child: const Text('Mark as Paid'),
+                    ),
+                  ],
+                ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Text('Settlement Note (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _noteController,
-            decoration: const InputDecoration(
-              hintText: 'Add internal note...',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            maxLines: 2,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, {
-            'method': _selectedMethod,
-            'note': _noteController.text,
-          }),
-          style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
-          child: const Text('Mark as Paid'),
         ),
-      ],
+      ),
     );
   }
 }

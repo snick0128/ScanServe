@@ -38,6 +38,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _isSidebarCollapsed = false;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -61,6 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isTablet = MediaQuery.of(context).size.width < 1200;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AdminTheme.scaffoldBackground,
       drawer: isMobile
           ? AdminSidebar(
@@ -82,10 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 else if (index == 1) _onItemTapped(2);
                 else if (index == 2) _onItemTapped(3);
                 else {
-                  Builder(builder: (context) {
-                    Scaffold.of(context).openDrawer();
-                    return const SizedBox.shrink();
-                  });
+                  _scaffoldKey.currentState?.openDrawer();
                 }
               },
               type: BottomNavigationBarType.fixed,

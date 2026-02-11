@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/order_details.dart';
+import 'order_service.dart';
 
 class PaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
+  final OrderService _orderService = OrderService();
 
   /// Process payment for an order
   Future<String> processPayment({
@@ -85,7 +87,7 @@ class PaymentService {
 
       // If payment is paid, also update order status
       if (paymentStatus == PaymentStatus.paid) {
-        updateData['status'] = tableId != null ? OrderStatus.preparing.name : OrderStatus.pending.name;
+        updateData['status'] = OrderStatus.completed.name;
       }
 
       // Always update order at the canonical path: tenants/{tenantId}/orders/{orderId}
@@ -95,6 +97,14 @@ class PaymentService {
           .collection('orders')
           .doc(orderId)
           .update(updateData);
+
+      // If dine-in payment succeeded, settle all table orders and release table
+      if (paymentStatus == PaymentStatus.paid && tableId != null && tableId.isNotEmpty && tableId != 'PARCEL') {
+        await _orderService.markTableOrdersAsPaid(
+          tenantId: tenantId,
+          tableId: tableId,
+        );
+      }
     } catch (e) {
       print('Error updating order payment status: $e');
       rethrow;

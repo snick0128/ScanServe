@@ -273,45 +273,54 @@ class _TablesScreenState extends State<TablesScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Manage Tables'),
-          content: SizedBox(
-            width: 600,
-            height: 500,
-            child: Column(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => _showAddEditTableDialog(context, provider, null),
-                  icon: const Icon(Ionicons.add_outline),
-                  label: const Text('Add New Table'),
-                ),
-                const Divider(height: 32),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: provider.tables.length,
-                    itemBuilder: (context, index) {
-                      final table = provider.tables[index];
-                      return ListTile(
-                        leading: CircleAvatar(child: Text(table.name.replaceAll(RegExp(r'[^0-9]'), ''))),
-                        title: Text(table.name),
-                        subtitle: Text('${table.section} • Max Pax: ${table.capacity}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Ionicons.create_outline, size: 18),
-                              onPressed: () => _showAddEditTableDialog(context, provider, table),
+          content: Builder(
+            builder: (context) {
+              final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(300.0, 650.0);
+              final maxHeight = MediaQuery.of(context).size.height * 0.7;
+              final listHeight = (maxHeight - 120).clamp(200.0, maxHeight);
+
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => _showAddEditTableDialog(context, provider, null),
+                      icon: const Icon(Ionicons.add_outline),
+                      label: const Text('Add New Table'),
+                    ),
+                    const Divider(height: 32),
+                    SizedBox(
+                      height: listHeight,
+                      child: ListView.builder(
+                        itemCount: provider.tables.length,
+                        itemBuilder: (context, index) {
+                          final table = provider.tables[index];
+                          return ListTile(
+                            leading: CircleAvatar(child: Text(table.name.replaceAll(RegExp(r'[^0-9]'), ''))),
+                            title: Text(table.name),
+                            subtitle: Text('${table.section} • Max Pax: ${table.capacity}'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Ionicons.create_outline, size: 18),
+                                  onPressed: () => _showAddEditTableDialog(context, provider, table),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Ionicons.trash_outline, size: 18, color: AdminTheme.critical),
+                                  onPressed: () => provider.deleteTable(table.id),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              icon: const Icon(Ionicons.trash_outline, size: 18, color: AdminTheme.critical),
-                              onPressed: () => provider.deleteTable(table.id),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
@@ -330,13 +339,16 @@ class _TablesScreenState extends State<TablesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(table == null ? 'Add Table' : 'Edit Table'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Table Name (e.g. Table 1)')),
-            TextField(controller: sectionController, decoration: const InputDecoration(labelText: 'Section')),
-            TextField(controller: capacityController, decoration: const InputDecoration(labelText: 'Capacity'), keyboardType: TextInputType.number),
-          ],
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: (MediaQuery.of(context).size.width - 48).clamp(280.0, 420.0)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Table Name (e.g. Table 1)')),
+              TextField(controller: sectionController, decoration: const InputDecoration(labelText: 'Section')),
+              TextField(controller: capacityController, decoration: const InputDecoration(labelText: 'Capacity'), keyboardType: TextInputType.number),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -522,7 +534,7 @@ class _TableCard extends StatelessWidget {
     if (table.status == TableStatus.billRequested) {
       return Row(
         children: [
-          if (context.read<AdminAuthProvider>().isAdmin) ...[
+          if (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain) ...[
             _buildReleaseButton(context, isMobile),
             const SizedBox(width: 8),
           ],
@@ -608,7 +620,7 @@ class _TableCard extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Release Table'),
-        content: Text('Are you sure you want to end the session for ${table.name}? This will mark all orders as Paid.'),
+        content: Text('Are you sure you want to end the session for ${table.name}? This will cancel all active orders and free the table.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
           TextButton(

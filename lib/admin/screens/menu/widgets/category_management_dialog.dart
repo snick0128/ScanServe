@@ -10,90 +10,96 @@ class CategoryManagementDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxWidth = (size.width - 24).clamp(320.0, 700.0);
+    final maxHeight = size.height * 0.9;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 600,
-        height: 700,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Manage Categories',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const Divider(height: 32),
-            Expanded(
-              child: Consumer<MenuProvider>(
-                builder: (context, provider, _) {
-                  if (provider.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  final categories = provider.categories;
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Manage Categories',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(height: 32),
+              Expanded(
+                child: Consumer<MenuProvider>(
+                  builder: (context, provider, _) {
+                    if (provider.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    final categories = provider.categories;
 
-                  if (categories.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Ionicons.grid_outline, size: 48, color: Colors.grey[300]),
-                          const SizedBox(height: 16),
-                          const Text('No categories found', style: TextStyle(color: AdminTheme.secondaryText)),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    itemCount: categories.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final category = categories[index];
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        title: Text(category.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${category.items.length} items', style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+                    if (categories.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            IconButton(
-                              icon: const Icon(Ionicons.create_outline, size: 20, color: AdminTheme.secondaryText),
-                              onPressed: () => _showCategoryInput(context, category),
-                            ),
-                            IconButton(
-                              icon: const Icon(Ionicons.trash_outline, size: 20, color: AdminTheme.critical),
-                              onPressed: () => _confirmDelete(context, category),
-                            ),
+                            Icon(Ionicons.grid_outline, size: 48, color: Colors.grey[300]),
+                            const SizedBox(height: 16),
+                            const Text('No categories found', style: TextStyle(color: AdminTheme.secondaryText)),
                           ],
                         ),
                       );
-                    },
-                  );
-                },
+                    }
+
+                    return ListView.separated(
+                      itemCount: categories.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final category = categories[index];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          title: Text(category.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('${category.items.length} items', style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Ionicons.create_outline, size: 20, color: AdminTheme.secondaryText),
+                                onPressed: () => _showCategoryInput(context, category),
+                              ),
+                              IconButton(
+                                icon: const Icon(Ionicons.trash_outline, size: 20, color: AdminTheme.critical),
+                                onPressed: () => _confirmDelete(context, category),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _showCategoryInput(context, null),
-              icon: const Icon(Ionicons.add_circle, color: Colors.white),
-              label: const Text('Add New Category', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AdminTheme.primaryColor,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => _showCategoryInput(context, null),
+                icon: const Icon(Ionicons.add_circle, color: Colors.white),
+                label: const Text('Add New Category', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AdminTheme.primaryColor,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

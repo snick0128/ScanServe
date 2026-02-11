@@ -650,6 +650,74 @@ class OrdersProvider with ChangeNotifier {
     }
   }
 
+  Future<void> forceReleaseTable(String tableId, {String reason = 'Manual release'}) async {
+    _checkPermission(['admin', 'superadmin', 'captain'], action: 'Releasing tables');
+    if (_tenantId == null) return;
+
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await _firestore.runTransaction((transaction) async {
+        final ordersQuery = await _firestore
+            .collection('tenants')
+            .doc(_tenantId)
+            .collection('orders')
+            .where('tableId', isEqualTo: tableId)
+            .where('status', whereNotIn: [
+              model.OrderStatus.completed.name,
+              model.OrderStatus.cancelled.name
+            ])
+            .get();
+
+        for (var doc in ordersQuery.docs) {
+          transaction.update(doc.reference, {
+            'status': model.OrderStatus.cancelled.name,
+            'cancellationReason': reason,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'closedAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        if (tableId != 'PARCEL') {
+          final tableRef = _firestore
+              .collection('tenants')
+              .doc(_tenantId)
+              .collection('tables')
+              .doc(tableId);
+
+          transaction.update(tableRef, {
+            'status': 'available',
+            'isAvailable': true,
+            'isOccupied': false,
+            'currentSessionId': null,
+            'occupiedAt': null,
+            'lastReleasedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      });
+
+      if (_auth != null && _activity != null) {
+        _activity!.logAction(
+          action: 'Table Released',
+          description: 'Table $tableId released manually. Active orders cancelled.',
+          actorId: _auth!.user?.uid ?? 'demo',
+          actorName: _auth!.user?.email ?? 'Unknown',
+          actorRole: _auth!.role ?? 'admin',
+          type: ActivityType.tableUpdate,
+          tenantId: _tenantId!,
+          metadata: {'tableId': tableId, 'reason': reason},
+        );
+      }
+    } catch (e) {
+      _handleError('Failed to release table: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> cancelOrder(String orderId, String reason) async {
     _checkPermission(['admin', 'superadmin', 'captain'], action: 'Cancelling orders');
     if (orderId.isEmpty) {

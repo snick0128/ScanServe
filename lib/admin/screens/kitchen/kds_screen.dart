@@ -175,117 +175,161 @@ class _KDSScreenState extends State<KDSScreen> {
   }
 
   Widget _buildOfflineOverlay() {
-    return Container(
-      color: Colors.black.withOpacity(0.9),
-      width: double.infinity,
-      height: double.infinity,
-      child: Center(
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(40),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Ionicons.cloud_offline_outline, size: 80, color: AdminTheme.critical),
-              const SizedBox(height: 24),
-              const Text(
-                'CONNECTION LOST',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AdminTheme.critical),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'The KDS has stopped receiving orders. This may be due to a network failure or session expiry.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, color: AdminTheme.primaryText),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _acknowledgeOnline,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AdminTheme.critical,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 64),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
+        final maxWidth = isCompact ? constraints.maxWidth - 24 : 500.0;
+        final padding = isCompact ? 24.0 : 40.0;
+
+        return Container(
+          color: Colors.black.withOpacity(0.9),
+          width: double.infinity,
+          height: double.infinity,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: EdgeInsets.all(padding),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Ionicons.cloud_offline_outline, size: isCompact ? 64 : 80, color: AdminTheme.critical),
+                      SizedBox(height: isCompact ? 16 : 24),
+                      Text(
+                        'CONNECTION LOST',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: isCompact ? 24 : 32, fontWeight: FontWeight.w900, color: AdminTheme.critical),
+                      ),
+                      SizedBox(height: isCompact ? 12 : 16),
+                      Text(
+                        'The KDS has stopped receiving orders. This may be due to a network failure or session expiry.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: isCompact ? 14 : 18, color: AdminTheme.primaryText),
+                      ),
+                      SizedBox(height: isCompact ? 20 : 32),
+                      ElevatedButton(
+                        onPressed: _acknowledgeOnline,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AdminTheme.critical,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 56),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: Text('RETRY & ACKNOWLEDGE', style: TextStyle(fontSize: isCompact ? 16 : 20, fontWeight: FontWeight.bold)),
+                      ),
+                      SizedBox(height: isCompact ? 12 : 16),
+                      Text(
+                        'Manual acknowledgement is required to resume kitchen operations.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: isCompact ? 11 : 12, color: AdminTheme.secondaryText),
+                      ),
+                    ],
+                  ),
                 ),
-                child: const Text('RETRY & ACKNOWLEDGE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Manual acknowledgement is required to resume kitchen operations.',
-                style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildTopStatusBar(int activeCount, OrdersProvider provider) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 720;
+
+        final stationSelector = InkWell(
+          onTap: _showStationSettings,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              border: Border.all(color: AdminTheme.primaryColor),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 10, height: 10,
-                  decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                ),
+                Icon(Ionicons.restaurant_outline, size: 16, color: AdminTheme.primaryColor),
                 SizedBox(width: 8.w),
-                Flexible(
-                  child: Text(
-                    'KITCHEN DISPLAY',
-                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  _currentStation?.name ?? 'SELECT STATION',
+                  style: TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13.sp),
                 ),
+                SizedBox(width: 4.w),
+                Icon(Ionicons.chevron_down, size: 14, color: AdminTheme.primaryColor),
               ],
             ),
           ),
-          const Spacer(),
-          
-          // Station Display & Selector
-          InkWell(
-            onTap: _showStationSettings,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                border: Border.all(color: AdminTheme.primaryColor),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Ionicons.restaurant_outline, size: 16, color: AdminTheme.primaryColor),
-                  SizedBox(width: 8.w),
-                  Text(
-                    _currentStation?.name ?? 'SELECT STATION',
-                    style: TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13.sp),
-                  ),
-                  SizedBox(width: 4.w),
-                  Icon(Ionicons.chevron_down, size: 14, color: AdminTheme.primaryColor),
-                ],
-              ),
-            ),
+        );
+
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
           ),
-          const SizedBox(width: 16),
-          
-          // Controls
-          _buildStatusBarIcon(Ionicons.expand_outline, () {
-            setState(() => _isFullScreen = !_isFullScreen);
-            // In a real app, toggle platform fullscreen
-          }),
-        ],
-      ),
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 10, height: 10,
+                          decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                        ),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            'KITCHEN DISPLAY',
+                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        _buildStatusBarIcon(Ionicons.expand_outline, () {
+                          setState(() => _isFullScreen = !_isFullScreen);
+                        }),
+                      ],
+                    ),
+                    SizedBox(height: 8.h),
+                    Align(alignment: Alignment.centerLeft, child: stationSelector),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10, height: 10,
+                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                          ),
+                          SizedBox(width: 8.w),
+                          Flexible(
+                            child: Text(
+                              'KITCHEN DISPLAY',
+                              style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    stationSelector,
+                    const SizedBox(width: 16),
+                    _buildStatusBarIcon(Ionicons.expand_outline, () {
+                      setState(() => _isFullScreen = !_isFullScreen);
+                    }),
+                  ],
+                ),
+        );
+      },
     );
   }
 
@@ -321,16 +365,46 @@ class _KDSScreenState extends State<KDSScreen> {
   }
 
   Widget _buildOrderGrid(List<model.Order> orders, List<MenuItem> menuItems) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(24),
-      scrollDirection: Axis.horizontal,
-      itemCount: orders.length,
-      separatorBuilder: (context, index) => const SizedBox(width: 24),
-      itemBuilder: (context, index) => _buildOrderColumn(orders[index], menuItems),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 700;
+        if (isCompact) {
+          final cardWidth = (constraints.maxWidth - 32.w).clamp(260.w, constraints.maxWidth).toDouble();
+          return ListView.separated(
+            padding: EdgeInsets.all(16.w),
+            itemCount: orders.length,
+            separatorBuilder: (context, index) => SizedBox(height: 16.h),
+            itemBuilder: (context, index) => _buildOrderColumn(
+              orders[index],
+              menuItems,
+              cardWidth: cardWidth,
+              isCompact: true,
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: EdgeInsets.all(24.w),
+          scrollDirection: Axis.horizontal,
+          itemCount: orders.length,
+          separatorBuilder: (context, index) => SizedBox(width: 24.w),
+          itemBuilder: (context, index) => _buildOrderColumn(
+            orders[index],
+            menuItems,
+            cardWidth: 320.w,
+            isCompact: false,
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildOrderColumn(model.Order order, List<MenuItem> menuItems) {
+  Widget _buildOrderColumn(
+    model.Order order,
+    List<MenuItem> menuItems, {
+    required double cardWidth,
+    required bool isCompact,
+  }) {
     final stationItems = _filterItemsForStation(order.items, menuItems);
     if (stationItems.isEmpty) return const SizedBox.shrink();
 
@@ -345,7 +419,7 @@ class _KDSScreenState extends State<KDSScreen> {
     final allCheckedReady = stationItems.every((item) => item.status == model.OrderItemStatus.ready);
 
     return Container(
-      width: 320,
+      width: cardWidth,
       margin: EdgeInsets.only(bottom: 8.h),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -367,10 +441,10 @@ class _KDSScreenState extends State<KDSScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      order.tableName ?? 'TAB 0',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AdminTheme.primaryText),
-                    ),
+                  Text(
+                    order.tableName ?? 'TAB 0',
+                    style: TextStyle(fontSize: isCompact ? 20.sp : 24, fontWeight: FontWeight.w900, color: AdminTheme.primaryText),
+                  ),
                     Row(
                       children: [
                         IconButton(
@@ -382,7 +456,7 @@ class _KDSScreenState extends State<KDSScreen> {
                         const SizedBox(width: 8),
                         Text(
                           _formatDuration(age),
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: statusColor),
+                          style: TextStyle(fontSize: isCompact ? 16.sp : 18, fontWeight: FontWeight.bold, color: statusColor),
                         ),
                       ],
                     ),
@@ -636,65 +710,76 @@ class _KDSScreenState extends State<KDSScreen> {
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Table ${order.tableName}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Ionicons.close)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('Order ID: #${order.id.substring(0, 8)}', style: const TextStyle(color: AdminTheme.secondaryText)),
-              Text('Order Age: ${_formatDuration(age)}', style: const TextStyle(color: AdminTheme.secondaryText)),
-              const SizedBox(height: 24),
-              const Text('STATION ITEMS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1, color: AdminTheme.secondaryText)),
-              const Divider(),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: stationItems.length,
-                  itemBuilder: (context, idx) {
-                    final item = stationItems[idx];
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('${item.quantity}× ${item.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: (item.notes != null || (item.addons != null && item.addons!.isNotEmpty)) 
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (item.notes != null) Text(item.notes!, style: const TextStyle(color: Colors.orange)),
-                              if (item.addons != null) ...item.addons!.map((a) => Text('• $a')),
-                            ],
-                          ) 
-                        : null,
-                      trailing: Text(item.status.displayName, style: TextStyle(color: item.status == model.OrderItemStatus.ready ? AdminTheme.success : AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
-                    );
-                  },
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        child: Builder(
+          builder: (context) {
+            final size = MediaQuery.of(context).size;
+            final maxWidth = (size.width - 24).clamp(320.0, 520.0);
+            final maxHeight = size.height * 0.9;
+
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Table ${order.tableName}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Ionicons.close)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Order ID: #${order.id.substring(0, 8)}', style: const TextStyle(color: AdminTheme.secondaryText)),
+                    Text('Order Age: ${_formatDuration(age)}', style: const TextStyle(color: AdminTheme.secondaryText)),
+                    const SizedBox(height: 24),
+                    const Text('STATION ITEMS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1, color: AdminTheme.secondaryText)),
+                    const Divider(),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: maxHeight * 0.45),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: stationItems.length,
+                        itemBuilder: (context, idx) {
+                          final item = stationItems[idx];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('${item.quantity}× ${item.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: (item.notes != null || (item.addons != null && item.addons!.isNotEmpty)) 
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (item.notes != null) Text(item.notes!, style: const TextStyle(color: Colors.orange)),
+                                    if (item.addons != null) ...item.addons!.map((a) => Text('• $a')),
+                                  ],
+                                ) 
+                              : null,
+                            trailing: Text(item.status.displayName, style: TextStyle(color: item.status == model.OrderItemStatus.ready ? AdminTheme.success : AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _printKOT(order),
+                            icon: const Icon(Ionicons.print_outline, size: 18),
+                            label: const Text('PRINT KOT'),
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _printKOT(order), // Handle print
-                      icon: const Icon(Ionicons.print_outline, size: 18),
-                      label: const Text('PRINT KOT'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

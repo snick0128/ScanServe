@@ -571,13 +571,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildCategoryList(AnalyticsProvider provider, bool isMobile) {
+    final totalCategorySales = provider.categorySales.values.fold<double>(0.0, (sum, v) => sum + v);
     return Wrap(
       spacing: isMobile ? 16 : 48,
       runSpacing: isMobile ? 16 : 24,
       children: provider.categorySales.entries.map((e) {
         final index = provider.categorySales.keys.toList().indexOf(e.key);
         final color = _getCategoryColor(index);
-        final percentage = provider.totalRevenue > 0 ? (e.value / provider.totalRevenue * 100).toInt() : 0;
+        final percentage = totalCategorySales > 0 ? (e.value / totalCategorySales * 100) : 0.0;
         return SizedBox(
           width: isMobile ? double.infinity : 280,
           child: Row(
@@ -589,7 +590,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(e.key, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('$percentage% of total sales', style: TextStyle(color: AdminTheme.secondaryText, fontSize: 12)),
+                    Text('${percentage.toStringAsFixed(1)}% of total sales', style: TextStyle(color: AdminTheme.secondaryText, fontSize: 12)),
                   ],
                 ),
               ),

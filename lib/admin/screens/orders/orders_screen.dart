@@ -773,18 +773,61 @@ class _OrderCard extends StatelessWidget {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Settlement'),
-        content: Text('Marking table ${order.tableName} as PAID will settle ${sessionOrders.length} orders. Proceed?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success),
-            child: const Text('CONFIRM & RELEASE'),
+      builder: (context) {
+        final size = MediaQuery.of(context).size;
+        final isCompact = size.width < 480;
+        final maxWidth = (size.width - 24).clamp(300.0, 520.0);
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Confirm Settlement', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  Text('Marking table ${order.tableName} as PAID will settle ${sessionOrders.length} orders. Proceed?'),
+                  const SizedBox(height: 20),
+                  if (isCompact)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('CANCEL'),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success),
+                          child: const Text('CONFIRM & RELEASE'),
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success),
+                          child: const Text('CONFIRM & RELEASE'),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
 
     if (confirm == true) {
@@ -807,32 +850,83 @@ class _OrderCard extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Ionicons.checkmark_circle, color: AdminTheme.success),
-            SizedBox(width: 12),
-            Text('Success'),
-          ],
-        ),
-        content: const Text('Session settled and table released. Print receipt?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(context);
-              final billService = BillService();
-              final billData = await billService.getBill(order.tenantId, billId);
-              if (billData != null) {
-                 _printBill(billData);
-              }
-            },
-            icon: const Icon(Ionicons.print_outline),
-            label: const Text('PRINT'),
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.primaryColor),
+      builder: (context) {
+        final size = MediaQuery.of(context).size;
+        final isCompact = size.width < 480;
+        final maxWidth = (size.width - 24).clamp(300.0, 520.0);
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Ionicons.checkmark_circle, color: AdminTheme.success),
+                      SizedBox(width: 12),
+                      Text('Success', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Session settled and table released. Print receipt?'),
+                  const SizedBox(height: 20),
+                  if (isCompact)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('CLOSE'),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final billService = BillService();
+                            final billData = await billService.getBill(order.tenantId, billId);
+                            if (billData != null) {
+                               _printBill(billData);
+                            }
+                          },
+                          icon: const Icon(Ionicons.print_outline),
+                          label: const Text('PRINT'),
+                          style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.primaryColor),
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final billService = BillService();
+                            final billData = await billService.getBill(order.tenantId, billId);
+                            if (billData != null) {
+                               _printBill(billData);
+                            }
+                          },
+                          icon: const Icon(Ionicons.print_outline),
+                          label: const Text('PRINT'),
+                          style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.primaryColor),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

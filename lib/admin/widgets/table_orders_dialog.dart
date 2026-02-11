@@ -190,14 +190,14 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                         ],
                       ),
                     ),
-                    if (showAsOccupied && !hasActiveOrders && context.read<AdminAuthProvider>().isAdmin)
+                    if (showAsOccupied && !hasActiveOrders && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain))
                       TextButton.icon(
                         onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('Release Table'),
-                              content: const Text('Are you sure you want to mark this table as Vacant? This will end the current session.'),
+                              content: const Text('Are you sure you want to mark this table as Vacant? This will cancel active orders and end the current session.'),
                               actions: [
                                 TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
                                 TextButton(

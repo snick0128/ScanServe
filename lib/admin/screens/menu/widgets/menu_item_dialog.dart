@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:provider/provider.dart';
@@ -125,119 +126,188 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.item != null;
+    final size = MediaQuery.of(context).size;
+    final isCompact = size.width < 900;
+    final maxWidth = (size.width - 24).clamp(320.0, 1200.0);
+    final dialogWidth = isCompact ? maxWidth : math.min(1100.0, maxWidth);
+    final maxHeight = size.height * 0.92;
+
     return Dialog(
-      insetPadding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 24.h),
+      insetPadding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 40.w, vertical: 24.h),
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 1100,
-        height: MediaQuery.of(context).size.height * 0.9,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          children: [
-            _buildStickyHeader(isEditing),
-            Expanded(
-              child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  padding: EdgeInsets.all(40.w),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // LEFT COLUMN: Primary Work
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildGeneralInfoSection(),
-                            SizedBox(height: 32.h),
-                            _buildPricingAndCategorySection(),
-                            SizedBox(height: 32.h),
-                            _buildRecipeBuilderSection(),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 48.w),
-                      // RIGHT COLUMN: Meta & Controls
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildImageSection(),
-                            SizedBox(height: 32.h),
-                            _buildStatusSettingsSection(),
-                            SizedBox(height: 32.h),
-                            _buildPrepTimeSection(),
-                          ],
-                        ),
-                      ),
-                    ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dialogWidth, maxHeight: maxHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            children: [
+              _buildStickyHeader(isEditing, isCompact),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: EdgeInsets.all(isCompact ? 16.w : 40.w),
+                    child: isCompact
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildGeneralInfoSection(),
+                              SizedBox(height: 24.h),
+                              _buildPricingAndCategorySection(),
+                              SizedBox(height: 24.h),
+                              _buildRecipeBuilderSection(),
+                              SizedBox(height: 24.h),
+                              _buildImageSection(),
+                              SizedBox(height: 24.h),
+                              _buildStatusSettingsSection(),
+                              SizedBox(height: 24.h),
+                              _buildPrepTimeSection(),
+                            ],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // LEFT COLUMN: Primary Work
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildGeneralInfoSection(),
+                                    SizedBox(height: 32.h),
+                                    _buildPricingAndCategorySection(),
+                                    SizedBox(height: 32.h),
+                                    _buildRecipeBuilderSection(),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 48.w),
+                              // RIGHT COLUMN: Meta & Controls
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildImageSection(),
+                                    SizedBox(height: 32.h),
+                                    _buildStatusSettingsSection(),
+                                    SizedBox(height: 32.h),
+                                    _buildPrepTimeSection(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStickyHeader(bool isEditing) {
+  Widget _buildStickyHeader(bool isEditing, bool isCompact) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 24.h),
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 16.w : 40.w, vertical: 24.h),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      child: isCompact
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   isEditing ? 'Edit Menu Item' : 'Add New Menu Item',
-                  style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                  style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
                 ),
+                SizedBox(height: 4.h),
                 Text(
                   isEditing ? 'Update details, price and ingredients' : 'Configure your new dish for the digital menu',
-                  style: TextStyle(fontSize: 14.sp, color: AdminTheme.secondaryText),
+                  style: TextStyle(fontSize: 12.sp, color: AdminTheme.secondaryText),
+                ),
+                SizedBox(height: 12.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSaving ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                          side: const BorderSide(color: AdminTheme.dividerColor),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                        ),
+                        child: Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _saveItem,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AdminTheme.primaryColor,
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                        ),
+                        child: _isSaving 
+                          ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text(isEditing ? 'Save' : 'Create', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isEditing ? 'Edit Menu Item' : 'Add New Menu Item',
+                        style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                      ),
+                      Text(
+                        isEditing ? 'Update details, price and ingredients' : 'Configure your new dish for the digital menu',
+                        style: TextStyle(fontSize: 14.sp, color: AdminTheme.secondaryText),
+                      ),
+                    ],
+                  ),
+                ),
+                OutlinedButton(
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+                    side: const BorderSide(color: AdminTheme.dividerColor),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  child: Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                ),
+                SizedBox(width: 16.w),
+                ElevatedButton(
+                  onPressed: _isSaving ? null : _saveItem,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AdminTheme.primaryColor,
+                    padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  child: _isSaving 
+                    ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text(isEditing ? 'Save Changes' : 'Create Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
                 ),
               ],
             ),
-          ),
-          OutlinedButton(
-            onPressed: _isSaving ? null : () => Navigator.pop(context),
-            style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
-              side: const BorderSide(color: AdminTheme.dividerColor),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-            ),
-            child: Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 14.sp)),
-          ),
-          SizedBox(width: 16.w),
-          ElevatedButton(
-            onPressed: _isSaving ? null : _saveItem,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AdminTheme.primaryColor,
-              padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-            ),
-            child: _isSaving 
-              ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text(isEditing ? 'Save Changes' : 'Create Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
-          ),
-        ],
-      ),
     );
   }
 

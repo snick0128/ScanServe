@@ -128,17 +128,11 @@ class TablesProvider with ChangeNotifier {
     if (_tenantId == null) return;
     
     try {
-      // 1. Mark all active orders for this table as completed using provider
+      // 1. Force release (cancel active orders) via OrdersProvider
       if (_ordersProvider != null) {
-        final activeOrders = _ordersProvider!.orders.where((order) =>
-          order.tableId == tableId
-        ).toList();
-        
-        for (final order in activeOrders) {
-          await _ordersProvider!.markAsPaid(order.id);
-        }
-        
-        print('🔓 Released table $tableId - Completed ${activeOrders.length} orders via provider');
+        await _ordersProvider!.forceReleaseTable(tableId, reason: 'Manual table release');
+        print('🔓 Released table $tableId via OrdersProvider');
+        return;
       }
       
       // 2. Update table status to available and track last released timestamp

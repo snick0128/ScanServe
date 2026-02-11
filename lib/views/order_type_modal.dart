@@ -24,104 +24,111 @@ class _OrderTypeSelectionModalState extends State<OrderTypeSelectionModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.restaurant_menu,
-                color: Theme.of(context).primaryColor,
-                size: 28,
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    Icons.restaurant_menu,
+                    color: Theme.of(context).primaryColor,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'How would you like to order?',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                'How would you like to order?',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+
+              const SizedBox(height: 24),
+
+              // Order Type Options
+              _buildOrderTypeOption(
+                context,
+                type: OrderType.dineIn,
+                icon: Icons.restaurant,
+                title: 'Dine-in',
+                subtitle: 'Enjoy your meal at our restaurant',
+                color: Colors.orange,
+              ),
+
+              const SizedBox(height: 16),
+
+              _buildOrderTypeOption(
+                context,
+                type: OrderType.parcel,
+                icon: Icons.takeout_dining,
+                title: 'Parcel',
+                subtitle: 'Take away or delivery',
+                color: Colors.green,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _selectedType != null ? () {
+                        widget.onOrderTypeSelected(_selectedType!, _selectedTableId);
+
+                        // Save preferences
+                        final sessionService = SessionService();
+                        sessionService.saveOrderType(_selectedType!);
+                        if (_selectedTableId != null) {
+                          sessionService.saveTableId(_selectedTableId!);
+                        }
+
+                        Navigator.of(context).pop();
+                      } : null,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(
+                        'Continue',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-
-          const SizedBox(height: 24),
-
-          // Order Type Options
-          _buildOrderTypeOption(
-            context,
-            type: OrderType.dineIn,
-            icon: Icons.restaurant,
-            title: 'Dine-in',
-            subtitle: 'Enjoy your meal at our restaurant',
-            color: Colors.orange,
-          ),
-
-          const SizedBox(height: 16),
-
-          _buildOrderTypeOption(
-            context,
-            type: OrderType.parcel,
-            icon: Icons.takeout_dining,
-            title: 'Parcel',
-            subtitle: 'Take away or delivery',
-            color: Colors.green,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _selectedType != null ? () {
-                    widget.onOrderTypeSelected(_selectedType!, _selectedTableId);
-
-                    // Save preferences
-                    final sessionService = SessionService();
-                    sessionService.saveOrderType(_selectedType!);
-                    if (_selectedTableId != null) {
-                      sessionService.saveTableId(_selectedTableId!);
-                    }
-
-                    Navigator.of(context).pop();
-                  } : null,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text(
-                    'Continue',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
