@@ -72,6 +72,12 @@ class OrderStatusCard extends StatelessWidget {
       case OrderStatus.ready:
         statusColor = Colors.green;
         break;
+      case OrderStatus.billRequested:
+        statusColor = Colors.indigo;
+        break;
+      case OrderStatus.paymentPending:
+        statusColor = Colors.deepOrange;
+        break;
       case OrderStatus.served:
       case OrderStatus.completed:
         statusColor = Colors.teal;
@@ -110,6 +116,10 @@ class OrderStatusCard extends StatelessWidget {
         break;
       case OrderStatus.ready:
         progress = 0.75;
+        break;
+      case OrderStatus.billRequested:
+      case OrderStatus.paymentPending:
+        progress = 0.9;
         break;
       case OrderStatus.served:
       case OrderStatus.completed:
@@ -168,6 +178,10 @@ class OrderStatusCard extends StatelessWidget {
         return Colors.blue;
       case OrderStatus.ready:
         return Colors.green;
+      case OrderStatus.billRequested:
+        return Colors.indigo;
+      case OrderStatus.paymentPending:
+        return Colors.deepOrange;
       case OrderStatus.served:
       case OrderStatus.completed:
         return Colors.teal;
@@ -184,6 +198,10 @@ class OrderStatusCard extends StatelessWidget {
         return 'Your order is being prepared. It will be ready soon!';
       case OrderStatus.ready:
         return 'Your order is ready to be served! 🍽️';
+      case OrderStatus.billRequested:
+        return 'Bill requested. Finalizing your checkout.';
+      case OrderStatus.paymentPending:
+        return 'Payment is pending. Please complete settlement.';
       case OrderStatus.served:
       case OrderStatus.completed:
         return 'Thank you! Your order has been completed.';

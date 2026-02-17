@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'models/tenant_model.dart';
 import 'models/order.dart' as order_model;
+import 'models/table_status.dart';
 
 /// Seed demo data for testing
 class DataSeeder {
@@ -30,7 +31,7 @@ class DataSeeder {
         section: 'Indoor',
         capacity: 4,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 0,
       ),
       RestaurantTable(
@@ -39,7 +40,7 @@ class DataSeeder {
         section: 'Indoor',
         capacity: 2,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 1,
       ),
       RestaurantTable(
@@ -48,7 +49,7 @@ class DataSeeder {
         section: 'Indoor',
         capacity: 6,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 2,
       ),
       RestaurantTable(
@@ -57,7 +58,7 @@ class DataSeeder {
         section: 'Outdoor',
         capacity: 4,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 3,
       ),
       RestaurantTable(
@@ -66,7 +67,7 @@ class DataSeeder {
         section: 'Outdoor',
         capacity: 4,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 4,
       ),
       RestaurantTable(
@@ -75,7 +76,7 @@ class DataSeeder {
         section: 'Rooftop',
         capacity: 8,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 5,
       ),
       RestaurantTable(
@@ -84,7 +85,7 @@ class DataSeeder {
         section: 'Rooftop',
         capacity: 4,
         isAvailable: false,
-        status: 'occupied',
+        status: TableStatus.occupied,
         isOccupied: true,
         occupiedAt: DateTime.now().subtract(const Duration(minutes: 45)),
         orderIndex: 6,
@@ -95,7 +96,7 @@ class DataSeeder {
         section: 'VIP',
         capacity: 10,
         isAvailable: true,
-        status: 'available',
+        status: TableStatus.available,
         orderIndex: 7,
       ),
     ];
@@ -236,24 +237,21 @@ class DataSeeder {
       tableName: 'Table 7',
       items: [
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_002',
+          id: 'item_002', // Use item ID
           name: 'Chicken Biryani',
           price: 349.0,
           quantity: 2,
           status: order_model.OrderItemStatus.preparing,
         ),
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_005',
+          id: 'item_005',
           name: 'Paneer Tikka',
           price: 249.0,
           quantity: 1,
           status: order_model.OrderItemStatus.preparing,
         ),
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_007',
+          id: 'item_007',
           name: 'Fresh Lime Soda',
           price: 79.0,
           quantity: 2,
@@ -278,16 +276,14 @@ class DataSeeder {
       tableName: 'Table 3',
       items: [
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_001',
+          id: 'item_001',
           name: 'Margherita Pizza',
           price: 299.0,
           quantity: 1,
           status: order_model.OrderItemStatus.pending,
         ),
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_003',
+          id: 'item_003',
           name: 'Caesar Salad',
           price: 199.0,
           quantity: 2,
@@ -311,16 +307,14 @@ class DataSeeder {
       tableName: 'Table 4',
       items: [
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_004',
+          id: 'item_004',
           name: 'Butter Chicken',
           price: 399.0,
           quantity: 2,
           status: order_model.OrderItemStatus.ready,
         ),
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_008',
+          id: 'item_008',
           name: 'Masala Dosa',
           price: 129.0,
           quantity: 1,
@@ -344,8 +338,7 @@ class DataSeeder {
       tableName: 'Table 1',
       items: [
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_001',
+          id: 'item_001',
           name: 'Margherita Pizza',
           price: 299.0,
           quantity: 2,
@@ -353,8 +346,7 @@ class DataSeeder {
           servedAt: now.subtract(const Duration(hours: 2)),
         ),
         order_model.OrderItem(
-          id: uuid.v4(),
-          menuItemId: 'item_006',
+          id: 'item_006',
           name: 'Chocolate Brownie',
           price: 149.0,
           quantity: 2,
@@ -368,7 +360,7 @@ class DataSeeder {
       status: order_model.OrderStatus.completed,
       paymentStatus: order_model.PaymentStatus.paid,
       createdAt: now.subtract(const Duration(hours: 3)),
-      closedAt: now.subtract(const Duration(hours: 2)),
+      paidAt: now.subtract(const Duration(hours: 2)), // Use paidAt instead of closedAt
       estimatedWaitTime: 20,
     );
 

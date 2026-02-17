@@ -721,12 +721,12 @@ class _OrderCard extends StatelessWidget {
       if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Accept Order';
       color = AdminTheme.info;
-      action = () => provider.updateOrderStatus(order.id, model.OrderStatus.preparing);
+      action = () => _runStatusAction(context, provider, order.id, model.OrderStatus.preparing);
     } else if (order.status == model.OrderStatus.preparing) {
       if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Ready to Serve';
       color = AdminTheme.warning;
-      action = () => provider.updateOrderStatus(order.id, model.OrderStatus.ready);
+      action = () => _runStatusAction(context, provider, order.id, model.OrderStatus.ready);
     } else if (order.status == model.OrderStatus.ready) {
       if (!auth.isAdmin && !auth.isCaptain) return const SizedBox.shrink();
       label = 'Mark Served';
@@ -972,12 +972,42 @@ class _OrderCard extends StatelessWidget {
   }
 
   void _handleMarkServed(BuildContext context, OrdersProvider provider) async {
-    await provider.updateOrderStatus(order.id, model.OrderStatus.served);
-    if (context.mounted) {
+    try {
+      await provider.updateOrderStatus(order.id, model.OrderStatus.served);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Table ${order.tableName} served. Inventory updated.'),
+            backgroundColor: AdminTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to mark served: $e'),
+            backgroundColor: AdminTheme.critical,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _runStatusAction(
+    BuildContext context,
+    OrdersProvider provider,
+    String orderId,
+    model.OrderStatus newStatus,
+  ) async {
+    try {
+      await provider.updateOrderStatus(orderId, newStatus);
+    } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Table ${order.tableName} served. Inventory updated.'),
-          backgroundColor: AdminTheme.success,
+          content: Text('Action failed: $e'),
+          backgroundColor: AdminTheme.critical,
         ),
       );
     }

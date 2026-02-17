@@ -218,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isReady ? 'PRINTER READY' : 'PRINTER ERROR',
+                        isReady ? 'PRINTER READY' : 'PRINTER UNVERIFIED',
                         style: TextStyle(
                           fontSize: 11.sp,
                           fontWeight: FontWeight.bold,
@@ -236,6 +236,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Text(isReady ? 'Printer is connected' : 'Printer Issue Detected', 
                           style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                        if (isReady)
+                          const Text('Physical print test confirmed', style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
                         if (!isReady && printProvider.lastFailureAt != null)
                           Text('Failed at: ${DateFormat('HH:mm:ss').format(printProvider.lastFailureAt!)}', 
                             style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
@@ -721,15 +723,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (order.status == model.OrderStatus.pending) {
       if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Accept';
-      onPressed = () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.preparing);
+      onPressed = () => _runOrderStatusAction(order.id, model.OrderStatus.preparing);
     } else if (order.status == model.OrderStatus.preparing) {
       if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Complete';
-      onPressed = () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.ready);
+      onPressed = () => _runOrderStatusAction(order.id, model.OrderStatus.ready);
     } else if (order.status == model.OrderStatus.ready) {
       if (!auth.isAdmin && !auth.isCaptain) return const SizedBox.shrink();
       label = 'Served';
-      onPressed = () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.served);
+      onPressed = () => _runOrderStatusAction(order.id, model.OrderStatus.served);
     } else {
       return const SizedBox.shrink();
     }
@@ -745,6 +747,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold)),
     );
+  }
+
+  Future<void> _runOrderStatusAction(String orderId, model.OrderStatus status) async {
+    try {
+      await context.read<OrdersProvider>().updateOrderStatus(orderId, status);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Action failed: $e'),
+          backgroundColor: AdminTheme.critical,
+        ),
+      );
+    }
   }
 
   Widget _buildStaffCallsPanel() {

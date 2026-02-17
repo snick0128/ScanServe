@@ -8,7 +8,7 @@ class PrintingService {
   factory PrintingService() => _instance;
   PrintingService._internal();
 
-  bool _isPrinterReady = true;
+  bool _isPrinterReady = false;
   DateTime? _lastFailureAt;
   String? _lastError;
 
@@ -40,7 +40,6 @@ class PrintingService {
       final printSuccess = _triggerBrowserPrint(iframe);
       
       if (printSuccess) {
-        _isPrinterReady = true;
         _lastError = null;
       } else {
         _handleFailure('Print request ignored by browser or user.');
@@ -147,6 +146,18 @@ class PrintingService {
       createdAt: DateTime.now()
     );
     
-    return await printKOT(testOrder);
+    final triggerOk = await printKOT(testOrder);
+    if (!triggerOk) return false;
+
+    final confirmed = html.window.confirm(
+      'Did the test KOT print successfully on the physical printer?',
+    );
+    if (confirmed) {
+      _isPrinterReady = true;
+      _lastError = null;
+      return true;
+    }
+    _handleFailure('Printer test was not confirmed by user.');
+    return false;
   }
 }

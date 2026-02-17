@@ -367,9 +367,9 @@ class _KDSScreenState extends State<KDSScreen> {
   Widget _buildOrderGrid(List<model.Order> orders, List<MenuItem> menuItems) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 700;
-        if (isCompact) {
-          final cardWidth = (constraints.maxWidth - 32.w).clamp(260.w, constraints.maxWidth).toDouble();
+        final width = constraints.maxWidth;
+        if (width < 700) {
+          final cardWidth = (width - 32.w).clamp(260.w, width).toDouble();
           return ListView.separated(
             padding: EdgeInsets.all(16.w),
             itemCount: orders.length,
@@ -383,15 +383,21 @@ class _KDSScreenState extends State<KDSScreen> {
           );
         }
 
-        return ListView.separated(
-          padding: EdgeInsets.all(24.w),
-          scrollDirection: Axis.horizontal,
+        final crossAxisCount = width < 1200 ? 2 : 3;
+        final ratio = width < 1200 ? 0.72 : 0.75;
+        return GridView.builder(
+          padding: EdgeInsets.all(16.w),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 16.h,
+            crossAxisSpacing: 16.w,
+            childAspectRatio: ratio,
+          ),
           itemCount: orders.length,
-          separatorBuilder: (context, index) => SizedBox(width: 24.w),
           itemBuilder: (context, index) => _buildOrderColumn(
             orders[index],
             menuItems,
-            cardWidth: 320.w,
+            cardWidth: null,
             isCompact: false,
           ),
         );
@@ -402,7 +408,7 @@ class _KDSScreenState extends State<KDSScreen> {
   Widget _buildOrderColumn(
     model.Order order,
     List<MenuItem> menuItems, {
-    required double cardWidth,
+    required double? cardWidth,
     required bool isCompact,
   }) {
     final stationItems = _filterItemsForStation(order.items, menuItems);
@@ -556,10 +562,13 @@ class _KDSScreenState extends State<KDSScreen> {
                     style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13.sp)
                   ),
                 ),
-                if (_currentStation?.id == 'pass_expo' && context.read<AdminAuthProvider>().isAdmin) ...[
+                if (_currentStation?.id == 'pass_expo' &&
+                    (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain)) ...[
                   SizedBox(height: 8.h),
                   ElevatedButton(
-                    onPressed: () => context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.served),
+                    onPressed: order.status == model.OrderStatus.ready
+                        ? () => _serveEntireOrder(order)
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AdminTheme.primaryColor,
@@ -699,6 +708,27 @@ class _KDSScreenState extends State<KDSScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _serveEntireOrder(model.Order order) async {
+    try {
+      await context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.served);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Order for ${order.tableName ?? "table"} marked as served'),
+          backgroundColor: AdminTheme.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to serve order: $e'),
+          backgroundColor: AdminTheme.critical,
+        ),
+      );
     }
   }
 
@@ -930,25 +960,59 @@ class _KDSScreenState extends State<KDSScreen> {
 
   Widget _buildNewOrderBanner(OrdersProvider provider) {
     final order = provider.latestNewOrder!;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
-      color: AdminTheme.primaryColor,
-      child: Row(
-        children: [
-          Icon(Ionicons.alert_circle, color: Colors.white, size: 24.w),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Text(
-              'NEW ORDER RECEIVED: Table ${order.tableName} - #${order.id.substring(0, 8)}',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.sp),
-            ),
-          ),
-          TextButton(
-            onPressed: () => provider.clearLatestNewOrder(),
-            child: Text('ACKNOWLEDGE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, decoration: TextDecoration.underline, fontSize: 13.sp)),
-          ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 720;
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          color: AdminTheme.primaryColor,
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Ionicons.alert_circle, color: Colors.white, size: 22.w),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Text(
+                            'NEW ORDER: ${order.tableName} • #${order.id.substring(0, 8)}',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.sp),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8.h),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () => provider.clearLatestNewOrder(),
+                        child: Text(
+                          'ACKNOWLEDGE',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, decoration: TextDecoration.underline, fontSize: 12.sp),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(Ionicons.alert_circle, color: Colors.white, size: 24.w),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Text(
+                        'NEW ORDER RECEIVED: Table ${order.tableName} - #${order.id.substring(0, 8)}',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.sp),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => provider.clearLatestNewOrder(),
+                      child: Text('ACKNOWLEDGE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, decoration: TextDecoration.underline, fontSize: 13.sp)),
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 }

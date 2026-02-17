@@ -41,7 +41,6 @@ class BackgroundPrintProvider with ChangeNotifier {
         .doc(_tenantId)
         .collection('orders')
         .where('createdAt', isGreaterThan: twelveHoursAgo)
-        .where('status', whereNotIn: [model.OrderStatus.completed.name, model.OrderStatus.cancelled.name])
         .snapshots()
         .listen((snapshot) {
           for (var change in snapshot.docChanges) {
@@ -55,6 +54,9 @@ class BackgroundPrintProvider with ChangeNotifier {
   Future<void> _processOrderChange(DocumentSnapshot doc) async {
     try {
       final order = model.Order.fromFirestore(doc);
+      if (order.status == model.OrderStatus.completed || order.status == model.OrderStatus.cancelled) {
+        return;
+      }
       
       // 1. Identify unprinted items
       final unprintedItems = order.items.where((i) => !i.printedToKOT).toList();
@@ -112,7 +114,7 @@ class BackgroundPrintProvider with ChangeNotifier {
   }
 
   Future<void> checkPrinter() async {
-    final success = await _printingService.checkPrinter();
+    await _printingService.checkPrinter();
     notifyListeners();
   }
 

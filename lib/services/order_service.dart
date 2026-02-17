@@ -247,22 +247,16 @@ class OrderService {
     required String tableId,
   }) async {
     try {
-      await _firestore.runTransaction((transaction) async {
-        // 1. Find all non-completed orders for this table
-        final ordersQuery = await _firestore
-            .collection('tenants')
-            .doc(tenantId)
-            .collection('orders')
-            .where('tableId', isEqualTo: tableId)
-            .where('status', whereNotIn: [
-              model.OrderStatus.completed.name,
-              model.OrderStatus.cancelled.name
-            ])
-            .get();
+      final ordersCollection = _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('orders');
+      final activeOrders = await _getActiveOrdersForTable(tenantId, tableId);
 
+      await _firestore.runTransaction((transaction) async {
         // 2. Update each order to 'completed'
-        for (var doc in ordersQuery.docs) {
-          transaction.update(doc.reference, {
+        for (var doc in activeOrders) {
+          transaction.update(ordersCollection.doc(doc.id), {
             'status': model.OrderStatus.completed.name,
             'paymentStatus': model.PaymentStatus.paid.name,
             'updatedAt': FieldValue.serverTimestamp(),
@@ -320,18 +314,43 @@ class OrderService {
         .doc(tenantId)
         .collection('orders')
         .where('tableId', isEqualTo: tableId)
-        .where('status', whereNotIn: [
-          model.OrderStatus.completed.name,
-          model.OrderStatus.cancelled.name
-        ])
         .snapshots()
         .map((snapshot) {
           return snapshot.docs
+              .where((doc) {
+                final status = doc.data()['status']?.toString() ?? '';
+                return status != model.OrderStatus.completed.name &&
+                    status != model.OrderStatus.cancelled.name;
+              })
               .map((doc) => model_details.OrderDetails.fromMap({
                     ...doc.data(),
                     'orderId': doc.id, // Ensure ID is mapped correctly
                   }))
               .toList();
         });
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _getActiveOrdersForTable(
+    String tenantId,
+    String tableId,
+  ) async {
+    final ordersRef = _firestore.collection('tenants').doc(tenantId).collection('orders');
+    final completed = model.OrderStatus.completed.name;
+    final cancelled = model.OrderStatus.cancelled.name;
+
+    try {
+      final query = await ordersRef
+          .where('tableId', isEqualTo: tableId)
+          .where('status', whereNotIn: [completed, cancelled])
+          .get();
+      return query.docs;
+    } on FirebaseException catch (e) {
+      if (e.code != 'failed-precondition') rethrow;
+      final fallback = await ordersRef.where('tableId', isEqualTo: tableId).get();
+      return fallback.docs.where((doc) {
+        final status = doc.data()['status']?.toString() ?? '';
+        return status != completed && status != cancelled;
+      }).toList();
+    }
   }
 }

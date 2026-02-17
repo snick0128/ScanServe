@@ -356,7 +356,17 @@ class OrdersProvider with ChangeNotifier {
 
   void _checkPermission(List<String> allowedRoles, {String? action}) {
     if (_auth == null) return; // Fallback for system actions if auth is not yet injected
-    if (!allowedRoles.contains(_auth!.role)) {
+    final currentRole = (_auth!.role ?? '')
+        .trim()
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('_', '')
+        .replaceAll('-', '');
+    final normalizedAllowedRoles = allowedRoles
+        .map((r) => r.trim().toLowerCase().replaceAll(' ', '').replaceAll('_', '').replaceAll('-', ''))
+        .toList();
+
+    if (!normalizedAllowedRoles.contains(currentRole)) {
       throw Exception('Unauthorized: ${action ?? "This action"} requires ${allowedRoles.join(" or ")} role. Current role: ${_auth!.role}');
     }
   }
@@ -433,11 +443,19 @@ class OrdersProvider with ChangeNotifier {
       // REQUIREMENT: If marking entire order as SERVED, ensure all items are also marked served
       if (newStatus == model.OrderStatus.served) {
          final data = doc.data() as Map<String, dynamic>?;
-         final items = List<Map<String, dynamic>>.from(data?['items'] ?? []);
-         for (var item in items) {
-            item['status'] = model.OrderItemStatus.served.name;
-            item['servedAt'] = FieldValue.serverTimestamp();
-         }
+         final rawItems = (data?['items'] as List? ?? []);
+         final now = DateTime.now();
+
+         // Rebuild item maps through the model to guarantee serializable values
+         // and avoid Firestore sentinel values inside arrays.
+         final items = rawItems
+             .map((raw) => model.OrderItem.fromMap(Map<String, dynamic>.from(raw)))
+             .map((item) => item.copyWith(
+                   status: model.OrderItemStatus.served,
+                   servedAt: now,
+                 ).toMap())
+             .toList();
+
          updateData['items'] = items;
       }
 
@@ -658,44 +676,43 @@ class OrdersProvider with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      await _firestore.runTransaction((transaction) async {
-        final ordersQuery = await _firestore
+      final ordersQuery = await _tenantOrdersCollection
+          .where('tableId', isEqualTo: tableId)
+          .get();
+      final activeOrders = ordersQuery.docs.where((doc) {
+        final status = (doc.data() as Map<String, dynamic>)['status']?.toString() ?? '';
+        return status != model.OrderStatus.completed.name &&
+            status != model.OrderStatus.cancelled.name;
+      }).toList();
+
+      final batch = _firestore.batch();
+      for (final doc in activeOrders) {
+        batch.update(doc.reference, {
+          'status': model.OrderStatus.cancelled.name,
+          'cancellationReason': reason,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'closedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (tableId != 'PARCEL') {
+        final tableRef = _firestore
             .collection('tenants')
             .doc(_tenantId)
-            .collection('orders')
-            .where('tableId', isEqualTo: tableId)
-            .where('status', whereNotIn: [
-              model.OrderStatus.completed.name,
-              model.OrderStatus.cancelled.name
-            ])
-            .get();
+            .collection('tables')
+            .doc(tableId);
 
-        for (var doc in ordersQuery.docs) {
-          transaction.update(doc.reference, {
-            'status': model.OrderStatus.cancelled.name,
-            'cancellationReason': reason,
-            'updatedAt': FieldValue.serverTimestamp(),
-            'closedAt': FieldValue.serverTimestamp(),
-          });
-        }
+        batch.update(tableRef, {
+          'status': 'available',
+          'isAvailable': true,
+          'isOccupied': false,
+          'currentSessionId': null,
+          'occupiedAt': null,
+          'lastReleasedAt': FieldValue.serverTimestamp(),
+        });
+      }
 
-        if (tableId != 'PARCEL') {
-          final tableRef = _firestore
-              .collection('tenants')
-              .doc(_tenantId)
-              .collection('tables')
-              .doc(tableId);
-
-          transaction.update(tableRef, {
-            'status': 'available',
-            'isAvailable': true,
-            'isOccupied': false,
-            'currentSessionId': null,
-            'occupiedAt': null,
-            'lastReleasedAt': FieldValue.serverTimestamp(),
-          });
-        }
-      });
+      await batch.commit();
 
       if (_auth != null && _activity != null) {
         _activity!.logAction(
@@ -710,7 +727,11 @@ class OrdersProvider with ChangeNotifier {
         );
       }
     } catch (e) {
-      _handleError('Failed to release table: $e');
+      if (e is FirebaseException) {
+        _handleError('Failed to release table (${e.code}): ${e.message ?? e.toString()}');
+      } else {
+        _handleError('Failed to release table: $e');
+      }
       rethrow;
     } finally {
       _isLoading = false;
@@ -996,6 +1017,9 @@ class OrdersProvider with ChangeNotifier {
           final oldItem = mergedItems[existingItemIndex];
           mergedItems[existingItemIndex] = oldItem.copyWith(
             quantity: oldItem.quantity + newItem.quantity,
+            // Ensure merged quantity changes get re-printed as KOT.
+            printedToKOT: false,
+            printedAt: null,
           );
         } else {
           mergedItems.add(newItem);
@@ -1053,6 +1077,9 @@ class OrdersProvider with ChangeNotifier {
               final oldItem = mergedItems[existingItemIndex];
               mergedItems[existingItemIndex] = oldItem.copyWith(
                 quantity: oldItem.quantity + newItem.quantity,
+                // Quantity bump on an existing line is an add-on for kitchen.
+                printedToKOT: false,
+                printedAt: null,
               );
             } else {
               mergedItems.add(newItem);

@@ -203,12 +203,49 @@ class InventoryService {
 
   Future<void> _markLinkedMenuItemsUnavailable(String tenantId, String ingredientId, List<MenuItem> menuDefinitions) async {
     final menuService = MenuService();
+    final Map<String, Future<String?>> categoryIdCache = {};
     for (var menuItem in menuDefinitions) {
       if (menuItem.inventoryIngredients.containsKey(ingredientId) && menuItem.isManualAvailable) {
         final updatedMenuItem = menuItem.copyWith(isManualAvailable: false);
-        await menuService.updateMenuItem(tenantId, menuItem.category!.toLowerCase(), updatedMenuItem);
+        final rawCategory = menuItem.category;
+        if (rawCategory == null || rawCategory.trim().isEmpty) continue;
+
+        final normalizedKey = _normalizeCategoryKey(rawCategory);
+        categoryIdCache.putIfAbsent(
+          normalizedKey,
+          () => _resolveCategoryId(tenantId, rawCategory),
+        );
+        final categoryId = await categoryIdCache[normalizedKey]!;
+        if (categoryId == null) {
+          print('⚠️ Could not resolve category ID for "${menuItem.category}" while updating ${menuItem.name}');
+          continue;
+        }
+        await menuService.updateMenuItem(tenantId, categoryId, updatedMenuItem);
       }
     }
+  }
+
+  String _normalizeCategoryKey(String value) {
+    return value.trim().toLowerCase().replaceAll(RegExp(r'[_\-\s]+'), '');
+  }
+
+  Future<String?> _resolveCategoryId(String tenantId, String categoryValue) async {
+    final categoriesSnapshot = await _firestore
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('categories')
+        .get();
+    final normalizedInput = _normalizeCategoryKey(categoryValue);
+
+    for (final doc in categoriesSnapshot.docs) {
+      final id = doc.id;
+      final name = (doc.data()['name'] ?? '').toString();
+      if (_normalizeCategoryKey(id) == normalizedInput ||
+          _normalizeCategoryKey(name) == normalizedInput) {
+        return id;
+      }
+    }
+    return null;
   }
 
   /// Delete an inventory item

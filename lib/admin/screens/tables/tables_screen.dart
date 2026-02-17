@@ -633,11 +633,19 @@ class _TableCard extends StatelessWidget {
     );
 
     if (confirm == true) {
-      await context.read<TablesProvider>().releaseTable(table.id);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${table.name} released successfully'), backgroundColor: AdminTheme.success),
-        );
+      try {
+        await context.read<TablesProvider>().releaseTable(table.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${table.name} released successfully'), backgroundColor: AdminTheme.success),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to release ${table.name}: $e'), backgroundColor: AdminTheme.critical),
+          );
+        }
       }
     }
   }

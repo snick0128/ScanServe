@@ -68,13 +68,14 @@ class BillRequestService {
               .doc(tenantId)
               .collection('orders')
               .where('tableId', isEqualTo: tableId)
-              .where('status', whereNotIn: ['completed', 'cancelled'])
               .get();
               
           final batch = _firestore.batch();
           final orderStatus = isCashAtCounter ? 'paymentPending' : 'billRequested';
           
           for (var doc in ordersQuery.docs) {
+            final status = doc.data()['status']?.toString() ?? '';
+            if (status == 'completed' || status == 'cancelled') continue;
             batch.update(doc.reference, {
               'status': orderStatus,
               'paymentStatus': isCashAtCounter ? 'paymentPending' : 'pending',

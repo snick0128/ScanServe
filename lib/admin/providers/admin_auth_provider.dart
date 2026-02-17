@@ -34,6 +34,17 @@ class AdminAuthProvider with ChangeNotifier {
   List<String> _assignedTables = [];
   List<String> get assignedTables => _assignedTables;
 
+  String _normalizeRole(String? role) {
+    final value = (role ?? '')
+        .trim()
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('_', '')
+        .replaceAll('-', '');
+    if (value == 'super') return 'superadmin';
+    return value;
+  }
+
   AdminAuthProvider() {
     _init();
   }
@@ -61,7 +72,7 @@ class AdminAuthProvider with ChangeNotifier {
   Future<void> _loadPersistedSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _role = prefs.getString('admin_role');
+      _role = _normalizeRole(prefs.getString('admin_role'));
       _tenantId = prefs.getString('admin_tenantId');
       _tenantName = prefs.getString('admin_tenantName');
       _kitchenStationId = prefs.getString('admin_kitchenStationId');
@@ -95,7 +106,7 @@ class AdminAuthProvider with ChangeNotifier {
     try {
       final userDoc = await _firestore.collection('users').doc(_user!.uid).get();
       if (userDoc.exists) {
-        _role = userDoc['role'];
+        _role = _normalizeRole(userDoc.data()?['role']?.toString());
         _isAdmin = _role == 'admin' || _role == 'superadmin';
         _tenantId = userDoc['tenantId'];
         _tenantName = userDoc['tenantName'];

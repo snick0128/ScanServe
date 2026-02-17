@@ -190,14 +190,17 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                         ],
                       ),
                     ),
-                    if (showAsOccupied && !hasActiveOrders && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain))
+                    if (showAsOccupied && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain))
                       TextButton.icon(
                         onPressed: () async {
+                          final confirmMessage = hasActiveOrders
+                              ? 'Are you sure you want to mark this table as Vacant? This will cancel active orders and end the current session.'
+                              : 'Are you sure you want to mark this table as Vacant? This will end the current session.';
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('Release Table'),
-                              content: const Text('Are you sure you want to mark this table as Vacant? This will cancel active orders and end the current session.'),
+                              content: Text(confirmMessage),
                               actions: [
                                 TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
                                 TextButton(
@@ -209,11 +212,19 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                             ),
                           );
                           if (confirm == true) {
-                            await tablesProvider.releaseTable(widget.tableId);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Table released successfully'))
-                              );
+                            try {
+                              await tablesProvider.releaseTable(widget.tableId);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Table released successfully'))
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to release table: $e'))
+                                );
+                              }
                             }
                           }
                         },
