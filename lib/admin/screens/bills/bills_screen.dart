@@ -426,6 +426,7 @@ class _BillsScreenState extends State<BillsScreen> {
   }
 
   Widget _buildPendingBillsTable(BillsProvider provider) {
+    final canSettle = context.read<AdminAuthProvider>().isAdmin;
     final sessions = provider.activeSessions
         .where((s) => s.tableName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true)
         .toList();
@@ -505,20 +506,22 @@ class _BillsScreenState extends State<BillsScreen> {
                   SizedBox(height: 16.h),
                   Row(
                     children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _handleMarkAsPaid(context, provider, session),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AdminTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(vertical: 12.h),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                            elevation: 0,
+                      if (canSettle) ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _handleMarkAsPaid(context, provider, session),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AdminTheme.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                              elevation: 0,
+                            ),
+                            child: Text('Mark as Paid', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
                           ),
-                          child: Text('Mark as Paid', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
                         ),
-                      ),
-                      SizedBox(width: 12.w),
+                        SizedBox(width: 12.w),
+                      ],
                       IconButton(
                         onPressed: () => _confirmCancelSession(context, provider, session),
                         icon: Icon(Ionicons.close_circle_outline, color: AdminTheme.critical, size: 20.w),
@@ -594,20 +597,22 @@ class _BillsScreenState extends State<BillsScreen> {
               DataCell(Text('$mins mins', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 15))),
               DataCell(Row(
                 children: [
-                   _processingTableId == session.tableId 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : ElevatedButton(
-                        onPressed: () => _handleMarkAsPaid(context, provider, session),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AdminTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  if (canSettle) ...[
+                    _processingTableId == session.tableId 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : ElevatedButton(
+                          onPressed: () => _handleMarkAsPaid(context, provider, session),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AdminTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Mark as Paid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
-                        child: const Text('Mark as Paid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                  const SizedBox(width: 8),
+                    const SizedBox(width: 8),
+                  ],
                   IconButton(
                     onPressed: () => _confirmCancelSession(context, provider, session),
                     icon: const Icon(Ionicons.close_circle_outline, color: AdminTheme.critical, size: 20),

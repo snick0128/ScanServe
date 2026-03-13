@@ -272,7 +272,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('$_taxLabel (${(_taxRate * 100).toInt()}%)'),
-                Text('₹${(cart.totalAmount * _taxRate).toStringAsFixed(2)}'),
+                Text('₹${((cart.totalAmount - _discount) * _taxRate).toStringAsFixed(2)}'),
               ],
             ),
             if (_discount > 0) ...[
@@ -289,9 +289,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Text('Total (incl. 18% GST)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 Text(
-                  '₹${(cart.totalAmount * (1 + _taxRate) - _discount).toStringAsFixed(2)}', 
+                  '₹${((cart.totalAmount - _discount) * (1 + _taxRate)).toStringAsFixed(2)}', 
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)
                 ),
               ],

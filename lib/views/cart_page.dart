@@ -12,20 +12,26 @@ import '../utils/snackbar_helper.dart';
 import '../theme/app_theme.dart';
 import '../utils/haptic_helper.dart';
 import 'payment_page.dart';
+import '../controllers/recommendation_controller.dart';
+import '../models/tenant_model.dart' as tenant_model;
 
 class CartPage extends StatefulWidget {
   final String tenantId;
   final VoidCallback? onBack;
   final VoidCallback? onOrderPlaced;
 
-  const CartPage({Key? key, required this.tenantId, this.onBack, this.onOrderPlaced}) : super(key: key);
+  const CartPage({
+    Key? key,
+    required this.tenantId,
+    this.onBack,
+    this.onOrderPlaced,
+  }) : super(key: key);
 
   @override
   State<CartPage> createState() => _CartPageState();
 }
 
 class _CartPageState extends State<CartPage> {
-
   @override
   Widget build(BuildContext context) {
     final orderController = context.watch<OrderController>();
@@ -34,7 +40,8 @@ class _CartPageState extends State<CartPage> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      resizeToAvoidBottomInset: false, // Prevent the main screen from jumping when keyboard opens
+      resizeToAvoidBottomInset:
+          false, // Prevent the main screen from jumping when keyboard opens
       appBar: AppBar(
         title: FutureBuilder<Map<String, dynamic>>(
           future: orderService.getTenantSettings(widget.tenantId),
@@ -84,7 +91,9 @@ class _CartPageState extends State<CartPage> {
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          if (cartController.items.isNotEmpty && orderController.currentOrderType == OrderType.dineIn) ...[
+                          if (cartController.items.isNotEmpty &&
+                              orderController.currentOrderType ==
+                                  OrderType.dineIn) ...[
                             StreamBuilder<List<OrderDetails>>(
                               stream: orderService.getTableOrders(
                                 widget.tenantId,
@@ -99,7 +108,8 @@ class _CartPageState extends State<CartPage> {
                                     child: const CircularProgressIndicator(),
                                   );
                                 }
-                                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                if (!snapshot.hasData ||
+                                    snapshot.data!.isEmpty) {
                                   return const SizedBox.shrink();
                                 }
 
@@ -111,25 +121,31 @@ class _CartPageState extends State<CartPage> {
                                 );
                               },
                             ),
-                            const Divider(height: 1, color: AppTheme.borderColor),
+                            const Divider(
+                              height: 1,
+                              color: AppTheme.borderColor,
+                            ),
                           ],
                           _CartItemsWithNotes(
                             key: ValueKey(cartController.items.length),
                             items: cartController.items,
                             onUpdateQuantity: (item, newQuantity) {
                               HapticHelper.light();
-                              final key = cartController.getCartKey(item.item.id, item.selectedVariant);
+                              final key = cartController.getCartKey(
+                                item.item.id,
+                                item.selectedVariant,
+                              );
                               if (newQuantity <= 0) {
                                 cartController.removeItem(key);
                               } else {
-                                cartController.updateQuantity(
-                                  key,
-                                  newQuantity,
-                                );
+                                cartController.updateQuantity(key, newQuantity);
                               }
                             },
                             onNoteUpdate: (item, note) {
-                              final key = cartController.getCartKey(item.item.id, item.selectedVariant);
+                              final key = cartController.getCartKey(
+                                item.item.id,
+                                item.selectedVariant,
+                              );
                               cartController.updateNote(key, note);
                             },
                             isMobile: isMobile,
@@ -142,6 +158,9 @@ class _CartPageState extends State<CartPage> {
                               isMobile: isMobile,
                               isTablet: isTablet,
                             ),
+                          // RECOMMENDATIONS SECTION
+                          if (cartController.items.isNotEmpty)
+                            _buildRecommendations(context, isMobile),
                         ],
                       ),
                     ),
@@ -160,6 +179,261 @@ class _CartPageState extends State<CartPage> {
           );
         },
       ),
+      // FEATURE 4: TIME-BASED ROTI POPUP
+      floatingActionButton: _buildRotiTimerPopup(context),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildRotiTimerPopup(BuildContext context) {
+    final reco = context.watch<RecommendationController>();
+    if (!reco.shouldShowRotiPopup || reco.rotiItemToSuggest == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black26, blurRadius: 20, offset: const Offset(0, 10))
+        ],
+        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.timer_outlined, color: Colors.orange),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Need one more roti?',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () => reco.dismissRotiReminder(),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'It\'s been a while since your last roti order. Would you like to repeat ${reco.rotiItemToSuggest!.name}?',
+            style: TextStyle(color: AppTheme.secondaryText, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => reco.dismissRotiReminder(),
+                  child: const Text('No'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    reco.repeatLastRoti();
+                    reco.dismissRotiReminder();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Added to cart!'))
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                  child: const Text('Yes'),
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecommendations(BuildContext context, bool isMobile) {
+    final reco = context.watch<RecommendationController>();
+    
+    // Feature 1: "1 More Roti" Quick Reorder
+    final lastRoti = reco.lastOrderedRotiInfo;
+    final rotiFromCart = reco.rotiItemFromCart;
+    
+    // Feature 2: Often ordered with
+    final suggested = reco.getSuggestionsForItemsInCart();
+    final fallbackSuggested = suggested.isEmpty ? reco.getFallbackSuggestionsForItemsInCart() : const <tenant_model.MenuItem>[];
+    
+    // Feature 3: Meal Completion
+    final mealSuggestions = reco.getMealCompletionSuggestions();
+    
+    // Feature 5: Drink Suggestions
+    final drinkSuggestions = reco.getDrinkSuggestions();
+    
+    // Feature 6: Dessert Suggestions
+    final dessertSuggestions = reco.getDessertSuggestions();
+
+    final allSuggestions = [
+      if (mealSuggestions.isNotEmpty) ...mealSuggestions.map((m) => (m, 'Complete your meal')),
+      ...suggested.map((s) => (s, 'Often ordered with this')),
+      ...fallbackSuggested.map((s) => (s, 'Recommended with your order')),
+      if (drinkSuggestions.isNotEmpty) ...drinkSuggestions.map((d) => (d, 'Recommended Drinks')),
+      if (dessertSuggestions.isNotEmpty) ...dessertSuggestions.map((d) => (d, 'Finish with dessert')),
+    ];
+
+    if (allSuggestions.isEmpty && lastRoti == null && rotiFromCart == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // FEATURE 1: QUICK REORDER BUTTON
+          if (lastRoti != null || rotiFromCart != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.replay_outlined, color: AppTheme.primaryColor),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('1 More Roti', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('Quick add last ordered bread', style: TextStyle(fontSize: 12, color: AppTheme.secondaryText)),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      HapticHelper.medium();
+                      if (lastRoti != null) {
+                        reco.repeatLastRoti();
+                      } else if (rotiFromCart != null) {
+                        context.read<CartController>().addItem(rotiFromCart);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('ADD'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+          
+          if (allSuggestions.isNotEmpty) ...[
+            Text(
+              'REMARKABLE SUGGESTIONS',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                color: AppTheme.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 170,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: allSuggestions.length > 6 ? 6 : allSuggestions.length,
+                itemBuilder: (context, index) {
+                  final item = allSuggestions[index].$1;
+                  final reason = allSuggestions[index].$2;
+                  return _buildRecoCard(context, item, reason, isMobile);
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecoCard(BuildContext context, tenant_model.MenuItem item, String reason, bool isMobile) {
+    return Container(
+      width: 150,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+            child: item.imageUrl != null 
+              ? Image.network(item.imageUrl!, height: 80, width: 150, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildPlaceholder())
+              : _buildPlaceholder(),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  reason.toUpperCase(),
+                  style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.orange),
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.name,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('₹${item.price}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    InkWell(
+                      onTap: () {
+                        HapticHelper.light();
+                        context.read<CartController>().addItem(item);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
+                        child: const Icon(Icons.add, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      height: 80,
+      color: Colors.grey[100],
+      child: const Center(child: Icon(Icons.restaurant, color: Colors.grey, size: 24)),
     );
   }
 }
@@ -524,7 +798,9 @@ class _CartItemsWithNotes extends StatelessWidget {
                                 height: 36, // Increased height
                                 decoration: BoxDecoration(
                                   color: AppTheme.searchBarBackground,
-                                  borderRadius: BorderRadius.circular(12), // Smoother radius
+                                  borderRadius: BorderRadius.circular(
+                                    12,
+                                  ), // Smoother radius
                                   border: Border.all(
                                     color: AppTheme.borderColor,
                                     width: 1,
@@ -626,10 +902,10 @@ class _CartItemsWithNotes extends StatelessWidget {
                             Text(
                               item.item.description!,
                               style: TextStyle(
-                                  fontSize: isMobile ? 12 : 13,
-                                  color: AppTheme.secondaryText,
-                                  height: 1.3,
-                                ),
+                                fontSize: isMobile ? 12 : 13,
+                                color: AppTheme.secondaryText,
+                                height: 1.3,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -644,7 +920,10 @@ class _CartItemsWithNotes extends StatelessWidget {
                                 color: AppTheme.primaryText,
                               ),
                               children: [
-                                TextSpan(text: '₹${(item.selectedVariant?.price ?? item.item.price).toStringAsFixed(2)}'),
+                                TextSpan(
+                                  text:
+                                      '₹${(item.selectedVariant?.price ?? item.item.price).toStringAsFixed(2)}',
+                                ),
                                 TextSpan(
                                   text: ' × ${item.quantity}',
                                   style: const TextStyle(
@@ -654,7 +933,8 @@ class _CartItemsWithNotes extends StatelessWidget {
                                 ),
                                 const TextSpan(text: ' = '),
                                 TextSpan(
-                                  text: '₹${item.totalPrice.toStringAsFixed(2)}',
+                                  text:
+                                      '₹${item.totalPrice.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -792,7 +1072,10 @@ class _BillDetails extends StatelessWidget {
         final total = subtotal + tax;
 
         return Container(
-          margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: 12),
+          margin: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 24,
+            vertical: 12,
+          ),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -819,9 +1102,18 @@ class _BillDetails extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _buildSummaryRow('Subtotal', '₹${subtotal.toStringAsFixed(2)}', false),
+              _buildSummaryRow(
+                'Subtotal',
+                '₹${subtotal.toStringAsFixed(2)}',
+                false,
+              ),
               const SizedBox(height: 8),
-              _buildSummaryRow('GST', '₹${tax.toStringAsFixed(2)}', false, isGST: true),
+              _buildSummaryRow(
+                'GST',
+                '₹${tax.toStringAsFixed(2)}',
+                false,
+                isGST: true,
+              ),
               const SizedBox(height: 12),
               const Divider(color: Color(0xFFE5E5EA), thickness: 1),
               const SizedBox(height: 12),
@@ -850,7 +1142,11 @@ class _BillDetails extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: Color(0xFF8E8E93)),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Color(0xFF8E8E93),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -872,7 +1168,12 @@ class _BillDetails extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, bool isBold, {bool isGST = false}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value,
+    bool isBold, {
+    bool isGST = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -887,7 +1188,11 @@ class _BillDetails extends StatelessWidget {
             ),
             if (isGST) ...[
               const SizedBox(width: 4),
-              const Icon(Icons.info_outline, size: 14, color: Color(0xFF8E8E93)),
+              const Icon(
+                Icons.info_outline,
+                size: 14,
+                color: Color(0xFF8E8E93),
+              ),
             ],
           ],
         ),
@@ -933,7 +1238,12 @@ class _CartActionFooter extends StatelessWidget {
         final total = subtotal * (1 + taxRate);
 
         return Container(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + MediaQuery.of(context).padding.bottom,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -944,7 +1254,10 @@ class _CartActionFooter extends StatelessWidget {
               ),
             ],
             border: Border(
-              top: BorderSide(color: AppTheme.borderColor.withOpacity(0.6), width: 1),
+              top: BorderSide(
+                color: AppTheme.borderColor.withOpacity(0.6),
+                width: 1,
+              ),
             ),
           ),
           child: orderController.currentOrderType == OrderType.dineIn
@@ -960,7 +1273,8 @@ class _CartActionFooter extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => PaymentPage(tenantId: tenantId),
+                              builder: (context) =>
+                                  PaymentPage(tenantId: tenantId),
                             ),
                           );
                         },
@@ -983,6 +1297,8 @@ class _CartActionFooter extends StatelessWidget {
                             tableId: orderController.currentSession?.tableId,
                             cartItems: cartController.items,
                             chefNote: _buildNotesString(cartController),
+                            sessionId:
+                                orderController.currentSession?.sessionId,
                           );
                           cartController.clear();
                           if (onOrderPlaced != null) {
@@ -1015,7 +1331,9 @@ class _CartActionFooter extends StatelessWidget {
   }
 
   String _buildNotesString(CartController cart) {
-    final itemsWithNotes = cart.items.where((i) => i.note != null && i.note!.isNotEmpty);
+    final itemsWithNotes = cart.items.where(
+      (i) => i.note != null && i.note!.isNotEmpty,
+    );
     if (itemsWithNotes.isEmpty) return 'Sent to kitchen - payment pending';
     return 'Sent to kitchen - payment pending. Chef notes: ' +
         itemsWithNotes.map((i) => 'Item ${i.item.name}: ${i.note}').join('; ');

@@ -7,7 +7,7 @@ import '../../services/inventory_service.dart';
 class InventoryProvider with ChangeNotifier {
   final InventoryService _service = InventoryService();
   final String tenantId;
-  
+
   List<InventoryItem> _items = [];
   List<InventoryItem> _filteredItems = [];
   List<InventoryLog> _recentLogs = [];
@@ -29,10 +29,10 @@ class InventoryProvider with ChangeNotifier {
   String? get selectedCategory => _selectedCategory;
   StockStatus? get selectedStatus => _selectedStatus;
 
-  List<InventoryItem> get lowStockItems => 
+  List<InventoryItem> get lowStockItems =>
       _items.where((i) => i.status == StockStatus.low).toList();
 
-  List<InventoryItem> get outOfStockItems => 
+  List<InventoryItem> get outOfStockItems =>
       _items.where((i) => i.status == StockStatus.out).toList();
 
   void setSearchQuery(String query) {
@@ -52,17 +52,23 @@ class InventoryProvider with ChangeNotifier {
 
   void _applyFilters() {
     _filteredItems = _items.where((item) {
-      final matchesSearch = item.name.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesCategory = _selectedCategory == null || item.category == _selectedCategory;
-      final matchesStatus = _selectedStatus == null || item.status == _selectedStatus;
+      final matchesSearch = item.name.toLowerCase().contains(
+        _searchQuery.toLowerCase(),
+      );
+      final matchesCategory =
+          _selectedCategory == null || item.category == _selectedCategory;
+      final matchesStatus =
+          _selectedStatus == null || item.status == _selectedStatus;
       return matchesSearch && matchesCategory && matchesStatus;
     }).toList();
-    
+
     // Sort by lastUpdated descending (Newest first)
     _filteredItems.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
-    
+
     notifyListeners();
   }
+
+  List<InventoryItem> get rawItems => _items;
 
   void _init() {
     if (tenantId.isEmpty) {
@@ -74,22 +80,32 @@ class InventoryProvider with ChangeNotifier {
     _itemsSub?.cancel();
     _logsSub?.cancel();
 
-    _itemsSub = _service.getInventoryStream(tenantId).listen((data) {
-      _items = data;
-      _applyFilters();
-      _isLoading = false;
-    }, onError: (e) {
-      debugPrint('Error in inventory items stream: $e');
-      _isLoading = false;
-      notifyListeners();
-    });
+    _itemsSub = _service
+        .getInventoryStream(tenantId)
+        .listen(
+          (data) {
+            _items = data;
+            _applyFilters();
+            _isLoading = false;
+          },
+          onError: (e) {
+            debugPrint('Error in inventory items stream: $e');
+            _isLoading = false;
+            notifyListeners();
+          },
+        );
 
-    _logsSub = _service.getRecentLogsStream(tenantId).listen((data) {
-      _recentLogs = data;
-      notifyListeners();
-    }, onError: (e) {
-      debugPrint('Error in inventory logs stream: $e');
-    });
+    _logsSub = _service
+        .getRecentLogsStream(tenantId)
+        .listen(
+          (data) {
+            _recentLogs = data;
+            notifyListeners();
+          },
+          onError: (e) {
+            debugPrint('Error in inventory logs stream: $e');
+          },
+        );
   }
 
   /// Manually force a refresh of the inventory data

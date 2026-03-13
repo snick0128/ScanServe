@@ -48,6 +48,8 @@ class MenuController extends ChangeNotifier {
     return categories;
   }
 
+  List<MenuItem> get items => List.unmodifiable(_items);
+
   int get activeFiltersCount {
     int count = 0;
     if (_isVegOnly) count++;

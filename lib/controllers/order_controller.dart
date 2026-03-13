@@ -41,7 +41,11 @@ class OrderController extends ChangeNotifier {
   List<OrderDetails> get activeOrders => _activeOrders.toList();
   List<OrderDetails> get pastOrders => _pastOrders.toList();
 
-  Future<void> setSession(String tenantId, String? tableId, {String? sessionId}) async {
+  Future<void> setSession(
+    String tenantId,
+    String? tableId, {
+    String? sessionId,
+  }) async {
     // Get guest ID first
     final guestId = await _guestSession.getGuestId();
 
@@ -68,7 +72,6 @@ class OrderController extends ChangeNotifier {
     await _initializeOrderTracking();
     notifyListeners();
   }
-
 
   // Load last used order type from preferences
   Future<OrderType?> loadLastOrderType() async {
@@ -119,19 +122,20 @@ class OrderController extends ChangeNotifier {
         .doc(_currentSession!.tenantId)
         .collection('orders')
         .add({
-      'guestId': guestId,
-      'tenantId': _currentSession!.tenantId,
-      'type': type.name,
-      'tableId': _currentSession!.tableId,
-      'status': OrderStatus.pending.name,
-      'timestamp': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(), // Added for consistency with Admin model
-      'items': [], // Will be populated when order is placed
-      'subtotal': 0,
-      'tax': 0,
-      'total': 0,
-      'sessionId': _currentSession!.sessionId, // Persist session ID
-    });
+          'guestId': guestId,
+          'tenantId': _currentSession!.tenantId,
+          'type': type.name,
+          'tableId': _currentSession!.tableId,
+          'status': OrderStatus.pending.name,
+          'timestamp': FieldValue.serverTimestamp(),
+          'createdAt':
+              FieldValue.serverTimestamp(), // Added for consistency with Admin model
+          'items': [], // Will be populated when order is placed
+          'subtotal': 0,
+          'tax': 0,
+          'total': 0,
+          'sessionId': _currentSession!.sessionId, // Persist session ID
+        });
 
     await setOrderType(type);
 
@@ -153,20 +157,24 @@ class OrderController extends ChangeNotifier {
         .doc(orderId)
         .snapshots()
         .listen((doc) {
-      if (!doc.exists) return;
-      
-      final updatedOrder = OrderDetails.fromMap(doc.data()!..['id'] = doc.id);
-      final index = _activeOrders.indexWhere((o) => o.orderId == orderId);
-      
-      if (index != -1) {
-        _activeOrders[index] = updatedOrder;
-        notifyListeners();
-      }
-    });
+          if (!doc.exists) return;
+
+          final updatedOrder = OrderDetails.fromMap(
+            doc.data()!..['id'] = doc.id,
+          );
+          final index = _activeOrders.indexWhere((o) => o.orderId == orderId);
+
+          if (index != -1) {
+            _activeOrders[index] = updatedOrder;
+            notifyListeners();
+          }
+        });
   }
 
   void _pruneOrderStatusSubscriptions(Set<String> activeOrderIds) {
-    final stale = _orderStatusSubscriptions.keys.where((id) => !activeOrderIds.contains(id)).toList();
+    final stale = _orderStatusSubscriptions.keys
+        .where((id) => !activeOrderIds.contains(id))
+        .toList();
     for (final id in stale) {
       _orderStatusSubscriptions[id]?.cancel();
       _orderStatusSubscriptions.remove(id);
@@ -177,6 +185,20 @@ class OrderController extends ChangeNotifier {
   bool get isPaymentCompleted => _isPaymentCompleted;
 
   void acknowledgePayment() {
+    _isPaymentCompleted = false;
+    notifyListeners();
+  }
+
+  Future<void> clearSession() async {
+    await _ordersSubscription?.cancel();
+    await _tableOrdersSubscription?.cancel();
+    for (var sub in _orderStatusSubscriptions.values) {
+      sub.cancel();
+    }
+    _orderStatusSubscriptions.clear();
+    _activeOrders.clear();
+    _pastOrders.clear();
+    _currentSession = null;
     _isPaymentCompleted = false;
     notifyListeners();
   }
@@ -221,17 +243,19 @@ class OrderController extends ChangeNotifier {
 
           for (final doc in snapshot.docs) {
             final orderData = doc.data();
-            
+
             try {
               final orderDetails = OrderDetails.fromMap(orderData);
-              
-              final isPast = orderDetails.status == OrderStatus.cancelled || 
-                             orderDetails.status == OrderStatus.completed;
-              
+
+              final isPast =
+                  orderDetails.status == OrderStatus.cancelled ||
+                  orderDetails.status == OrderStatus.completed;
+
               // If we have a tableId filter, only show orders for this table AND session (dine-in)
               // Otherwise show all orders for this guest
               if (tableId != null && orderDetails.type == OrderType.dineIn) {
-                if (orderDetails.tableId == tableId && orderDetails.sessionId == _currentSession?.sessionId) {
+                if (orderDetails.tableId == tableId &&
+                    orderDetails.sessionId == _currentSession?.sessionId) {
                   if (isPast) {
                     _pastOrders.add(orderDetails);
                   } else {
@@ -259,16 +283,22 @@ class OrderController extends ChangeNotifier {
           // Sort by timestamp, newest first
           _activeOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           _pastOrders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-          _pruneOrderStatusSubscriptions(_activeOrders.map((o) => o.orderId).toSet());
+          _pruneOrderStatusSubscriptions(
+            _activeOrders.map((o) => o.orderId).toSet(),
+          );
 
           // REQUIREMENT: Detect when all orders for this session are PAID
           // Instead of silent clearing, we trigger a flag for the UI to show the prompt
-          if (tableId != null && _activeOrders.isEmpty && _pastOrders.isNotEmpty) {
+          if (tableId != null &&
+              _activeOrders.isEmpty &&
+              _pastOrders.isNotEmpty) {
             final latestPastOrder = _pastOrders.first;
             if (latestPastOrder.status == OrderStatus.completed) {
               if (!_isPaymentCompleted) {
-                 debugPrint('💰 [GOAL] All orders PAID for table $tableId. Triggering customer prompt.');
-                 _isPaymentCompleted = true;
+                debugPrint(
+                  '💰 [GOAL] All orders PAID for table $tableId. Triggering customer prompt.',
+                );
+                _isPaymentCompleted = true;
               }
             }
           }
@@ -276,8 +306,6 @@ class OrderController extends ChangeNotifier {
           notifyListeners();
         });
   }
-
-
 
   // Check if there are active orders for the current table
   bool hasActiveTableOrders(String tableId) {
@@ -357,6 +385,7 @@ class OrderController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   @override
   void dispose() {
     _ordersSubscription?.cancel();

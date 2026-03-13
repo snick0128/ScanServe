@@ -59,23 +59,51 @@ class _TablesScreenState extends State<TablesScreen> {
                 _buildHeader(tablesProvider),
                 _buildKPIBar(tablesProvider),
                 _buildFiltersBar(),
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16.w : 32.w),
-                  itemCount: groupedTables.length,
-                  itemBuilder: (context, index) {
-                    final section = groupedTables.keys.elementAt(index);
-                    final sectionTables = groupedTables[section]!;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSection(section, sectionTables, ordersProvider, isMobile),
-                        SizedBox(height: 32.h),
-                      ],
-                    );
-                  },
-                ),
+                if (groupedTables.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 60.h, horizontal: 32.w),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Ionicons.restaurant_outline, size: 64, color: Colors.grey[200]),
+                          SizedBox(height: 16.h),
+                          Text(
+                            _searchQuery.isNotEmpty 
+                              ? 'No tables match your search'
+                              : 'No tables found in this section',
+                            style: TextStyle(fontSize: 16.sp, color: AdminTheme.secondaryText, fontWeight: FontWeight.w500),
+                          ),
+                          if (_searchQuery.isEmpty && _selectedFilter == 'All Tables') ...[
+                            SizedBox(height: 12.h),
+                            TextButton.icon(
+                              onPressed: () => _showAddEditTableDialog(context, tablesProvider, null),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Your First Table'),
+                            ),
+                          ],
+                        ]
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 16.w : 32.w),
+                    itemCount: groupedTables.length,
+                    itemBuilder: (context, index) {
+                      final section = groupedTables.keys.elementAt(index);
+                      final sectionTables = groupedTables[section]!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSection(section, sectionTables, ordersProvider, isMobile),
+                          SizedBox(height: 32.h),
+                        ],
+                      );
+                    },
+                  ),
               ],
             ),
           );
@@ -260,7 +288,7 @@ class _TablesScreenState extends State<TablesScreen> {
       result = result.where((t) => t.status == TableStatus.available).toList();
     } else if (_selectedFilter == 'Active') {
       result = result.where((t) => t.status == TableStatus.occupied).toList();
-    } else if (_selectedFilter == 'Settlement Pending') {
+    } else if (_selectedFilter == 'Pending') {
       result = result.where((t) => t.status == TableStatus.billRequested || t.status == TableStatus.paymentPending).toList();
     }
 
@@ -643,7 +671,10 @@ class _TableCard extends StatelessWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to release ${table.name}: $e'), backgroundColor: AdminTheme.critical),
+            SnackBar(
+              content: Text('Unable to release ${table.name} right now. Please try again.'),
+              backgroundColor: AdminTheme.critical,
+            ),
           );
         }
       }

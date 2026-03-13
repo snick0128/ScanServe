@@ -535,6 +535,7 @@ class OrdersProvider with ChangeNotifier {
     double? finalAmount,
     double? correctionAmount,
     String? correctionReason,
+    String? paymentMethod,
   }) async {
     _checkPermission(['admin', 'superadmin'], action: 'Settling tables');
     if (_tenantId == null) return;
@@ -565,18 +566,18 @@ class OrdersProvider with ChangeNotifier {
           }
 
           transaction.update(doc.reference, {
-              'status': model.OrderStatus.completed.name,
-              'paymentStatus': model.PaymentStatus.paid.name,
-              'paymentMethod': 'Cash',
-              'paidBy': _auth?.userName ?? _auth?.user?.email ?? 'Admin',
-              'paidAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-              'closedAt': FieldValue.serverTimestamp(),
-              if (finalAmount != null) 'finalSettledAmount': finalAmount,
-              if (correctionAmount != null) 'correctionAmount': correctionAmount,
-              if (correctionReason != null) 'correctionReason': correctionReason,
-            });
-          }
+            'status': model.OrderStatus.completed.name,
+            'paymentStatus': model.PaymentStatus.paid.name,
+            'paymentMethod': paymentMethod ?? 'Cash',
+            'paidBy': _auth?.userName ?? _auth?.user?.email ?? 'Admin',
+            'paidAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+            'closedAt': FieldValue.serverTimestamp(),
+            if (finalAmount != null) 'finalSettledAmount': finalAmount,
+            if (correctionAmount != null) 'correctionAmount': correctionAmount,
+            if (correctionReason != null) 'correctionReason': correctionReason,
+          });
+        }
 
           if (tableId != 'PARCEL') {
             final tableRef = _firestore

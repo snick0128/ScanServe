@@ -234,6 +234,7 @@ class OrderItem {
   final double price;
   final int quantity;
   final String? notes;
+  final bool quickReorder;
 
   OrderItem({
     required this.id,
@@ -241,6 +242,7 @@ class OrderItem {
     required this.price,
     required this.quantity,
     this.notes,
+    this.quickReorder = false,
   });
 
   factory OrderItem.fromCartItem(CartItem cartItem) {
@@ -250,6 +252,7 @@ class OrderItem {
       price: cartItem.item.price,
       quantity: cartItem.quantity,
       notes: cartItem.note,
+      quickReorder: cartItem.quickReorder,
     );
   }
 
@@ -260,6 +263,7 @@ class OrderItem {
       'price': price,
       'quantity': quantity,
       'notes': notes,
+      'quick_reorder': quickReorder,
     };
   }
 
@@ -270,6 +274,7 @@ class OrderItem {
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
       quantity: (map['quantity'] as num?)?.toInt() ?? 1,
       notes: map['notes']?.toString(),
+      quickReorder: map['quick_reorder'] ?? false,
     );
   }
 

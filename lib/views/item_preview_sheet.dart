@@ -9,6 +9,7 @@ import '../utils/snackbar_helper.dart';
 import '../utils/session_validator.dart';
 import '../app.dart';
 import '../config/app_config.dart';
+import '../controllers/menu_controller.dart' as app_controller;
 
 class ItemPreviewSheet extends StatefulWidget {
   final MenuItem item;
@@ -166,6 +167,9 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                                 const SizedBox(height: 12),
                                 ...widget.item.variants.map((v) => _buildVariantOption(v)),
                               ],
+                              
+                              // FEATURE 2: Often Ordered With
+                              _buildSuggestedItemsSection(context),
                               
                               const SizedBox(height: 100), // Reserve space for footer
                             ],
@@ -374,6 +378,137 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSuggestedItemsSection(BuildContext context) {
+    if (widget.item.suggestedItemIds.isEmpty) return const SizedBox.shrink();
+    
+    final menuController = context.watch<app_controller.MenuController>();
+    final suggestedItems = menuController.items
+        .where((i) => widget.item.suggestedItemIds.contains(i.id))
+        .take(3)
+        .toList();
+
+    if (suggestedItems.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        Text(
+          'Often Ordered With This',
+          style: GoogleFonts.outfit(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1C1C1E),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 140,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: suggestedItems.length,
+            itemBuilder: (context, index) {
+              return _buildSmallItemCard(context, suggestedItems[index]);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSmallItemCard(BuildContext context, MenuItem item) {
+    return Container(
+      width: 130,
+      margin: const EdgeInsets.only(right: 12, bottom: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+            child: item.imageUrl != null
+                ? Image.network(
+                    item.imageUrl!,
+                    height: 70,
+                    width: 130,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                  )
+                : _buildPlaceholder(),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '₹${item.price.toInt()}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        HapticHelper.light();
+                        context.read<CartController>().addItem(item);
+                        SnackbarHelper.showTopSnackBar(
+                          context,
+                          'Added ${item.name} to cart',
+                          duration: const Duration(seconds: 1),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF0F6D3F),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      height: 70,
+      color: Colors.grey[100],
+      child: const Center(child: Icon(Icons.fastfood, size: 24, color: Colors.grey)),
     );
   }
 

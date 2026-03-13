@@ -712,6 +712,7 @@ class _OrderCard extends StatelessWidget {
   Widget _buildActionButton(BuildContext context) {
     final provider = context.read<OrdersProvider>();
     final auth = context.read<AdminAuthProvider>();
+    final isBusy = context.watch<OrdersProvider>().isLoading;
     
     String label = 'Mark Served';
     Color color = AdminTheme.primaryColor;
@@ -746,15 +747,17 @@ class _OrderCard extends StatelessWidget {
     }
 
     return ElevatedButton(
-      onPressed: action,
+      onPressed: isBusy ? null : action,
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         elevation: 0,
+        disabledBackgroundColor: Colors.grey[300],
+        disabledForegroundColor: Colors.white70,
       ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      child: Text(isBusy ? 'Please wait' : label, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 
@@ -840,7 +843,9 @@ class _OrderCard extends StatelessWidget {
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Settlement failed: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_friendlyErrorMessage(e, fallback: 'Unable to settle this table right now.'))),
+          );
         }
       }
     }
@@ -986,7 +991,7 @@ class _OrderCard extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to mark served: $e'),
+            content: Text(_friendlyErrorMessage(e, fallback: 'Unable to mark this order as served.')),
             backgroundColor: AdminTheme.critical,
           ),
         );
@@ -1006,11 +1011,20 @@ class _OrderCard extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Action failed: $e'),
+          content: Text(_friendlyErrorMessage(e, fallback: 'Unable to update order right now. Please try again.')),
           backgroundColor: AdminTheme.critical,
         ),
       );
     }
+  }
+
+  String _friendlyErrorMessage(Object error, {required String fallback}) {
+    final raw = error.toString().toLowerCase();
+    if (raw.contains('unauthorized')) return 'You do not have permission for this action.';
+    if (raw.contains('network') || raw.contains('unavailable')) return 'Network issue. Please check connection and try again.';
+    if (raw.contains('failed-precondition') || raw.contains('index')) return 'System is syncing setup. Please try again shortly.';
+    if (raw.contains('invalid status transition')) return 'This order state has changed. Please refresh and retry.';
+    return fallback;
   }
 
   Widget _buildStatusBadge(model.OrderStatus status) {

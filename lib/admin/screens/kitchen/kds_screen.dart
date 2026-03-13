@@ -520,16 +520,28 @@ class _KDSScreenState extends State<KDSScreen> {
                               Text(
                                 '${item.quantity}× ${item.name}',
                                 style: TextStyle(
-                                  fontSize: 16, 
+                                  fontSize: isCompact ? 14 : 16, 
                                   fontWeight: FontWeight.bold, 
                                   color: isChecked ? AdminTheme.secondaryText : AdminTheme.primaryText,
                                   decoration: isReady ? TextDecoration.lineThrough : null,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               if (item.notes != null && item.notes!.isNotEmpty)
-                                Text(item.notes!, style: const TextStyle(fontSize: 13, color: Colors.orange, fontWeight: FontWeight.bold)),
+                                Text(
+                                  item.notes!,
+                                  style: TextStyle(fontSize: isCompact ? 12 : 13, color: Colors.orange, fontWeight: FontWeight.bold),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               if (item.addons != null && item.addons!.isNotEmpty)
-                                ...item.addons!.map((addon) => Text('• $addon', style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText))),
+                                ...item.addons!.map((addon) => Text(
+                                  '• $addon',
+                                  style: TextStyle(fontSize: isCompact ? 11 : 12, color: AdminTheme.secondaryText),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                )),
                             ],
                           ),
                         ),
@@ -559,7 +571,7 @@ class _KDSScreenState extends State<KDSScreen> {
                   ),
                   child: Text(
                     allCheckedReady ? 'ALL READY' : 'MARK SELECTED READY', 
-                    style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 13.sp)
+                    style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3, fontSize: isCompact ? 11.sp : 13.sp)
                   ),
                 ),
                 if (_currentStation?.id == 'pass_expo' &&
@@ -585,7 +597,7 @@ class _KDSScreenState extends State<KDSScreen> {
                         const SizedBox(width: 8),
                         Text(
                           'SERVE ENTIRE ORDER', 
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.sp, letterSpacing: 0.5)
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: isCompact ? 11.sp : 13.sp, letterSpacing: 0.3)
                         ),
                       ],
                     ),
@@ -683,7 +695,7 @@ class _KDSScreenState extends State<KDSScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('⚠ Updated $updatedCount items, ${errors.length} failed: ${errors.join(', ')}'),
+              content: Text('Updated $updatedCount item(s). ${errors.length} item(s) could not be updated.'),
               backgroundColor: AdminTheme.warning,
               duration: const Duration(seconds: 4),
             ),
@@ -697,7 +709,7 @@ class _KDSScreenState extends State<KDSScreen> {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating items: ${e.toString()}'),
+            content: const Text('Unable to update selected items. Please try again.'),
             backgroundColor: AdminTheme.critical,
             duration: const Duration(seconds: 4),
             action: SnackBarAction(
@@ -725,7 +737,7 @@ class _KDSScreenState extends State<KDSScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to serve order: $e'),
+          content: const Text('Unable to serve this order right now. Please try again.'),
           backgroundColor: AdminTheme.critical,
         ),
       );

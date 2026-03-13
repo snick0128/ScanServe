@@ -27,6 +27,7 @@ class ActiveSession {
 
 class BillsProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const double _fallbackTaxRate = 0.05;
   
   List<Map<String, dynamic>> _allBills = [];
   bool _isLoading = false;
@@ -167,7 +168,15 @@ class BillsProvider with ChangeNotifier {
     return '${trend > 0 ? '+' : ''}${trend.toStringAsFixed(1)}%';
   }
 
-  Future<String?> markAsPaid(String tableId, List<String> orderIds, {String? paymentMethod, String? note}) async {
+  Future<String?> markAsPaid(String tableId, List<String> orderIds, {
+    double discount = 0,
+    bool isPercentage = true,
+    String? paymentMethod,
+    String? note,
+    double? finalAmount,
+    double? correctionAmount,
+    String? correctionReason,
+  }) async {
     if (_tenantId == null || _ordersProvider == null) return null;
     
     try {
@@ -177,25 +186,49 @@ class BillsProvider with ChangeNotifier {
           .toList();
       
       if (orders.isEmpty) return null;
+ 
+      final taxRate = _resolveTaxRate(orders);
 
-      // 2. Generate the bill record
+      // 2. Generate the bill record (Atomic transactional creation)
       final billService = BillService();
       final billId = await billService.generateBill(
         tenantId: _tenantId!,
         tableId: tableId,
         orders: orders,
+        discount: discount,
+        isPercentage: isPercentage,
+        taxRate: taxRate,
         paymentMethod: paymentMethod,
         note: note,
       );
 
-      // 3. Close the table session
-      await _ordersProvider!.markTableAsPaid(tableId);
+      // 3. Finalize settlement and release table
+      await _ordersProvider!.markTableAsPaid(
+        tableId,
+        finalAmount: finalAmount,
+        correctionAmount: correctionAmount,
+        correctionReason: correctionReason,
+        paymentMethod: paymentMethod,
+      );
       
       return billId;
     } catch (e) {
       print('❌ Error in markAsPaid flow: $e');
       rethrow;
     }
+  }
+
+  double _resolveTaxRate(List<model.Order> orders) {
+    final settingsRate = (_ordersProvider?.tenantSettings['taxRate'] as num?)?.toDouble();
+    if (settingsRate != null && settingsRate >= 0) return settingsRate;
+
+    final subtotal = orders.fold(0.0, (sum, o) => sum + o.subtotal);
+    if (subtotal > 0) {
+      final tax = orders.fold(0.0, (sum, o) => sum + o.tax);
+      return tax / subtotal;
+    }
+
+    return _fallbackTaxRate;
   }
 
   Future<void> bulkCloseSessions() async {

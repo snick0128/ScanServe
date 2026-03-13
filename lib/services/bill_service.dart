@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/order.dart' as model;
+import '../utils/bill_calculator.dart';
 
 class BillService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -12,25 +13,25 @@ class BillService {
     required String tableId,
     required List<model.Order> orders,
     double discount = 0.0,
+    bool isPercentage = true,
+    double? taxRate,
     String? paymentMethod,
     String? note,
   }) async {
     try {
       final billId = _uuid.v4();
       
-      double subtotal = 0.0;
-      double tax = 0.0;
-      
-      for (final order in orders) {
-        subtotal += order.subtotal;
-        tax += order.tax;
-      }
-      
-      final discountAmount = subtotal * (discount / 100);
-      final discountedSubtotal = subtotal - discountAmount;
-      final taxRate = subtotal > 0 ? (tax / subtotal) : 0.05; 
-      final newTax = discountedSubtotal * taxRate;
-      final finalTotal = discountedSubtotal + newTax;
+      final calculations = BillCalculator.calculateBill(
+        orders: orders,
+        discountValue: discount,
+        isPercentageDiscount: isPercentage,
+        customTaxRate: taxRate,
+      );
+
+      final subtotal = calculations['subtotal']!;
+      final newTax = calculations['taxAmount']!;
+      final discountAmount = calculations['totalDiscount']!;
+      final finalTotal = calculations['finalTotal']!;
       
       String? customerName;
       String? customerPhone;
@@ -72,41 +73,44 @@ class BillService {
         'subtotal': subtotal,
         'tax': newTax,
         'discount': discount,
+        'isPercentageDiscount': isPercentage,
         'discountAmount': discountAmount,
-        'total': subtotal + tax,
+        'totalDiscount': discountAmount,
+        'total': subtotal + newTax,
         'finalTotal': finalTotal,
+        'taxRate': taxRate,
         'paymentMethod': paymentMethod ?? 'Cash',
         'note': note,
         'createdAt': FieldValue.serverTimestamp(),
         'orderDetails': consolidatedItems.values.toList(),
       };
       
-      await _firestore
-          .collection('tenants')
-          .doc(tenantId)
-          .collection('bills')
-          .doc(billId)
-          .set(billData);
-      
-      final batch = _firestore.batch();
-      for (final order in orders) {
-        final orderRef = _firestore
+      await _firestore.runTransaction((transaction) async {
+        // Create the bill document
+        final billRef = _firestore
             .collection('tenants')
             .doc(tenantId)
-            .collection('orders')
-            .doc(order.id);
+            .collection('bills')
+            .doc(billId);
         
-        batch.update(orderRef, {
-          'status': model.OrderStatus.completed.name,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'billId': billId,
-          'paymentMethod': paymentMethod ?? 'Cash',
-          'paymentNote': note,
-        });
-      }
-      await batch.commit();
+        transaction.set(billRef, billData);
+        
+        // Tag orders with this billId, but DON'T complete them yet (Requirement: Release on payment)
+        for (final order in orders) {
+          final orderRef = _firestore
+              .collection('tenants')
+              .doc(tenantId)
+              .collection('orders')
+              .doc(order.id);
+          
+          transaction.update(orderRef, {
+            'billId': billId,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      });
       
-      print('Bill generated successfully: $billId');
+      print('✅ Bill #$billId created and orders tagged');
       return billId;
     } catch (e) {
       print('Error generating bill: $e');

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/tenant_model.dart';
+import '../models/table_status.dart';
 
 class TenantService {
   final _firestore = FirebaseFirestore.instance;
@@ -113,9 +114,22 @@ class TenantService {
         if (!snapshot.exists) return false;
         
         final data = snapshot.data();
-        final isOccupied = data?['isOccupied'] == true; // Robust bool check
-        final isAvailable = data?['isAvailable'] != false; // Robust bool check
+        final status = TableStatus.fromString(data?['status']);
+        final isOccupied = data?['isOccupied'] == true || status.hasActiveSession;
+        final isAvailable = data?['isAvailable'] == true || status.canAcceptCustomers;
         final currentSession = data?['currentSessionId'];
+
+        // If status says available, allow lock and heal flags on write.
+        if (status.canAcceptCustomers) {
+          transaction.update(tableRef, {
+            'isOccupied': true,
+            'currentSessionId': sessionId,
+            'status': 'occupied',
+            'isAvailable': false,
+            'occupiedAt': FieldValue.serverTimestamp(),
+          });
+          return true;
+        }
 
         // Block if ALREADY occupied by someone else, or if NOT available
         if (isOccupied || !isAvailable) {

@@ -19,6 +19,7 @@ import 'menu_selector_dialog.dart';
 import '../theme/admin_theme.dart';
 import '../../../models/table_status.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
+import '../../../utils/bill_calculator.dart';
 
 
 class TableOrdersDialog extends StatefulWidget {
@@ -41,13 +42,58 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
   final BillService _billService = BillService();
   final TablesService _tablesService = TablesService();
   final _discountController = TextEditingController(text: '0');
+  final _scrollController = ScrollController();
+  final _discountFocusNode = FocusNode();
+  bool _isPercentageDiscount = true;
   bool _isGeneratingBill = false;
   Map<String, dynamic>? _generatedBill;
+  static const double _fallbackTaxRate = 0.05;
+
+  @override
+  void initState() {
+    super.initState();
+    _discountFocusNode.addListener(() {
+      if (_discountFocusNode.hasFocus && _discountController.text == '0') {
+        _discountController.clear();
+      } else if (!_discountFocusNode.hasFocus && _discountController.text.isEmpty) {
+        _discountController.text = '0';
+      }
+    });
+  }
 
   @override
   void dispose() {
     _discountController.dispose();
+    _scrollController.dispose();
+    _discountFocusNode.dispose();
     super.dispose();
+  }
+
+  double _resolveTaxRate(OrdersProvider ordersProvider, List<model.Order> orders) {
+    final settingsRate = (ordersProvider.tenantSettings['taxRate'] as num?)?.toDouble();
+    if (settingsRate != null && settingsRate >= 0) return settingsRate;
+
+    final subtotal = orders.fold(0.0, (sum, o) => sum + o.subtotal);
+    if (subtotal > 0) {
+      final tax = orders.fold(0.0, (sum, o) => sum + o.tax);
+      return tax / subtotal;
+    }
+
+    return _fallbackTaxRate;
+  }
+
+  void _rebuildPreservingScroll(VoidCallback update) {
+    final offset = _scrollController.hasClients ? _scrollController.offset : null;
+    setState(update);
+    if (offset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final max = _scrollController.position.maxScrollExtent;
+      final clamped = offset.clamp(0.0, max);
+      if (clamped != _scrollController.offset) {
+        _scrollController.jumpTo(clamped);
+      }
+    });
   }
 
   Future<void> _startNewOrder() async {
@@ -222,7 +268,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                             } catch (e) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to release table: $e'))
+                                  const SnackBar(content: Text('Unable to release table right now. Please try again.'))
                                 );
                               }
                             }
@@ -366,10 +412,16 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                             activeOrderId = orders.last.id;
                         }
 
-                        // AGGREGATE STATS FOR THE TABLE
-                        final totalSubtotal = orders.fold<double>(0, (sum, o) => sum + o.subtotal);
-                        final totalTax = orders.fold<double>(0, (sum, o) => sum + o.tax);
-                        final totalTotal = orders.fold<double>(0, (sum, o) => sum + o.total);
+                        // AGGREGATE STATS FOR THE TABLE (Requirement #3 & #1)
+                        final discountValue = double.tryParse(_discountController.text) ?? 0.0;
+                        final taxRate = _resolveTaxRate(ordersProvider, orders);
+                        final currentCalc = BillCalculator.calculateBill(
+                          orders: orders,
+                          discountValue: discountValue,
+                          isPercentageDiscount: _isPercentageDiscount,
+                          customTaxRate: taxRate,
+                        );
+                        final totalTotal = currentCalc['finalTotal']!;
 
                         return Column(
                           children: [
@@ -396,6 +448,8 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                               child: orders.isEmpty 
                                 ? const Center(child: Text('No active orders'))
                                 : ListView.builder(
+                                  key: const PageStorageKey<String>('table-orders-list'),
+                                  controller: _scrollController,
                                   itemCount: orders.length + 1, // +1 for the bill section
                                   itemBuilder: (context, index) {
                                     if (index < orders.length) {
@@ -406,7 +460,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                                       if (orders.isNotEmpty && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain)) {
                                           return Padding(
                                             padding: const EdgeInsets.only(top: 24, bottom: 80), // bottom padding for fixed bar
-                                            child: _buildBillSection(orders),
+                                            child: _buildBillSection(orders, taxRate),
                                           );
                                       } else if (orders.isNotEmpty) {
                                         return const Padding(
@@ -439,10 +493,10 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     );
   }
 
-  Widget _buildBillSection(List<model.Order> orders) {
+  Widget _buildBillSection(List<model.Order> orders, double taxRate) {
     return Column(
       children: [
-        _buildBillSummary(orders),
+        _buildBillSummary(orders, taxRate),
         const SizedBox(height: 16),
         _buildGenerateBillButton(orders),
       ],
@@ -650,6 +704,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     final amountController = TextEditingController(text: currentTotal.toStringAsFixed(2));
     final reasonController = TextEditingController();
     double correctionAmount = 0;
+    String selectedPaymentMethod = 'Cash';
 
     return showDialog<void>(
       context: context,
@@ -657,11 +712,11 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
+          title: const Row(
             children: [
-              const Icon(Icons.payments_outlined, color: AdminTheme.success),
-              const SizedBox(width: 12),
-              const Text('Confirm Settlement'),
+              Icon(Icons.payments_outlined, color: AdminTheme.success),
+              SizedBox(width: 12),
+              Text('Confirm Settlement'),
             ],
           ),
           content: SingleChildScrollView(
@@ -689,6 +744,15 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                     });
                   },
                 ),
+                const SizedBox(height: 16),
+                const Text('Payment Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedPaymentMethod,
+                  items: ['Cash', 'UPI', 'Card', 'Other'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (val) => setState(() => selectedPaymentMethod = val ?? 'Cash'),
+                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                ),
                 if (correctionAmount != 0) ...[
                   const SizedBox(height: 16),
                   Container(
@@ -705,11 +769,13 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                           color: correctionAmount < 0 ? AdminTheme.success : AdminTheme.critical,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Correction: ₹${correctionAmount.abs().toStringAsFixed(2)} (${correctionAmount < 0 ? "Discount" : "Charge"})',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: correctionAmount < 0 ? AdminTheme.success : AdminTheme.critical,
+                        Expanded(
+                          child: Text(
+                            'Correction: ₹${correctionAmount.abs().toStringAsFixed(2)} (${correctionAmount < 0 ? "Discount" : "Charge"})',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: correctionAmount < 0 ? AdminTheme.success : AdminTheme.critical,
+                            ),
                           ),
                         ),
                       ],
@@ -725,7 +791,6 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 2,
-                    autofocus: true,
                   ),
                 ],
               ],
@@ -745,16 +810,22 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                   return;
                 }
 
-                final ordersProvider = context.read<OrdersProvider>();
                 final billsProvider = context.read<BillsProvider>();
                 
                 try {
                   final finalAmount = double.tryParse(amountController.text) ?? currentTotal;
-                  
-                  // REQUIRED: Use BillsProvider flow to ensure Bill record is generated
-                  // and table is released in one atomic action.
                   final orderIds = orders.map((o) => o.id).toList();
-                  final billId = await billsProvider.markAsPaid(widget.tableId, orderIds);
+                  
+                  final billId = await billsProvider.markAsPaid(
+                    widget.tableId, 
+                    orderIds,
+                    discount: double.tryParse(_discountController.text) ?? 0,
+                    isPercentage: _isPercentageDiscount,
+                    finalAmount: finalAmount,
+                    correctionAmount: correctionAmount != 0 ? correctionAmount : null,
+                    correctionReason: correctionAmount != 0 ? reasonController.text : null,
+                    paymentMethod: selectedPaymentMethod,
+                  );
 
                   if (context.mounted) {
                     Navigator.pop(context); // Close Confirmation Dialog
@@ -851,16 +922,20 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     );
   }
 
-  Widget _buildBillSummary(List<model.Order> orders) {
-    final subtotal = orders.fold<double>(0.0, (sum, o) => sum + o.subtotal);
-    final tax = orders.fold<double>(0.0, (sum, o) => sum + o.tax);
+  Widget _buildBillSummary(List<model.Order> orders, double taxRate) {
+    final discountValue = double.tryParse(_discountController.text) ?? 0.0;
+    
+    final calculations = BillCalculator.calculateBill(
+      orders: orders,
+      discountValue: discountValue,
+      isPercentageDiscount: _isPercentageDiscount,
+      customTaxRate: taxRate,
+    );
 
-    final discount = double.tryParse(_discountController.text) ?? 0.0;
-    final discountAmount = subtotal * (discount / 100);
-    final discountedSubtotal = subtotal - discountAmount;
-    final taxRate = subtotal > 0 ? (tax / subtotal) : 0.05;
-    final newTax = discountedSubtotal * taxRate;
-    final finalTotal = discountedSubtotal + newTax;
+    final subtotal = calculations['subtotal']!;
+    final newTax = calculations['taxAmount']!;
+    final discountAmount = calculations['totalDiscount']!;
+    final finalTotal = calculations['finalTotal']!;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -875,16 +950,36 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
           const Text('BILLING DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
           const SizedBox(height: 20),
           _buildBillRow('Session Subtotal', '₹${subtotal.toStringAsFixed(2)}'),
-          _buildBillRow('Tax (Recalculated)', '₹${newTax.toStringAsFixed(2)}'),
+          _buildBillRow('Tax (${(taxRate * 100).toStringAsFixed(taxRate * 100 % 1 == 0 ? 0 : 2)}%)', '₹${newTax.toStringAsFixed(2)}'),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Add Discount (%)', style: TextStyle(fontWeight: FontWeight.w600)),
+              Row(
+                children: [
+                   const Text('Add Discount', style: TextStyle(fontWeight: FontWeight.w600)),
+                   const SizedBox(width: 8),
+                   ToggleButtons(
+                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                     borderRadius: BorderRadius.circular(8),
+                     isSelected: [_isPercentageDiscount, !_isPercentageDiscount],
+                     onPressed: (index) {
+                       _rebuildPreservingScroll(() {
+                         _isPercentageDiscount = index == 0;
+                       });
+                     },
+                     children: const [
+                       Text('%', style: TextStyle(fontWeight: FontWeight.bold)),
+                       Text('₹', style: TextStyle(fontWeight: FontWeight.bold)),
+                     ],
+                   ),
+                ],
+              ),
               SizedBox(
                 width: 80,
                 child: TextField(
                   controller: _discountController,
+                  focusNode: _discountFocusNode,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontWeight: FontWeight.bold),
@@ -893,12 +988,14 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (val) {
+                    _rebuildPreservingScroll(() {});
+                  },
                 ),
               ),
             ],
           ),
-          if (discount > 0) ...[
+          if (discountAmount > 0) ...[
             const SizedBox(height: 12),
             _buildBillRow('Discount Savings', '-₹${discountAmount.toStringAsFixed(2)}', color: AdminTheme.success),
           ],
@@ -964,12 +1061,15 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
 
     try {
       final discount = double.tryParse(_discountController.text) ?? 0.0;
+      final taxRate = _resolveTaxRate(context.read<OrdersProvider>(), orders);
       
       final billId = await _billService.generateBill(
         tenantId: widget.tenantId,
         tableId: widget.tableId,
         orders: orders,
         discount: discount,
+        isPercentage: _isPercentageDiscount,
+        taxRate: taxRate,
       );
 
       final billData = await _billService.getBill(widget.tenantId, billId);

@@ -23,17 +23,7 @@ class BillView extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: AppTheme.primaryText,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.print_outlined),
-            onPressed: () {
-              // Simulate print success
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Preparing bill for printing...')),
-              );
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -88,26 +78,7 @@ class BillView extends StatelessWidget {
               total, 
               style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green[700]),
             ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                   // Logic for print
-                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Print dialog opened')),
-                  );
-                },
-                icon: const Icon(Icons.print),
-                label: const Text('PRINT BILL'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

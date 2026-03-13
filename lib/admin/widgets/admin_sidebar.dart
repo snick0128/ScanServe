@@ -48,8 +48,11 @@ class AdminSidebar extends StatelessWidget {
                     color: AdminTheme.primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
-                  child: Icon(Ionicons.restaurant, 
-                    color: AdminTheme.primaryColor, size: 24.w),
+                  child: Icon(
+                    Ionicons.restaurant,
+                    color: AdminTheme.primaryColor,
+                    size: 24.w,
+                  ),
                 ),
                 if (!isCollapsed) ...[
                   SizedBox(width: 12.w),
@@ -104,6 +107,14 @@ class AdminSidebar extends StatelessWidget {
                     icon: Ionicons.list_outline,
                     activeIcon: Ionicons.list,
                     label: 'Orders',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 6,
+                    icon: Ionicons.people_outline,
+                    activeIcon: Ionicons.people,
+                    label: 'Staff',
                     isCollapsed: isCollapsed,
                   ),
                   _buildNavItem(
@@ -197,6 +208,14 @@ class AdminSidebar extends StatelessWidget {
                   ),
                   _buildNavItem(
                     context: context,
+                    index: 6,
+                    icon: Ionicons.time_outline,
+                    activeIcon: Ionicons.time,
+                    label: 'My Shift',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
                     index: 7,
                     icon: Ionicons.settings_outline,
                     activeIcon: Ionicons.settings,
@@ -233,7 +252,7 @@ class AdminSidebar extends StatelessWidget {
     required bool isCollapsed,
   }) {
     final isSelected = selectedIndex == index;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: InkWell(
@@ -246,15 +265,21 @@ class AdminSidebar extends StatelessWidget {
             vertical: 12.h,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? AdminTheme.primaryColor.withOpacity(0.12) : Colors.transparent,
+            color: isSelected
+                ? AdminTheme.primaryColor.withOpacity(0.12)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12.r),
           ),
           child: Row(
-            mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisAlignment: isCollapsed
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
             children: [
               Icon(
                 isSelected ? activeIcon : icon,
-                color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText,
+                color: isSelected
+                    ? AdminTheme.primaryColor
+                    : AdminTheme.secondaryText,
                 size: 22.w,
               ),
               if (!isCollapsed) ...[
@@ -263,9 +288,13 @@ class AdminSidebar extends StatelessWidget {
                   child: Text(
                     label,
                     style: TextStyle(
-                      color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
+                      color: isSelected
+                          ? AdminTheme.primaryText
+                          : AdminTheme.secondaryText,
                       fontSize: 15.sp,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -281,7 +310,7 @@ class AdminSidebar extends StatelessWidget {
 
   Widget _buildUserProfile(BuildContext context) {
     final auth = context.read<AdminAuthProvider>();
-    
+
     return Container(
       padding: EdgeInsets.all(16.w),
       margin: EdgeInsets.all(12.w),
@@ -302,7 +331,11 @@ class AdminSidebar extends StatelessWidget {
                 height: 36.w,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
-                  return Icon(Ionicons.person_outline, size: 18.w, color: AdminTheme.secondaryText);
+                  return Icon(
+                    Ionicons.person_outline,
+                    size: 18.w,
+                    color: AdminTheme.secondaryText,
+                  );
                 },
               ),
             ),
@@ -338,8 +371,11 @@ class AdminSidebar extends StatelessWidget {
             ),
             IconButton(
               onPressed: () => _handleLogout(context),
-              icon: Icon(Ionicons.log_out_outline, 
-                color: AdminTheme.critical, size: 20.w),
+              icon: Icon(
+                Ionicons.log_out_outline,
+                color: AdminTheme.critical,
+                size: 20.w,
+              ),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -366,7 +402,10 @@ class AdminSidebar extends StatelessWidget {
               Navigator.pop(context);
               context.read<AdminAuthProvider>().signOut();
             },
-            child: const Text('LOGOUT', style: TextStyle(color: AdminTheme.critical)),
+            child: const Text(
+              'LOGOUT',
+              style: TextStyle(color: AdminTheme.critical),
+            ),
           ),
         ],
       ),

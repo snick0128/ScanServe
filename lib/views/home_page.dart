@@ -10,6 +10,7 @@ import '../controllers/order_controller.dart';
 import '../services/session_service.dart';
 import '../services/waiter_call_service.dart';
 import '../services/guest_session_service.dart';
+import '../services/bill_request_service.dart';
 import 'meal_time_tabs.dart';
 import 'search_bar.dart' as custom_search;
 import 'menu_grid.dart';
@@ -54,13 +55,14 @@ class _HomeContentState extends State<HomeContent> {
   bool _isLoadingTenant = true;
   bool? _isVegOnly;
   int _selectedIndex = 1; // Default to Menu
+  Offset? _waiterTapPosition;
 
   @override
   void initState() {
     super.initState();
     _initializeSession();
     _loadTenantInfo();
-    
+
     // Listen for payment completion
     final orderController = context.read<OrderController>();
     orderController.addListener(_handlePaymentStatusChange);
@@ -76,7 +78,9 @@ class _HomeContentState extends State<HomeContent> {
     // We need to be careful with context in dispose
     // But since HomePage is long lived, this is generally okay
     try {
-      context.read<OrderController>().removeListener(_handlePaymentStatusChange);
+      context.read<OrderController>().removeListener(
+        _handlePaymentStatusChange,
+      );
     } catch (_) {}
     super.dispose();
   }
@@ -98,9 +102,11 @@ class _HomeContentState extends State<HomeContent> {
 
   void _showPostPaymentPrompt() {
     final orderController = context.read<OrderController>();
-    
+
     // Reset the flag immediately so we don't show it twice
     orderController.acknowledgePayment();
+
+    _endSession(navigate: false);
 
     showDialog(
       context: context,
@@ -118,18 +124,30 @@ class _HomeContentState extends State<HomeContent> {
           'Your payment has been confirmed. Your session is now closed. Please scan the QR again to start a new order.',
           style: TextStyle(fontSize: 16),
         ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         actions: [
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await _endSession();
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => Initializer(config: AppConfig.init()),
+                  ),
+                  (route) => false,
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Scan Again'),
           ),
@@ -138,7 +156,7 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  Future<void> _endSession() async {
+  Future<void> _endSession({bool navigate = true}) async {
     final orderController = context.read<OrderController>();
     final session = orderController.currentSession;
     if (session == null) return;
@@ -152,11 +170,15 @@ class _HomeContentState extends State<HomeContent> {
     // 2. Clear local session
     final guestSession = GuestSessionService();
     await guestSession.clearCustomerSession();
+    await guestSession.clearSession();
+    await orderController.clearSession();
 
     // 3. Reset app state - push back to Initializer to force a re-scan or fresh state
-    if (mounted) {
+    if (mounted && navigate) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init())),
+        MaterialPageRoute(
+          builder: (context) => Initializer(config: AppConfig.init()),
+        ),
         (route) => false,
       );
     }
@@ -172,7 +194,8 @@ class _HomeContentState extends State<HomeContent> {
     final guestId = session.guestId;
 
     // 1. Create a brand new session ID
-    final newSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
+    final newSessionId =
+        'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
 
     // 2. Lock table with new session in backend (dine-in only)
     bool isLocked = true;
@@ -182,9 +205,9 @@ class _HomeContentState extends State<HomeContent> {
     }
 
     if (!isLocked) {
-       // Fallback if somehow failed
-       await _endSession();
-       return;
+      // Fallback if somehow failed
+      await _endSession();
+      return;
     }
 
     // 3. Save new session locally
@@ -200,9 +223,12 @@ class _HomeContentState extends State<HomeContent> {
 
     // 4. Update order controller
     orderController.setSession(tenantId, tableId, sessionId: newSessionId);
-    
+
     if (mounted) {
-      SnackbarHelper.showTopSnackBar(context, 'New session started. You can add more items!');
+      SnackbarHelper.showTopSnackBar(
+        context,
+        'New session started. You can add more items!',
+      );
     }
   }
 
@@ -230,7 +256,9 @@ class _HomeContentState extends State<HomeContent> {
         if (_isVegOnly == true) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              context.read<app_controller.MenuController>().setStrictVegMode(true);
+              context.read<app_controller.MenuController>().setStrictVegMode(
+                true,
+              );
             }
           });
         }
@@ -252,7 +280,7 @@ class _HomeContentState extends State<HomeContent> {
     });
   }
 
-  Future<void> _callWaiter() async {
+  Future<void> _callWaiter({String? notes}) async {
     HapticHelper.medium();
     try {
       final waiterCallService = WaiterCallService();
@@ -260,22 +288,159 @@ class _HomeContentState extends State<HomeContent> {
       final guestId = await guestSessionService.getGuestId();
       final session = await guestSessionService.getCurrentSession();
       final profile = await guestSessionService.getGuestProfile();
-      
+
       await waiterCallService.createWaiterCall(
         tenantId: widget.tenantId,
         guestId: guestId,
         tableId: session['tableId'],
-        tableName: session['tableId'] != null ? 'Table ${session['tableId']}' : null,
+        tableName: session['tableId'] != null
+            ? 'Table ${session['tableId']}'
+            : null,
         customerName: profile?.name,
+        notes: notes,
       );
-      
+
       if (mounted) {
-        SnackbarHelper.showTopSnackBar(context, 'Waiter called! Someone will be with you shortly.');
+        SnackbarHelper.showTopSnackBar(
+          context,
+          notes == null || notes.isEmpty
+              ? 'Waiter called! Someone will be with you shortly.'
+              : '$notes requested! Someone will be with you shortly.',
+        );
       }
     } catch (e) {
       if (mounted) {
-        SnackbarHelper.showTopSnackBar(context, 'Failed to call waiter. Please try again.');
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Failed to call waiter. Please try again.',
+        );
       }
+    }
+  }
+
+  Future<void> _requestBill() async {
+    try {
+      final billRequestService = BillRequestService();
+      final guestSessionService = GuestSessionService();
+      final orderController = context.read<OrderController>();
+
+      final session = await guestSessionService.getCurrentSession();
+      final tenantId = session['tenantId'] ?? widget.tenantId;
+      final tableId = session['tableId'];
+
+      if (tenantId == null) {
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Unable to request bill - session not found',
+        );
+        return;
+      }
+
+      final guestId = await guestSessionService.getGuestId();
+      final profile = await guestSessionService.getGuestProfile();
+
+      final hasPending = await billRequestService.hasPendingBillRequest(
+        tenantId: tenantId,
+        guestId: guestId,
+      );
+
+      if (hasPending) {
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'You already have a pending request',
+        );
+        return;
+      }
+
+      final orderIds = orderController.activeOrders
+          .map((order) => order.orderId)
+          .toList();
+
+      final tableName = orderController.activeOrders.isNotEmpty
+          ? orderController.activeOrders.first.tableName
+          : (tableId != null ? 'Table $tableId' : null);
+
+      await billRequestService.createBillRequest(
+        tenantId: tenantId,
+        guestId: guestId,
+        customerName: profile?.name ?? 'Guest',
+        customerPhone: profile?.phone,
+        tableId: tableId,
+        tableName: tableName,
+        orderIds: orderIds,
+      );
+
+      if (mounted) {
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Bill requested! Please wait for the staff.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Failed to request bill. Please try again.',
+        );
+      }
+    }
+  }
+
+  Future<void> _showWaiterOptions() async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final position = _waiterTapPosition ?? const Offset(0, 0);
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(position, position),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem(
+          value: 'water',
+          child: Row(
+            children: [
+              Icon(Icons.local_drink_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('Water bottle'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'bill',
+          child: Row(
+            children: [
+              Icon(Icons.receipt_long_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('Bill'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'waiter',
+          child: Row(
+            children: [
+              Icon(Icons.notifications_active_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('Call waiter'),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    switch (selected) {
+      case 'water':
+        await _callWaiter(notes: 'Water bottle');
+        break;
+      case 'bill':
+        await _requestBill();
+        break;
+      case 'waiter':
+        await _callWaiter(notes: 'Call waiter');
+        break;
+      default:
+        break;
     }
   }
 
@@ -285,7 +450,7 @@ class _HomeContentState extends State<HomeContent> {
       canPop: _selectedIndex == 1, // Only allow system pop if we are on Menu
       onPopInvoked: (didPop) {
         if (didPop) return;
-        
+
         // If we are on Orders (0) or Cart (2), go back to Menu (1)
         if (_selectedIndex != 1) {
           setState(() {
@@ -323,9 +488,7 @@ class _HomeContentState extends State<HomeContent> {
       backgroundColor: AppTheme.backgroundColor,
       elevation: 0,
       centerTitle: false,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.r),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(
@@ -341,7 +504,9 @@ class _HomeContentState extends State<HomeContent> {
               children: [
                 Flexible(
                   child: Text(
-                    _isLoadingTenant ? 'Loading...' : (_tenantName ?? 'Restaurant'),
+                    _isLoadingTenant
+                        ? 'Loading...'
+                        : (_tenantName ?? 'Restaurant'),
                     style: GoogleFonts.outfit(
                       color: AppTheme.primaryText,
                       fontSize: 20.sp,
@@ -352,7 +517,10 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(6),
@@ -382,32 +550,42 @@ class _HomeContentState extends State<HomeContent> {
       actions: [
         Consumer<OrderController>(
           builder: (context, orderController, child) {
-            final isDineIn = orderController.currentOrderType == OrderType.dineIn &&
+            final isDineIn =
+                orderController.currentOrderType == OrderType.dineIn &&
                 orderController.currentSession?.tableId != null;
-            
+
             return Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: (isDineIn ? AppTheme.primaryColor : Colors.orange).withOpacity(0.1),
+                  color: (isDineIn ? AppTheme.primaryColor : Colors.orange)
+                      .withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (isDineIn ? AppTheme.primaryColor : Colors.orange).withOpacity(0.2),
+                    color: (isDineIn ? AppTheme.primaryColor : Colors.orange)
+                        .withOpacity(0.2),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isDineIn ? Icons.table_restaurant : Icons.shopping_bag_outlined,
+                      isDineIn
+                          ? Icons.table_restaurant
+                          : Icons.shopping_bag_outlined,
                       size: 14,
                       color: isDineIn ? AppTheme.primaryColor : Colors.orange,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      isDineIn 
-                          ? _formatTableId(orderController.currentSession!.tableId) 
+                      isDineIn
+                          ? _formatTableId(
+                              orderController.currentSession!.tableId,
+                            )
                           : 'Parcel Order',
                       style: GoogleFonts.outfit(
                         color: isDineIn ? AppTheme.primaryColor : Colors.orange,
@@ -489,7 +667,9 @@ class _HomeContentState extends State<HomeContent> {
                             children: [
                               _buildSectionTitle(category),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 child: MenuGrid(items: groupedItems[category]),
                               ),
                               const SizedBox(height: 16),
@@ -528,7 +708,8 @@ class _HomeContentState extends State<HomeContent> {
 
   Widget _buildCallWaiterButton() {
     return InkWell(
-      onTap: _callWaiter,
+      onTapDown: (details) => _waiterTapPosition = details.globalPosition,
+      onTap: _showWaiterOptions,
       borderRadius: BorderRadius.circular(12.r),
       child: Container(
         height: 48.h,
@@ -577,7 +758,7 @@ class _HomeContentState extends State<HomeContent> {
 
   Widget _buildFilterChips() {
     final menuController = context.watch<app_controller.MenuController>();
-    
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
@@ -588,18 +769,34 @@ class _HomeContentState extends State<HomeContent> {
             _buildChip('Veg', null, isVeg: true),
             _buildChip('Non-Veg', null, isNonVeg: true),
           ] else ...[
-             Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Container(
-                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                   decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green)),
-                   child: const Row(children:[
-                       Icon(Icons.eco, size: 16, color: Colors.green),
-                       SizedBox(width:6),
-                       Text('Pure Veg Restaurant', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)) 
-                   ]),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
                 ),
-             ),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.eco, size: 16, color: Colors.green),
+                    SizedBox(width: 6),
+                    Text(
+                      'Pure Veg Restaurant',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
           _buildChip('Bestseller', null),
         ],
@@ -607,13 +804,18 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  Widget _buildChip(String label, IconData? icon, {bool isVeg = false, bool isNonVeg = false}) {
+  Widget _buildChip(
+    String label,
+    IconData? icon, {
+    bool isVeg = false,
+    bool isNonVeg = false,
+  }) {
     final menuController = context.watch<app_controller.MenuController>();
     bool isActive = false;
-    
+
     if (isVeg) isActive = menuController.isVegOnly;
     if (isNonVeg) isActive = menuController.isNonVegOnly;
-    if (label == 'Bestseller') isActive = menuController.isBestsellerOnly; 
+    if (label == 'Bestseller') isActive = menuController.isBestsellerOnly;
     if (label == 'Filter') isActive = menuController.activeFiltersCount > 0;
 
     return GestureDetector(
@@ -623,7 +825,8 @@ class _HomeContentState extends State<HomeContent> {
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
-            useRootNavigator: false, // Ensures it opens relative to this context
+            useRootNavigator:
+                false, // Ensures it opens relative to this context
             backgroundColor: Colors.transparent,
             builder: (context) => const FilterBottomSheet(),
           );
@@ -690,10 +893,17 @@ class _HomeContentState extends State<HomeContent> {
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  border: Border.all(color: isVeg ? Colors.green : Colors.red, width: 1),
+                  border: Border.all(
+                    color: isVeg ? Colors.green : Colors.red,
+                    width: 1,
+                  ),
                   borderRadius: BorderRadius.circular(2),
                 ),
-                child: Icon(Icons.fiber_manual_record, size: 8, color: isVeg ? Colors.green : Colors.red),
+                child: Icon(
+                  Icons.fiber_manual_record,
+                  size: 8,
+                  color: isVeg ? Colors.green : Colors.red,
+                ),
               ),
               const SizedBox(width: 8),
             ],
@@ -763,17 +973,18 @@ class _HomeContentState extends State<HomeContent> {
             final hasCartItems = cart.items.isNotEmpty;
             final hasActiveOrders = orderController.activeOrders.isNotEmpty;
 
-            if (!hasCartItems && !hasActiveOrders) return const SizedBox.shrink();
+            if (!hasCartItems && !hasActiveOrders)
+              return const SizedBox.shrink();
 
             // REQUIREMENT 5: Cart CTA State Logic
             // Default "View Cart", "Pay" if cart empty but orders pending
             final bool showPay = !hasCartItems && hasActiveOrders;
             final String ctaText = showPay ? 'Pay' : 'View Cart';
-            
+
             final String amountText = showPay
                 ? 'Total Bill: ₹${orderController.activeOrders.fold<double>(0, (sum, order) => sum + order.total).toStringAsFixed(2)}'
                 : '${cart.itemCount} ${cart.itemCount == 1 ? 'item' : 'items'} • ₹${cart.totalAmount.toStringAsFixed(2)}';
-            
+
             return GestureDetector(
               onTap: () {
                 if (showPay) {
@@ -781,7 +992,8 @@ class _HomeContentState extends State<HomeContent> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => PaymentPage(tenantId: widget.tenantId),
+                      builder: (context) =>
+                          PaymentPage(tenantId: widget.tenantId),
                     ),
                   );
                 } else {
@@ -792,7 +1004,8 @@ class _HomeContentState extends State<HomeContent> {
                 }
               },
               child: Container(
-                height: 56.h, // Increased from 48.h for better touch target (Requirement #9)
+                height: 56
+                    .h, // Increased from 48.h for better touch target (Requirement #9)
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor,
@@ -832,7 +1045,11 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
                         SizedBox(width: 4.w),
-                        Icon(Icons.arrow_forward, color: Colors.white, size: 16.w),
+                        Icon(
+                          Icons.arrow_forward,
+                          color: Colors.white,
+                          size: 16.w,
+                        ),
                       ],
                     ),
                   ],
@@ -841,7 +1058,7 @@ class _HomeContentState extends State<HomeContent> {
             );
           },
         ),
-        
+
         // Navigation Tab Bar
         BottomNavigationBar(
           currentIndex: _selectedIndex,
@@ -854,8 +1071,14 @@ class _HomeContentState extends State<HomeContent> {
           unselectedFontSize: 12.sp,
           elevation: 0,
           items: [
-            BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined, size: 24.w), label: 'Orders'),
-            BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu, size: 24.w), label: 'Menu'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long_outlined, size: 24.w),
+              label: 'Orders',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu, size: 24.w),
+              label: 'Menu',
+            ),
             BottomNavigationBarItem(
               icon: Consumer<CartController>(
                 builder: (context, cart, child) {

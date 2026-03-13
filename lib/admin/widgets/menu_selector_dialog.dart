@@ -59,6 +59,8 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
     final isCompact = size.width < 600;
     final dialogWidth = isCompact ? size.width - 16 : size.width * 0.8;
     final dialogHeight = size.height < 700 ? size.height - 16 : size.height * 0.8;
+    const double qtyButtonSize = 40;
+    const double qtyIconSize = 22;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -126,30 +128,40 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
                                     if (qty == 0)
                                       ElevatedButton(
                                         onPressed: () => setState(() => quantities[item.id] = 1),
-                                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 30)),
+                                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 38)),
                                         child: const Text('Add'),
                                       )
                                     else
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.remove_circle_outline),
-                                            onPressed: () => setState(() {
-                                               if (quantities[item.id]! > 0) quantities[item.id] = quantities[item.id]! - 1;
-                                            }),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
+                                          SizedBox(
+                                            width: qtyButtonSize,
+                                            height: qtyButtonSize,
+                                            child: IconButton(
+                                              icon: const Icon(Icons.remove_circle_outline),
+                                              iconSize: qtyIconSize,
+                                              onPressed: () => setState(() {
+                                                if (quantities[item.id]! > 0) quantities[item.id] = quantities[item.id]! - 1;
+                                              }),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints.tightFor(width: qtyButtonSize, height: qtyButtonSize),
+                                            ),
                                           ),
                                           Padding(
                                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                                            child: Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            child: Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                           ),
-                                          IconButton(
-                                            icon: const Icon(Icons.add_circle_outline),
-                                            onPressed: () => setState(() => quantities[item.id] = quantities[item.id]! + 1),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
+                                          SizedBox(
+                                            width: qtyButtonSize,
+                                            height: qtyButtonSize,
+                                            child: IconButton(
+                                              icon: const Icon(Icons.add_circle_outline),
+                                              iconSize: qtyIconSize,
+                                              onPressed: () => setState(() => quantities[item.id] = quantities[item.id]! + 1),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints.tightFor(width: qtyButtonSize, height: qtyButtonSize),
+                                            ),
                                           ),
                                         ],
                                       )

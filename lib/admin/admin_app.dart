@@ -13,6 +13,8 @@ import 'providers/bills_provider.dart';
 import 'providers/menu_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/background_print_provider.dart';
+import 'providers/staff_provider.dart';
+import 'providers/procurement_provider.dart';
 import 'theme/admin_theme.dart';
 import '../theme/app_theme.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
@@ -30,7 +32,11 @@ class AdminApp extends StatelessWidget {
         ChangeNotifierProvider<ActivityProvider>(
           create: (_) => ActivityProvider(),
         ),
-        ChangeNotifierProxyProvider2<AdminAuthProvider, ActivityProvider, OrdersProvider>(
+        ChangeNotifierProxyProvider2<
+          AdminAuthProvider,
+          ActivityProvider,
+          OrdersProvider
+        >(
           create: (_) => OrdersProvider(),
           update: (_, auth, activity, orders) {
             if (auth.tenantId != null && orders != null) {
@@ -40,7 +46,11 @@ class AdminApp extends StatelessWidget {
             return orders ?? OrdersProvider();
           },
         ),
-        ChangeNotifierProxyProvider2<AdminAuthProvider, OrdersProvider, TablesProvider>(
+        ChangeNotifierProxyProvider2<
+          AdminAuthProvider,
+          OrdersProvider,
+          TablesProvider
+        >(
           create: (_) => TablesProvider(),
           update: (_, auth, orders, tables) {
             if (auth.tenantId != null && tables != null) {
@@ -62,13 +72,19 @@ class AdminApp extends StatelessWidget {
           create: (_) => InventoryProvider(''),
           update: (_, auth, previous) {
             // Only recreate if tenantId actually changed and is valid
-            if (auth.tenantId != null && auth.tenantId!.isNotEmpty && previous?.tenantId != auth.tenantId) {
+            if (auth.tenantId != null &&
+                auth.tenantId!.isNotEmpty &&
+                previous?.tenantId != auth.tenantId) {
               return InventoryProvider(auth.tenantId!);
             }
             return previous ?? InventoryProvider('');
           },
         ),
-        ChangeNotifierProxyProvider2<AdminAuthProvider, OrdersProvider, BillsProvider>(
+        ChangeNotifierProxyProvider2<
+          AdminAuthProvider,
+          OrdersProvider,
+          BillsProvider
+        >(
           create: (_) => BillsProvider(),
           update: (_, auth, orders, bills) {
             if (auth.tenantId != null && bills != null) {
@@ -104,6 +120,28 @@ class AdminApp extends StatelessWidget {
             return printing ?? BackgroundPrintProvider();
           },
         ),
+        ChangeNotifierProxyProvider<AdminAuthProvider, ProcurementProvider>(
+          create: (_) => ProcurementProvider(),
+          update: (_, auth, procurement) {
+            if (auth.tenantId != null && procurement != null) {
+              procurement.initialize(auth.tenantId!);
+            }
+            return procurement ?? ProcurementProvider();
+          },
+        ),
+        ChangeNotifierProxyProvider2<
+          AdminAuthProvider,
+          OrdersProvider,
+          StaffProvider
+        >(
+          create: (_) => StaffProvider(),
+          update: (_, auth, orders, staff) {
+            if (auth.tenantId != null && staff != null) {
+              staff.initialize(auth.tenantId!, auth: auth, orders: orders);
+            }
+            return staff ?? StaffProvider();
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'ScanServe Admin',
@@ -114,9 +152,7 @@ class AdminApp extends StatelessWidget {
           return child!;
         },
         home: const AuthWrapper(),
-        routes: {
-          '/login': (context) => const AdminLoginScreen(),
-        },
+        routes: {'/login': (context) => const AdminLoginScreen()},
       ),
     );
   }

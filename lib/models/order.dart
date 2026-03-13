@@ -22,6 +22,8 @@ class OrderItem {
   final String? category;
   final bool printedToKOT;
   final DateTime? printedAt;
+  final double discountAmount;
+  final double discountPercentage;
 
   OrderItem({
     required this.id,
@@ -41,6 +43,8 @@ class OrderItem {
     this.category,
     this.printedToKOT = false,
     this.printedAt,
+    this.discountAmount = 0,
+    this.discountPercentage = 0,
   }) : this.timestamp = timestamp ?? DateTime.now();
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
@@ -68,6 +72,8 @@ class OrderItem {
       category: data['category'],
       printedToKOT: data['printedToKOT'] ?? false,
       printedAt: data['printedAt'] != null ? parseTime(data['printedAt']) : null,
+      discountAmount: (data['discountAmount'] ?? 0).toDouble(),
+      discountPercentage: (data['discountPercentage'] ?? 0).toDouble(),
     );
   }
 
@@ -90,6 +96,8 @@ class OrderItem {
       'category': category,
       'printedToKOT': printedToKOT,
       if (printedAt != null) 'printedAt': Timestamp.fromDate(printedAt!),
+      'discountAmount': discountAmount,
+      'discountPercentage': discountPercentage,
     };
   }
 
@@ -130,10 +138,18 @@ class OrderItem {
       category: category ?? this.category,
       printedToKOT: printedToKOT ?? this.printedToKOT,
       printedAt: printedAt ?? this.printedAt,
+      discountAmount: discountAmount ?? this.discountAmount,
+      discountPercentage: discountPercentage ?? this.discountPercentage,
     );
   }
 
-  double get total => price * quantity;
+  double get total {
+    final subtotal = price * quantity;
+    if (discountPercentage > 0) {
+      return subtotal * (1 - discountPercentage / 100);
+    }
+    return subtotal - discountAmount;
+  }
 }
 
 class Order {

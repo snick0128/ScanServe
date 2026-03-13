@@ -31,11 +31,9 @@ class TablesProvider with ChangeNotifier {
   void initialize(String tenantId, {OrdersProvider? ordersProvider}) {
     print('🔥 TablesProvider: Initialize called for tenant: $tenantId');
     _ordersProvider = ordersProvider;
-    if (_tenantId == tenantId) {
-      print('🔥 TablesProvider: Already initialized for $tenantId, tables count: ${_tables.length}');
-      if (_tables.isNotEmpty && _ordersProvider != null) {
-        _syncTablesWithOrders();
-      }
+    if (_tenantId == tenantId && (_tables.isNotEmpty || _isLoading)) {
+      print('🔥 TablesProvider: Already healthy for $tenantId, tables count: ${_tables.length}');
+      _ordersProvider = ordersProvider; // Update the reference anyway
       return;
     }
     
@@ -89,20 +87,19 @@ class TablesProvider with ChangeNotifier {
        
        if (hasActiveOrders && table.status == TableStatus.available) {
           print('🛠️ Auto-Sync: Marking table ${table.name} as occupied due to active order');
+          final order = activeOrders.firstWhere((o) => o.tableId == table.id);
           updateTable(table.copyWith(
             isOccupied: true,
             isAvailable: false,
             status: TableStatus.occupied,
-            occupiedAt: activeOrders.firstWhere((o) => o.tableId == table.id).createdAt,
+            occupiedAt: order.createdAt,
+            currentSessionId: order.id, // Link to one of the active orders
           ));
-       } else if (!hasActiveOrders && table.status == TableStatus.occupied && table.lastReleasedAt != null) {
-          // If a table is occupied but has TRULY no orders, and it's been more than 30 mins since last released
-          // we could potentially auto-heal, but usually it's best to only do this for specific stale cases
-          // to avoid clearing a table that just sat down.
-          
+       } else if (!hasActiveOrders && table.status == TableStatus.occupied) {
+          // If a table is marked occupied but has NO orders, and it's been like that for a while
           final now = DateTime.now();
-          if (table.occupiedAt != null && now.difference(table.occupiedAt!).inHours > 6) {
-             print('🛠️ Auto-Sync: Releasing STALE table ${table.name} (Older than 6h with no orders)');
+          if (table.occupiedAt != null && now.difference(table.occupiedAt!).inMinutes > 5) {
+             print('🛠️ Auto-Sync: Releasing GHOST table ${table.name} (Occupied with no orders for 5+ min)');
              releaseTable(table.id);
           }
        }

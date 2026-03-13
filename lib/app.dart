@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:scan_serve/controllers/cart_controller.dart';
 import 'package:scan_serve/controllers/menu_controller.dart' as app_controller;
 import 'package:scan_serve/controllers/order_controller.dart';
+import 'package:scan_serve/controllers/recommendation_controller.dart';
 import 'package:scan_serve/config/app_config.dart';
 import 'package:scan_serve/views/home_page.dart';
 import 'package:scan_serve/models/order_model.dart';
@@ -30,6 +31,18 @@ class App extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => app_controller.MenuController()),
         ChangeNotifierProvider(create: (_) => CartController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
+        ChangeNotifierProxyProvider3<CartController, app_controller.MenuController, OrderController, RecommendationController>(
+          create: (context) => RecommendationController(
+            cartController: context.read<CartController>(),
+            menuController: context.read<app_controller.MenuController>(),
+            orderController: context.read<OrderController>(),
+          ),
+          update: (context, cart, menu, order, previous) => previous ?? RecommendationController(
+            cartController: cart,
+            menuController: menu,
+            orderController: order,
+          ),
+        ),
         Provider<OfflineService>(
           create: (_) => OfflineService()..initialize(),
           dispose: (_, service) => service.dispose(),

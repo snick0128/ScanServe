@@ -10,8 +10,15 @@ class CartItem {
   final Variant? selectedVariant;
   int quantity;
   String? note;
+  final bool quickReorder;
 
-  CartItem({required this.item, this.selectedVariant, this.quantity = 1, this.note});
+  CartItem({
+    required this.item,
+    this.selectedVariant,
+    this.quantity = 1,
+    this.note,
+    this.quickReorder = false,
+  });
 
   double get totalPrice => (selectedVariant?.price ?? item.price) * quantity;
 
@@ -20,6 +27,7 @@ class CartItem {
     'selectedVariant': selectedVariant?.toMap(),
     'quantity': quantity,
     'note': note,
+    'quickReorder': quickReorder,
   };
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
@@ -30,6 +38,7 @@ class CartItem {
           : null,
       quantity: json['quantity'],
       note: json['note'],
+      quickReorder: json['quickReorder'] ?? false,
     );
   }
 }
@@ -121,7 +130,7 @@ class CartController extends ChangeNotifier {
     return '${itemId}_${variant.name}';
   }
 
-  void addItem(MenuItem item, [Variant? variant]) {
+  void addItem(MenuItem item, [Variant? variant, bool quickReorder = false]) {
     // CRITICAL: Validate session before adding items
     final validation = SessionValidator.validateForCart(
       tenantId: _tenantId,
@@ -137,7 +146,11 @@ class CartController extends ChangeNotifier {
     if (_items.containsKey(key)) {
       _items[key]!.quantity++;
     } else {
-      _items[key] = CartItem(item: item, selectedVariant: variant);
+      _items[key] = CartItem(
+        item: item,
+        selectedVariant: variant,
+        quickReorder: quickReorder,
+      );
     }
     _saveCart();
     notifyListeners();

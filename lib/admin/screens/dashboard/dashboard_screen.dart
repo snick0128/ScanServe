@@ -25,10 +25,11 @@ import '../help/help_screen.dart';
 import '../bills/bills_screen.dart';
 import '../activity/activity_logs_screen.dart';
 import '../kitchen/kds_screen.dart';
+import '../staff/staff_management_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String tenantId;
-  
+
   const DashboardScreen({super.key, required this.tenantId});
 
   @override
@@ -76,13 +77,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onToggleCollapse: () {},
             )
           : null,
-      bottomNavigationBar: (isMobile && !context.read<AdminAuthProvider>().isKitchen) 
+      bottomNavigationBar:
+          (isMobile && !context.read<AdminAuthProvider>().isKitchen)
           ? BottomNavigationBar(
-              currentIndex: _selectedIndex == 0 ? 0 : (_selectedIndex == 2 ? 1 : (_selectedIndex == 3 ? 2 : 0)), 
+              currentIndex: _selectedIndex == 0
+                  ? 0
+                  : (_selectedIndex == 2 ? 1 : (_selectedIndex == 3 ? 2 : 0)),
               onTap: (index) {
-                if (index == 0) _onItemTapped(0);
-                else if (index == 1) _onItemTapped(2);
-                else if (index == 2) _onItemTapped(3);
+                if (index == 0)
+                  _onItemTapped(0);
+                else if (index == 1)
+                  _onItemTapped(2);
+                else if (index == 2)
+                  _onItemTapped(3);
                 else {
                   _scaffoldKey.currentState?.openDrawer();
                 }
@@ -91,12 +98,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               selectedItemColor: AdminTheme.primaryColor,
               unselectedItemColor: AdminTheme.secondaryText,
               items: const [
-                BottomNavigationBarItem(icon: Icon(Ionicons.grid_outline), label: 'Home'),
-                BottomNavigationBarItem(icon: Icon(Ionicons.restaurant_outline), label: 'Tables'),
-                BottomNavigationBarItem(icon: Icon(Ionicons.list_outline), label: 'Orders'),
-                BottomNavigationBarItem(icon: Icon(Ionicons.menu_outline), label: 'More'),
+                BottomNavigationBarItem(
+                  icon: Icon(Ionicons.grid_outline),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Ionicons.restaurant_outline),
+                  label: 'Tables',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Ionicons.list_outline),
+                  label: 'Orders',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Ionicons.menu_outline),
+                  label: 'More',
+                ),
               ],
-            ) 
+            )
           : null,
       body: Row(
         children: [
@@ -106,16 +125,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onItemSelected: _onItemTapped,
               isCollapsed: _isSidebarCollapsed,
               role: context.watch<AdminAuthProvider>().role,
-              onToggleCollapse: () => setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
+              onToggleCollapse: () =>
+                  setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
             ),
           Expanded(
             child: Column(
               children: [
                 _buildTopBar(isMobile),
                 _buildPrinterErrorBanner(),
-                Expanded(
-                  child: _buildContent(isTablet),
-                ),
+                Expanded(child: _buildContent(isTablet)),
               ],
             ),
           ),
@@ -143,14 +161,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           Expanded(
-            child: Text(
-              auth.isKitchen ? 'Kitchen Display' : (auth.isCaptain ? 'Service Portal' : 'Admin Dashboard'),
-              style: TextStyle(
-                fontSize: 18.sp, // Reduced for mobile
-                fontWeight: FontWeight.bold,
-                color: AdminTheme.primaryText,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  auth.isKitchen
+                      ? 'Kitchen Display'
+                      : (auth.isCaptain ? 'Service Portal' : 'Admin Dashboard'),
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: AdminTheme.primaryText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if ((auth.tenantName ?? '').trim().isNotEmpty)
+                  Text(
+                    auth.tenantName!.trim(),
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AdminTheme.secondaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
             ),
           ),
           SizedBox(width: 12.w),
@@ -158,9 +194,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: (context, provider, _) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: (provider.isSynced ? AdminTheme.success : AdminTheme.warning).withOpacity(0.1),
+                color:
+                    (provider.isSynced
+                            ? AdminTheme.success
+                            : AdminTheme.warning)
+                        .withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: (provider.isSynced ? AdminTheme.success : AdminTheme.warning).withOpacity(0.3)),
+                border: Border.all(
+                  color:
+                      (provider.isSynced
+                              ? AdminTheme.success
+                              : AdminTheme.warning)
+                          .withOpacity(0.3),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -169,7 +215,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: provider.isSynced ? AdminTheme.success : AdminTheme.warning,
+                      color: provider.isSynced
+                          ? AdminTheme.success
+                          : AdminTheme.warning,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -179,7 +227,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(
                       fontSize: 11.sp,
                       fontWeight: FontWeight.bold,
-                      color: provider.isSynced ? AdminTheme.success : AdminTheme.warning,
+                      color: provider.isSynced
+                          ? AdminTheme.success
+                          : AdminTheme.warning,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -192,12 +242,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: (context, printProvider, _) {
               final isReady = printProvider.isPrinterReady;
               final color = isReady ? AdminTheme.success : AdminTheme.critical;
-              
+
               return PopupMenuButton(
                 offset: const Offset(0, 50),
                 tooltip: 'Printer Status',
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -234,16 +287,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(isReady ? 'Printer is connected' : 'Printer Issue Detected', 
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                        Text(
+                          isReady
+                              ? 'Printer check confirmed'
+                              : 'Printer not confirmed',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AdminTheme.primaryText,
+                          ),
+                        ),
                         if (isReady)
-                          const Text('Physical print test confirmed', style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
+                          const Text(
+                            'Physical print test confirmed',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AdminTheme.secondaryText,
+                            ),
+                          ),
                         if (!isReady && printProvider.lastFailureAt != null)
-                          Text('Failed at: ${DateFormat('HH:mm:ss').format(printProvider.lastFailureAt!)}', 
-                            style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
+                          Text(
+                            'Failed at: ${DateFormat('HH:mm:ss').format(printProvider.lastFailureAt!)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AdminTheme.secondaryText,
+                            ),
+                          ),
                         if (!isReady && printProvider.lastError != null)
-                          Text(printProvider.lastError!, 
-                            style: const TextStyle(fontSize: 11, color: AdminTheme.critical)),
+                          Text(
+                            printProvider.lastError!,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AdminTheme.critical,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -254,7 +330,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Icon(Ionicons.refresh_outline, size: 18),
                         SizedBox(width: 8),
-                        Text('Test Print / Re-check'),
+                        Text('Run Printer Check'),
                       ],
                     ),
                   ),
@@ -266,7 +342,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           CircleAvatar(
             radius: 18.r,
             backgroundColor: AdminTheme.dividerColor,
-            child: Icon(Ionicons.person_outline, size: 18.w, color: AdminTheme.secondaryText),
+            child: Icon(
+              Ionicons.person_outline,
+              size: 18.w,
+              color: AdminTheme.secondaryText,
+            ),
           ),
         ],
       ),
@@ -277,24 +357,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Consumer<BackgroundPrintProvider>(
       builder: (context, printProvider, _) {
         if (printProvider.isPrinterReady) return const SizedBox.shrink();
-        
+
         return Container(
           width: double.infinity,
           color: AdminTheme.critical.withOpacity(0.9),
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
           child: Row(
             children: [
-              const Icon(Ionicons.warning_outline, color: Colors.white, size: 20),
+              const Icon(
+                Ionicons.warning_outline,
+                color: Colors.white,
+                size: 20,
+              ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Printer not detected or printing failed. Automatic KOTs may be missed.',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  'Printer is not confirmed. Auto KOT printing may be missed.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               TextButton(
                 onPressed: () => printProvider.checkPrinter(),
-                child: const Text('RETRY TEST PRINT', style: TextStyle(color: Colors.white, decoration: TextDecoration.underline)),
+                child: const Text(
+                  'RUN PRINTER CHECK',
+                  style: TextStyle(
+                    color: Colors.white,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
               ),
             ],
           ),
@@ -343,16 +436,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildModuleContent() {
     switch (_selectedIndex) {
-      case 1: return MenuItemsScreen(tenantId: widget.tenantId);
-      case 2: return TablesScreen(tenantId: widget.tenantId);
-      case 3: return OrdersScreen(tenantId: widget.tenantId);
-      case 4: return BillsScreen(tenantId: widget.tenantId);
-      case 5: return AnalyticsScreen(tenantId: widget.tenantId);
-      case 6: return const Center(child: Text('Staff Management'));
-      case 7: return SettingsScreen(tenantId: widget.tenantId);
-      case 8: return InventoryScreen(tenantId: widget.tenantId);
-      case 9: return KDSScreen(tenantId: widget.tenantId);
-      default: return const Center(child: Text('Coming Soon'));
+      case 1:
+        return MenuItemsScreen(tenantId: widget.tenantId);
+      case 2:
+        return TablesScreen(tenantId: widget.tenantId);
+      case 3:
+        return OrdersScreen(tenantId: widget.tenantId);
+      case 4:
+        return BillsScreen(tenantId: widget.tenantId);
+      case 5:
+        return AnalyticsScreen(tenantId: widget.tenantId);
+      case 6:
+        return StaffManagementScreen(tenantId: widget.tenantId);
+      case 7:
+        return SettingsScreen(tenantId: widget.tenantId);
+      case 8:
+        return InventoryScreen(tenantId: widget.tenantId);
+      case 9:
+        return KDSScreen(tenantId: widget.tenantId);
+      default:
+        return const Center(child: Text('Coming Soon'));
     }
   }
 
@@ -361,9 +464,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, ordersProvider, _) {
         final tablesProvider = context.watch<TablesProvider>();
         final notificationsProvider = context.watch<NotificationsProvider>();
-        
-        final revenue = ordersProvider.allOrders
-            .where((o) => o.status == model.OrderStatus.completed)
+
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+        DateTime _effectivePaidAt(model.Order o) {
+          return o.paidAt ?? o.updatedAt ?? o.createdAt;
+        }
+
+        final revenue = ordersProvider.pastOrders
+            .where((o) =>
+                o.status == model.OrderStatus.completed &&
+                o.paymentStatus == model.PaymentStatus.paid)
+            .where((o) {
+              final paidAt = _effectivePaidAt(o);
+              return !paidAt.isBefore(todayStart) && !paidAt.isAfter(todayEnd);
+            })
             .fold<double>(0, (sum, o) => sum + o.total);
 
         final activeKotCount = ordersProvider.orders
@@ -372,7 +489,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         int crossAxisCount = 5;
         double aspectRatio = 1.3;
-        
+
         final width = MediaQuery.of(context).size.width;
         if (width < 600) {
           crossAxisCount = 2;
@@ -394,42 +511,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           childAspectRatio: aspectRatio,
           children: [
             _buildKPICard(
-              'Active Tables', 
-              '${tablesProvider.activeSessionsCount}/${tablesProvider.totalTablesCount}', 
-              'Live occupancy', 
-              Ionicons.restaurant_outline, 
+              'Active Tables',
+              '${tablesProvider.activeSessionsCount}/${tablesProvider.totalTablesCount}',
+              'Live occupancy',
+              Ionicons.restaurant_outline,
               AdminTheme.success,
               onTap: () => _onItemTapped(2),
             ),
             _buildKPICard(
-              'Ongoing Orders', 
-              ordersProvider.orders.length.toString(), 
-              'Active and served', 
-              Ionicons.cart_outline, 
+              'Ongoing Orders',
+              ordersProvider.orders.length.toString(),
+              'Active and served',
+              Ionicons.cart_outline,
               AdminTheme.info,
               onTap: () => _onItemTapped(3),
             ),
             _buildKPICard(
-              'Active KOT', 
-              activeKotCount.toString(), 
-              'Being prepared', 
-              Ionicons.flame_outline, 
+              'Active KOT',
+              activeKotCount.toString(),
+              'Being prepared',
+              Ionicons.flame_outline,
               AdminTheme.warning,
               onTap: () => _onItemTapped(9), // Navigate to KDS for Active KOT
             ),
             _buildKPICard(
-              'Pending Bills', 
-              notificationsProvider.pendingBillRequestsCount.toString(), 
-              'Ready to pay', 
-              Ionicons.receipt_outline, 
+              'Pending Bills',
+              notificationsProvider.pendingBillRequestsCount.toString(),
+              'Ready to pay',
+              Ionicons.receipt_outline,
               AdminTheme.critical,
               onTap: () => _onItemTapped(4),
             ),
             _buildKPICard(
-              'Sales', 
-              '₹${NumberFormat('#,##,###').format(revenue)}', 
-              'Today\'s Total', 
-              Ionicons.cash_outline, 
+              'Sales',
+              '₹${NumberFormat('#,##,###').format(revenue)}',
+              'Paid Today',
+              Ionicons.cash_outline,
               AdminTheme.success,
               onTap: () => _onItemTapped(5), // Analytics/Revenue
             ),
@@ -439,7 +556,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildKPICard(String title, String value, String trend, IconData icon, Color color, {VoidCallback? onTap}) {
+  Widget _buildKPICard(
+    String title,
+    String value,
+    String trend,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return InkWell(
       onTap: onTap,
@@ -457,18 +581,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text(title, style: TextStyle(color: AdminTheme.secondaryText, fontSize: isMobile ? 12.sp : 15.sp, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: AdminTheme.secondaryText,
+                      fontSize: isMobile ? 12.sp : 15.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Icon(icon, color: color, size: isMobile ? 20.w : 24.w),
               ],
             ),
-            const Expanded(child: SizedBox()), // Use Expanded instead of Spacer or fixed gap
+            const Expanded(
+              child: SizedBox(),
+            ), // Use Expanded instead of Spacer or fixed gap
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(value, style: TextStyle(color: AdminTheme.primaryText, fontSize: isMobile ? 24.sp : 32.sp, fontWeight: FontWeight.bold)),
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: AdminTheme.primaryText,
+                  fontSize: isMobile ? 24.sp : 32.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             SizedBox(height: 4.h),
-            Text(trend, style: TextStyle(color: (trend.contains('+') || trend.contains('Live')) ? AdminTheme.success : AdminTheme.critical, fontSize: isMobile ? 11.sp : 13.sp, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+            Text(
+              trend,
+              style: TextStyle(
+                color: (trend.contains('+') || trend.contains('Live'))
+                    ? AdminTheme.success
+                    : AdminTheme.critical,
+                fontSize: isMobile ? 11.sp : 13.sp,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -484,25 +637,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: Row(
                 children: [
-                  Icon(Ionicons.flash_outline, color: AdminTheme.success, size: 24.w),
+                  Icon(
+                    Ionicons.flash_outline,
+                    color: AdminTheme.success,
+                    size: 24.w,
+                  ),
                   SizedBox(width: 8.w),
-                  Flexible(child: Text('Live Orders', style: TextStyle(color: AdminTheme.primaryText, fontSize: 20.sp, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                  Flexible(
+                    child: Text(
+                      'Live Orders',
+                      style: TextStyle(
+                        color: AdminTheme.primaryText,
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),
             TextButton(
               onPressed: () => _onItemTapped(3),
-              child: Text('VIEW ALL', style: TextStyle(color: AdminTheme.success, fontWeight: FontWeight.bold, fontSize: 12.sp)),
+              child: Text(
+                'VIEW ALL',
+                style: TextStyle(
+                  color: AdminTheme.success,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.sp,
+                ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
         Container(
-          height: MediaQuery.of(context).size.width < 900 ? null : 500.h, 
+          height: MediaQuery.of(context).size.width < 900 ? null : 500.h,
           decoration: BoxDecoration(
-            color: MediaQuery.of(context).size.width < 900 ? Colors.transparent : AdminTheme.cardBackground,
+            color: MediaQuery.of(context).size.width < 900
+                ? Colors.transparent
+                : AdminTheme.cardBackground,
             borderRadius: BorderRadius.circular(16.r),
-            border: MediaQuery.of(context).size.width < 900 ? null : Border.all(color: AdminTheme.dividerColor),
+            border: MediaQuery.of(context).size.width < 900
+                ? null
+                : Border.all(color: AdminTheme.dividerColor),
           ),
           child: Consumer<OrdersProvider>(
             builder: (context, provider, _) {
@@ -535,20 +713,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         columnSpacing: 40.w,
                         showCheckboxColumn: false,
                         columns: [
-                          DataColumn(label: Text('TABLE #', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                          DataColumn(label: Text('ORDER ITEMS', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                          DataColumn(label: Text('TIME', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
-                          DataColumn(label: Text('ACTION', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText))),
+                          DataColumn(
+                            label: Text(
+                              'TABLE #',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                                color: AdminTheme.secondaryText,
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'ORDER ITEMS',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                                color: AdminTheme.secondaryText,
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'TIME',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                                color: AdminTheme.secondaryText,
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'ACTION',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                                color: AdminTheme.secondaryText,
+                              ),
+                            ),
+                          ),
                         ],
                         rows: orders.map((order) {
-                          final diff = DateTime.now().difference(order.createdAt);
+                          final diff = DateTime.now().difference(
+                            order.createdAt,
+                          );
                           final minutes = diff.inMinutes;
-                          
+
                           String timeLabel;
                           Color timeColor = AdminTheme.primaryText;
-                          
-                          if (order.status == model.OrderStatus.served || order.status == model.OrderStatus.completed) {
-                            timeLabel = 'Served at ${DateFormat('HH:mm').format(order.updatedAt ?? order.createdAt)}';
+
+                          if (order.status == model.OrderStatus.served ||
+                              order.status == model.OrderStatus.completed) {
+                            timeLabel =
+                                'Served at ${DateFormat('HH:mm').format(order.updatedAt ?? order.createdAt)}';
                             timeColor = AdminTheme.success;
                           } else if (minutes < 2) {
                             timeLabel = 'Just ordered';
@@ -556,7 +774,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           } else if (minutes > 20) {
                             timeLabel = 'Late – please check';
                             timeColor = AdminTheme.critical;
-                          } else if (order.status == model.OrderStatus.preparing) {
+                          } else if (order.status ==
+                              model.OrderStatus.preparing) {
                             timeLabel = 'Cooking for ${minutes} mins';
                             timeColor = AdminTheme.warning;
                           } else {
@@ -564,11 +783,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           }
 
                           return DataRow(
-                            onSelectChanged: (_) => _showLiveOrderDetails(context, order),
+                            onSelectChanged: (_) =>
+                                _showLiveOrderDetails(context, order),
                             cells: [
-                              DataCell(Text(order.tableName ?? 'T-#', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 16.sp))),
-                              DataCell(Text(order.items.map((i) => '${i.quantity}x ${i.name}').join(', '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AdminTheme.primaryText, fontSize: 15.sp))),
-                              DataCell(Text(timeLabel, style: TextStyle(color: timeColor, fontSize: 15.sp, fontWeight: minutes > 20 ? FontWeight.bold : FontWeight.normal))),
+                              DataCell(
+                                Text(
+                                  order.tableName ?? 'T-#',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AdminTheme.primaryText,
+                                    fontSize: 16.sp,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  order.items
+                                      .map((i) => '${i.quantity}x ${i.name}')
+                                      .join(', '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AdminTheme.primaryText,
+                                    fontSize: 15.sp,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  timeLabel,
+                                  style: TextStyle(
+                                    color: timeColor,
+                                    fontSize: 15.sp,
+                                    fontWeight: minutes > 20
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
                               DataCell(_buildActionButton(order)),
                             ],
                           );
@@ -605,16 +857,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text(
                   'Order Details - ${order.tableName}',
-                  style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 24.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Ionicons.close, size: 24.w)),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Ionicons.close, size: 24.w),
+                ),
               ],
             ),
             const Divider(),
-            ...order.items.map((item) => ListTile(
-              title: Text('${item.quantity}x ${item.name}', style: TextStyle(fontSize: 16.sp)),
-              trailing: Text('₹${item.price * item.quantity}', style: TextStyle(fontSize: 16.sp)),
-            )).toList(),
+            ...order.items
+                .map(
+                  (item) => ListTile(
+                    title: Text(
+                      '${item.quantity}x ${item.name}',
+                      style: TextStyle(fontSize: 16.sp),
+                    ),
+                    trailing: Text(
+                      '₹${item.price * item.quantity}',
+                      style: TextStyle(fontSize: 16.sp),
+                    ),
+                  ),
+                )
+                .toList(),
             SizedBox(height: 20.h),
             Container(
               padding: EdgeInsets.all(16.w),
@@ -625,8 +893,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                   Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18.sp)),
-                   Text('₹${order.total}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24.sp, color: Colors.green)),
+                  Text(
+                    'Total Amount',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18.sp,
+                    ),
+                  ),
+                  Text(
+                    '₹${order.total}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24.sp,
+                      color: Colors.green,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -640,7 +921,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMobileOrderCard(model.Order order) {
     final diff = DateTime.now().difference(order.createdAt);
     final minutes = diff.inMinutes;
-    final timeColor = minutes > 20 ? AdminTheme.critical : AdminTheme.secondaryText;
+    final timeColor = minutes > 20
+        ? AdminTheme.critical
+        : AdminTheme.secondaryText;
 
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
@@ -658,7 +941,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(order.tableName ?? 'T-#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp)),
+                Text(
+                  order.tableName ?? 'T-#',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16.sp,
+                  ),
+                ),
                 _buildStatusBadge(order.status),
               ],
             ),
@@ -667,7 +956,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               order.items.map((i) => '${i.quantity}x ${i.name}').join(', '),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 14.sp),
+              style: TextStyle(
+                color: AdminTheme.secondaryText,
+                fontSize: 14.sp,
+              ),
             ),
             SizedBox(height: 12.h),
             Row(
@@ -675,7 +967,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text(
                   '${minutes}m ago',
-                  style: TextStyle(color: timeColor, fontSize: 12.sp, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: timeColor,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 _buildActionButton(order),
               ],
@@ -689,14 +985,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStatusBadge(model.OrderStatus status) {
     Color color;
     String label;
-    
+
     switch (status) {
-      case model.OrderStatus.pending: color = AdminTheme.info; label = 'NEW ORDER'; break;
-      case model.OrderStatus.preparing: color = AdminTheme.warning; label = 'PREPARING'; break;
-      case model.OrderStatus.ready: color = AdminTheme.success; label = 'READY'; break;
-      default: color = AdminTheme.secondaryText; label = status.name.toUpperCase();
+      case model.OrderStatus.pending:
+        color = AdminTheme.info;
+        label = 'NEW ORDER';
+        break;
+      case model.OrderStatus.preparing:
+        color = AdminTheme.warning;
+        label = 'PREPARING';
+        break;
+      case model.OrderStatus.ready:
+        color = AdminTheme.success;
+        label = 'READY';
+        break;
+      default:
+        color = AdminTheme.secondaryText;
+        label = status.name.toUpperCase();
     }
-    
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
       decoration: BoxDecoration(
@@ -707,8 +1014,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Text(
-          label, 
-          style: TextStyle(color: color, fontSize: 11.sp, fontWeight: FontWeight.bold),
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11.sp,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -719,48 +1030,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Color color = AdminTheme.primaryColor;
     VoidCallback? onPressed;
     final auth = context.read<AdminAuthProvider>();
-    
+    final isBusy = context.watch<OrdersProvider>().isLoading;
+
     if (order.status == model.OrderStatus.pending) {
       if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Accept';
-      onPressed = () => _runOrderStatusAction(order.id, model.OrderStatus.preparing);
+      onPressed = () =>
+          _runOrderStatusAction(order.id, model.OrderStatus.preparing);
     } else if (order.status == model.OrderStatus.preparing) {
       if (!auth.isAdmin && !auth.isKitchen) return const SizedBox.shrink();
       label = 'Complete';
-      onPressed = () => _runOrderStatusAction(order.id, model.OrderStatus.ready);
+      onPressed = () =>
+          _runOrderStatusAction(order.id, model.OrderStatus.ready);
     } else if (order.status == model.OrderStatus.ready) {
       if (!auth.isAdmin && !auth.isCaptain) return const SizedBox.shrink();
       label = 'Served';
-      onPressed = () => _runOrderStatusAction(order.id, model.OrderStatus.served);
+      onPressed = () =>
+          _runOrderStatusAction(order.id, model.OrderStatus.served);
     } else {
       return const SizedBox.shrink();
     }
 
     return ElevatedButton(
-      onPressed: onPressed,
+      onPressed: isBusy ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         minimumSize: Size(80.w, 32.h),
         side: BorderSide.none,
+        disabledBackgroundColor: Colors.grey[300],
+        disabledForegroundColor: Colors.white70,
       ),
-      child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold)),
+      child: Text(
+        isBusy ? 'Please wait' : label,
+        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
-  Future<void> _runOrderStatusAction(String orderId, model.OrderStatus status) async {
+  Future<void> _runOrderStatusAction(
+    String orderId,
+    model.OrderStatus status,
+  ) async {
     try {
       await context.read<OrdersProvider>().updateOrderStatus(orderId, status);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Action failed: $e'),
+          content: Text(
+            _friendlyErrorMessage(
+              e,
+              fallback: 'Unable to update order right now. Please try again.',
+            ),
+          ),
           backgroundColor: AdminTheme.critical,
         ),
       );
     }
+  }
+
+  String _friendlyErrorMessage(Object error, {required String fallback}) {
+    final raw = error.toString().toLowerCase();
+    if (raw.contains('unauthorized'))
+      return 'You do not have permission for this action.';
+    if (raw.contains('network') || raw.contains('unavailable'))
+      return 'Network issue. Please check connection and try again.';
+    if (raw.contains('failed-precondition') || raw.contains('index'))
+      return 'System is syncing setup. Please try again shortly.';
+    return fallback;
   }
 
   Widget _buildStaffCallsPanel() {
@@ -775,12 +1114,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    Icon(Ionicons.notifications, color: AdminTheme.critical, size: 24.w),
+                    Icon(
+                      Ionicons.notifications,
+                      color: AdminTheme.critical,
+                      size: 24.w,
+                    ),
                     SizedBox(width: 8.w),
                     Flexible(
                       child: Text(
-                        'Staff Calls', 
-                        style: TextStyle(color: AdminTheme.primaryText, fontSize: 20.sp, fontWeight: FontWeight.bold),
+                        'Staff Calls',
+                        style: TextStyle(
+                          color: AdminTheme.primaryText,
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -790,11 +1137,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               SizedBox(width: 8.w),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                decoration: BoxDecoration(color: AdminTheme.critical, borderRadius: BorderRadius.circular(4.r)),
+                decoration: BoxDecoration(
+                  color: AdminTheme.critical,
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
                 child: Consumer<NotificationsProvider>(
                   builder: (context, provider, _) => Text(
-                    '${provider.totalNotificationsCount} NEW', 
-                    style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: Colors.white)
+                    '${provider.totalNotificationsCount} NEW',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -804,17 +1158,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Expanded(
           child: Consumer<NotificationsProvider>(
             builder: (context, provider, _) {
-              final calls = <dynamic>[...provider.billRequests, ...provider.waiterCalls];
-              if (calls.isEmpty) return const Center(child: Text('No active calls', style: TextStyle(color: AdminTheme.secondaryText)));
-              
+              final calls = <dynamic>[
+                ...provider.billRequests,
+                ...provider.waiterCalls,
+              ];
+              if (calls.isEmpty)
+                return const Center(
+                  child: Text(
+                    'No active calls',
+                    style: TextStyle(color: AdminTheme.secondaryText),
+                  ),
+                );
+
               return ListView.builder(
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
                 itemCount: calls.length,
                 itemBuilder: (context, index) {
                   final call = calls[index];
                   bool isBill = call is BillRequest;
-                  String tableName = isBill ? (call as BillRequest).tableName ?? 'Table' : (call as WaiterCall).tableName ?? 'Table';
-                  
+                  String tableName = isBill
+                      ? (call as BillRequest).tableName ?? 'Table'
+                      : (call as WaiterCall).tableName ?? 'Table';
+                  final waiterNotes = isBill ? null : (call as WaiterCall).notes?.toString().trim();
+                  final waiterLabel = (waiterNotes == null || waiterNotes.isEmpty)
+                      ? 'Waiter Service'
+                      : waiterNotes;
+                  final waiterIcon = (waiterNotes != null && waiterNotes.toLowerCase().contains('water'))
+                      ? Icons.local_drink_outlined
+                      : Ionicons.person;
+
                   return Container(
                     margin: EdgeInsets.only(bottom: 12.h),
                     padding: EdgeInsets.all(16.w),
@@ -823,7 +1195,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       borderRadius: BorderRadius.circular(16.r),
                       border: Border.all(color: AdminTheme.dividerColor),
                       boxShadow: [
-                        BoxShadow(color: (isBill ? AdminTheme.warning : AdminTheme.critical).withOpacity(0.1), blurRadius: 10.w),
+                        BoxShadow(
+                          color:
+                              (isBill
+                                      ? AdminTheme.warning
+                                      : AdminTheme.critical)
+                                  .withOpacity(0.1),
+                          blurRadius: 10.w,
+                        ),
                       ],
                     ),
                     child: InkWell(
@@ -840,11 +1219,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Container(
                             padding: EdgeInsets.all(10.w),
                             decoration: BoxDecoration(
-                              color: (isBill ? AdminTheme.warning : AdminTheme.critical).withOpacity(0.1),
+                              color:
+                                  (isBill
+                                          ? AdminTheme.warning
+                                          : AdminTheme.critical)
+                                      .withOpacity(0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(isBill ? Ionicons.receipt : Ionicons.person, 
-                              color: isBill ? AdminTheme.warning : AdminTheme.critical, size: 20.w),
+                            child: Icon(
+                              isBill ? Ionicons.receipt : waiterIcon,
+                              color: isBill
+                                  ? AdminTheme.warning
+                                  : AdminTheme.critical,
+                              size: 20.w,
+                            ),
                           ),
                           SizedBox(width: 16.w),
                           Expanded(
@@ -853,27 +1241,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(child: Text(tableName, style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 15.sp), overflow: TextOverflow.ellipsis)),
+                                    Expanded(
+                                      child: Text(
+                                        tableName,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AdminTheme.primaryText,
+                                          fontSize: 15.sp,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                     SizedBox(width: 8.w),
                                     Text(
-                                      DateFormat('h:mm a').format(isBill ? (call as BillRequest).requestedAt : (call as WaiterCall).requestedAt), 
-                                      style: TextStyle(fontSize: 12.sp, color: AdminTheme.secondaryText)
+                                      DateFormat('h:mm a').format(
+                                        isBill
+                                            ? (call as BillRequest).requestedAt
+                                            : (call as WaiterCall).requestedAt,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 12.sp,
+                                        color: AdminTheme.secondaryText,
+                                      ),
                                     ),
                                   ],
                                 ),
-                                Text(isBill ? 'Requested: Final Bill' : 'Requested: Waiter Service', 
-                                  style: TextStyle(fontSize: 14.sp, color: AdminTheme.secondaryText), overflow: TextOverflow.ellipsis),
+                                Text(
+                                  isBill
+                                      ? 'Requested: Final Bill'
+                                      : 'Requested: $waiterLabel',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    color: AdminTheme.secondaryText,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ],
                             ),
                           ),
                           SizedBox(width: 12.w),
                           IconButton(
-                            icon: Icon(Ionicons.checkmark_circle_outline, color: AdminTheme.success, size: 24.w),
+                            icon: Icon(
+                              Ionicons.checkmark_circle_outline,
+                              color: AdminTheme.success,
+                              size: 24.w,
+                            ),
                             onPressed: () {
                               if (isBill) {
-                                provider.acknowledgeBillRequest((call as BillRequest).requestId);
+                                provider.acknowledgeBillRequest(
+                                  (call as BillRequest).requestId,
+                                );
                               } else {
-                                provider.completeWaiterCall((call as WaiterCall).callId);
+                                provider.completeWaiterCall(
+                                  (call as WaiterCall).callId,
+                                );
                               }
                             },
                           ),
@@ -891,12 +1312,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Center(
             child: TextButton(
               onPressed: () {},
-              child: Text('VIEW RESOLVED REQUESTS', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+              child: Text(
+                'VIEW RESOLVED REQUESTS',
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.secondaryText,
+                ),
+              ),
             ),
           ),
         ),
       ],
     );
   }
-
 }

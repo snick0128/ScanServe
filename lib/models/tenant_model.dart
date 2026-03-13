@@ -118,6 +118,10 @@ class MenuItem {
   final bool hasVariants;
   final List<Variant> variants;
   
+  // Rule-Based Suggestions
+  final List<String> suggestedItemIds;
+  final bool spicy;
+
   bool get isVeg {
     if (itemType == null) return true; // Default to veg if not specified
     final type = itemType!.toLowerCase().replaceAll('-', '').replaceAll(' ', '').trim();
@@ -136,6 +140,9 @@ class MenuItem {
     // If not tracking inventory, it's available
     if (inventoryTrackingType == InventoryTrackingType.none) return true;
 
+    // If inventory data hasn't loaded yet, default to available to avoid total blackout
+    if (inventory.isEmpty) return true;
+
     // Check each linked ingredient
     for (var entry in inventoryIngredients.entries) {
       final itemId = entry.key;
@@ -143,11 +150,12 @@ class MenuItem {
       
       try {
         final invItem = inventory.firstWhere((i) => i.id == itemId);
-        // If any key ingredient is completely out (or below needed qty), item is unavailable
+        // If any key ingredient is below needed qty, item is unavailable
         if (invItem.currentStock < qtyNeeded) return false;
       } catch (_) {
-        // If a linked item is missing from inventory list, assume unavailable for safety
-        return false;
+        // If a linked item is missing from inventory list, assume available 
+        // unless we want to be strict. For now, let's keep it available.
+        continue; 
       }
     }
     
@@ -171,6 +179,8 @@ class MenuItem {
     this.isBestseller = false,
     this.hasVariants = false,
     this.variants = const [],
+    this.suggestedItemIds = const [],
+    this.spicy = false,
   }) {
     this.itemType = itemType;
   }
@@ -183,37 +193,44 @@ class MenuItem {
       try {
         trackingType = InventoryTrackingType.values.firstWhere(
           (e) => e.name == data['inventoryTrackingType'],
+          orElse: () => InventoryTrackingType.none,
         );
       } catch (_) {
         trackingType = InventoryTrackingType.none;
       }
     }
 
-    final ingredientsData = data['inventoryIngredients'] as Map<String, dynamic>? ?? {};
+    final ingredientsData = data['inventoryIngredients'] as Map<dynamic, dynamic>? ?? {};
     final Map<String, double> ingredients = {};
     ingredientsData.forEach((key, value) {
-      ingredients[key] = (value as num).toDouble();
+      if (value is num) {
+        ingredients[key.toString()] = value.toDouble();
+      }
     });
 
     return MenuItem(
-      id: data['id'] ?? '',
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      price: (data['price'] ?? 0.0).toDouble(),
-      imageUrl: data['image_url'],
-      category: data['category'] ?? data['Category'],
-      subcategory: data['subcategory'] ?? data['Subcategory'],
-      itemType: itemType,
-      stockCount: data['stockCount'] ?? 0,
-      isTracked: data['isTracked'] ?? false,
+      id: (data['id'] ?? '').toString(),
+      name: (data['name'] ?? '').toString(),
+      description: (data['description'] ?? '').toString(),
+      price: (data['price'] ?? 0.0) is num ? (data['price'] as num).toDouble() : 0.0,
+      imageUrl: data['image_url']?.toString(),
+      category: (data['category'] ?? data['Category'])?.toString(),
+      subcategory: (data['subcategory'] ?? data['Subcategory'])?.toString(),
+      itemType: itemType?.toString(),
+      stockCount: (data['stockCount'] ?? 0) is num ? (data['stockCount'] as num).toInt() : 0,
+      isTracked: data['isTracked'] == true,
       isManualAvailable: data['isManualAvailable'] ?? true,
       inventoryTrackingType: trackingType,
       inventoryIngredients: ingredients,
-      isBestseller: data['isBestseller'] ?? false,
-      hasVariants: data['hasVariants'] ?? false,
+      isBestseller: data['isBestseller'] == true,
+      hasVariants: data['hasVariants'] == true,
       variants: (data['variants'] as List<dynamic>?)
-          ?.map((v) => Variant.fromMap(v))
+          ?.map((v) => Variant.fromMap(Map<String, dynamic>.from(v)))
           .toList() ?? const [],
+      suggestedItemIds: (data['suggestedItemIds'] as List<dynamic>?)
+          ?.map((id) => id.toString())
+          .toList() ?? const [],
+      spicy: data['spicy'] == true,
     );
   }
 
@@ -235,6 +252,8 @@ class MenuItem {
       'isBestseller': isBestseller,
       'hasVariants': hasVariants,
       'variants': variants.map((v) => v.toMap()).toList(),
+      'suggestedItemIds': suggestedItemIds,
+      'spicy': spicy,
     };
   }
 
@@ -255,6 +274,8 @@ class MenuItem {
     bool? isBestseller,
     bool? hasVariants,
     List<Variant>? variants,
+    List<String>? suggestedItemIds,
+    bool? spicy,
   }) {
     return MenuItem(
       id: id ?? this.id,
@@ -273,6 +294,8 @@ class MenuItem {
       isBestseller: isBestseller ?? this.isBestseller,
       hasVariants: hasVariants ?? this.hasVariants,
       variants: variants ?? this.variants,
+      suggestedItemIds: suggestedItemIds ?? this.suggestedItemIds,
+      spicy: spicy ?? this.spicy,
     );
   }
 }
