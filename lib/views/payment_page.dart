@@ -7,9 +7,7 @@ import '../services/bill_request_service.dart';
 import '../services/guest_session_service.dart';
 import '../utils/snackbar_helper.dart';
 import '../theme/app_theme.dart';
-import '../widgets/customer_details_bottom_sheet.dart';
 import '../utils/haptic_helper.dart';
-import 'upi_payment_page.dart';
 import 'bill_view.dart';
 
 class PaymentPage extends StatefulWidget {
@@ -27,21 +25,26 @@ class _PaymentPageState extends State<PaymentPage> {
   bool _isRequestingBill = false;
   String? _selectedMethod;
   // Feature toggle for online payments
-  static const bool _enableOnlinePayments = false;
-
   final List<Map<String, dynamic>> _paymentMethods = [
     {'id': 'cash', 'name': 'Cash at Counter', 'icon': Icons.store_outlined},
     {'id': 'bill', 'name': 'Request Bill', 'icon': Icons.receipt_long_outlined},
   ];
 
+  bool get _hasActiveOrder =>
+      context.watch<OrderController>().activeOrders.isNotEmpty;
+
   Future<void> _handleRequestBill({bool isCashAtCounter = false}) async {
     final orderController = context.read<OrderController>();
     if (orderController.activeOrders.isEmpty) {
-      SnackbarHelper.showTopSnackBar(context, 'No active orders found.');
+      SnackbarHelper.showTopSnackBar(
+        context,
+        'No active order found. Place an order before requesting payment.',
+      );
       return;
     }
 
-    final isParcel = orderController.activeOrders.first.type == OrderType.parcel;
+    final isParcel =
+        orderController.activeOrders.first.type == OrderType.parcel;
 
     try {
       final session = await _guestSession.getCurrentSession();
@@ -49,13 +52,16 @@ class _PaymentPageState extends State<PaymentPage> {
       final tableId = session['tableId'];
 
       if (tenantId == null) {
-        SnackbarHelper.showTopSnackBar(context, 'Unable to proceed - session not found');
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Unable to proceed - session not found',
+        );
         return;
       }
 
       final guestId = await _guestSession.getGuestId();
       final profile = await _guestSession.getGuestProfile();
-      
+
       // Only check for pending requests if it's Dine-in
       if (!isParcel) {
         final hasPending = await _billRequestService.hasPendingBillRequest(
@@ -64,7 +70,10 @@ class _PaymentPageState extends State<PaymentPage> {
         );
 
         if (hasPending) {
-          SnackbarHelper.showTopSnackBar(context, 'You already have a pending request');
+          SnackbarHelper.showTopSnackBar(
+            context,
+            'You already have a pending request',
+          );
           return;
         }
       }
@@ -74,9 +83,9 @@ class _PaymentPageState extends State<PaymentPage> {
       final orderIds = orderController.activeOrders
           .map((order) => order.orderId)
           .toList();
-      
-      final tableName = orderController.activeOrders.isNotEmpty 
-          ? orderController.activeOrders.first.tableName 
+
+      final tableName = orderController.activeOrders.isNotEmpty
+          ? orderController.activeOrders.first.tableName
           : (tableId != null ? 'Table $tableId' : null);
 
       if (!isParcel) {
@@ -96,13 +105,17 @@ class _PaymentPageState extends State<PaymentPage> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             title: Column(
               children: [
                 Icon(
-                  isCashAtCounter ? Icons.store_outlined : Icons.receipt_long_outlined, 
-                  color: AppTheme.primaryColor, 
-                  size: 48
+                  isCashAtCounter
+                      ? Icons.store_outlined
+                      : Icons.receipt_long_outlined,
+                  color: AppTheme.primaryColor,
+                  size: 48,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -176,93 +189,119 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
         centerTitle: true,
       ),
-      body: _isRequestingBill 
-        ? const Center(child: CircularProgressIndicator())
-        : ListView.builder(
-            padding: const EdgeInsets.all(20),
-            itemCount: _paymentMethods.length,
-            itemBuilder: (context, index) {
-              final method = _paymentMethods[index];
-              final isSelected = _selectedMethod == method['id'];
+      body: _isRequestingBill
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: _paymentMethods.length,
+              itemBuilder: (context, index) {
+                final method = _paymentMethods[index];
+                final isSelected = _selectedMethod == method['id'];
 
-              return GestureDetector(
-                onTap: () {
-                  HapticHelper.light();
-                  setState(() {
-                    _selectedMethod = method['id'];
-                  });
-                  _handleRequestBill(isCashAtCounter: method['id'] == 'cash');
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
-                      width: isSelected ? 2 : 1,
+                return GestureDetector(
+                  onTap: !_hasActiveOrder
+                      ? null
+                      : () {
+                          HapticHelper.light();
+                          setState(() {
+                            _selectedMethod = method['id'];
+                          });
+                          _handleRequestBill(
+                            isCashAtCounter: method['id'] == 'cash',
+                          );
+                        },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: _hasActiveOrder
+                          ? Colors.white
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppTheme.primaryColor
+                            : AppTheme.borderColor,
+                        width: isSelected ? 2 : 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
-                          shape: BoxShape.circle,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _hasActiveOrder
+                                ? AppTheme.primaryColor.withOpacity(0.1)
+                                : Colors.grey.shade300,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            method['icon'],
+                            color: _hasActiveOrder
+                                ? AppTheme.primaryColor
+                                : Colors.grey.shade600,
+                            size: 28,
+                          ),
                         ),
-                        child: Icon(
-                          method['icon'],
-                          color: AppTheme.primaryColor,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              method['name'],
-                              style: GoogleFonts.outfit(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryText,
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                method['name'],
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: _hasActiveOrder
+                                      ? AppTheme.primaryText
+                                      : AppTheme.secondaryText,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              method['id'] == 'cash' 
-                                ? 'Pay directly at the bill counter' 
-                                : 'Request bill at your table',
-                              style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                color: AppTheme.secondaryText,
+                              const SizedBox(height: 4),
+                              Text(
+                                method['id'] == 'cash'
+                                    ? 'Pay directly at the bill counter'
+                                    : 'Request bill at your table',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  color: AppTheme.secondaryText,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: AppTheme.borderColor,
-                      ),
-                    ],
+                        const Icon(
+                          Icons.chevron_right,
+                          color: AppTheme.borderColor,
+                        ),
+                      ],
+                    ),
                   ),
+                );
+              },
+            ),
+      bottomNavigationBar: !_hasActiveOrder
+          ? Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.amber.shade50,
+              child: Text(
+                'Payment is unavailable until at least one active order exists for this session.',
+                style: GoogleFonts.outfit(
+                  color: Colors.amber.shade900,
+                  fontWeight: FontWeight.w600,
                 ),
-              );
-            },
-          ),
+                textAlign: TextAlign.center,
+              ),
+            )
+          : null,
     );
   }
 }
-
-

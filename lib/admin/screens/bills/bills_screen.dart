@@ -10,9 +10,11 @@ import 'package:printing/printing.dart';
 import '../../theme/admin_theme.dart';
 import '../../providers/bills_provider.dart';
 import '../../providers/admin_auth_provider.dart';
+import '../../providers/orders_provider.dart';
 import '../../../services/bill_service.dart';
 import 'bill_details_screen.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
+import '../../utils/bill_print_builder.dart';
 
 class BillsScreen extends StatefulWidget {
   final String tenantId;
@@ -871,70 +873,17 @@ class _BillsScreenState extends State<BillsScreen> {
     final bill = await billService.getBill(widget.tenantId, billId);
     if (bill == null) return;
 
-    final pdf = pw.Document();
-    
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.roll80,
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Center(child: pw.Text('SCAN & SERVE', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
-              pw.Center(child: pw.Text('GUEST RECEIPT', style: const pw.TextStyle(fontSize: 10))),
-              pw.Divider(),
-              pw.Text('Bill ID: ${bill['billId'].toString().substring(0, 8)}'),
-              pw.Text('Table: ${bill['tableId']}'),
-              pw.Text('Date: ${DateFormat('dd/MM/yyyy h:mm a').format((bill['createdAt'] as Timestamp).toDate())}'),
-              pw.Divider(),
-              pw.Table.fromTextArray(
-                context: context,
-                data: [
-                  ['Item', 'Qty', 'Amt'],
-                  ...(bill['orderDetails'] as List).expand((order) => (order['items'] as List).map((i) => [
-                    i['name'],
-                    i['quantity'].toString(),
-                    i['total'].toString(),
-                  ])),
-                ],
-              ),
-              pw.Divider(),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Subtotal:'),
-                  pw.Text('Rs. ${bill['subtotal']}'),
-                ],
-              ),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Tax:'),
-                  pw.Text('Rs. ${bill['tax']}'),
-                ],
-              ),
-              if ((bill['discountAmount'] ?? 0) > 0)
-                 pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Discount:'),
-                    pw.Text('-Rs. ${bill['discountAmount']}'),
-                  ],
-                ),
-              pw.Divider(),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('FINAL TOTAL:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Rs. ${bill['finalTotal']}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text('THANK YOU! VISIT AGAIN', style: const pw.TextStyle(fontSize: 8))),
-            ],
-          );
-        },
-      ),
+    String taxLabel = 'GST';
+    try {
+      final settings = context.read<OrdersProvider>().tenantSettings;
+      final label = settings['taxLabel'];
+      if (label is String && label.trim().isNotEmpty) taxLabel = label;
+    } catch (_) {}
+
+    final pdf = await BillPrintBuilder.build(
+      bill: bill,
+      taxLabel: taxLabel,
+      receiptTitle: 'GUEST RECEIPT',
     );
 
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());

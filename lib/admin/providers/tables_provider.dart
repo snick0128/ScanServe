@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/tenant_model.dart';
 import '../../models/table_status.dart';
 import '../../services/tables_service.dart';
+import '../../services/waiter_call_service.dart';
 import './orders_provider.dart';
 import '../../models/order.dart' as order_model;
 
@@ -16,6 +17,7 @@ class TablesProvider with ChangeNotifier {
   String? _tenantId;
   StreamSubscription? _tablesSubscription;
   OrdersProvider? _ordersProvider;
+  final WaiterCallService _waiterCallService = WaiterCallService();
 
   List<RestaurantTable> get tables => _tables;
   bool get isLoading => _isLoading;
@@ -142,6 +144,14 @@ class TablesProvider with ChangeNotifier {
         occupiedAt: null,
         lastReleasedAt: DateTime.now(), // Tracking for Bug #6
       ));
+
+      // Clear pending waiter calls if we couldn't route through OrdersProvider
+      if (tableId != 'PARCEL') {
+        await _waiterCallService.completeWaiterCallsForTable(
+          tenantId: _tenantId!,
+          tableId: tableId,
+        );
+      }
     } catch (e) {
       print('Error releasing table: $e');
       rethrow;

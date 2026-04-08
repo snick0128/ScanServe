@@ -19,6 +19,7 @@ class OrderItem {
   final String? chefNote;
   final String? captainName;
   final String? variantName;
+  final String? selectedSpiceLevel;
   final String? category;
   final bool printedToKOT;
   final DateTime? printedAt;
@@ -40,6 +41,7 @@ class OrderItem {
     this.chefNote,
     this.captainName,
     this.variantName,
+    this.selectedSpiceLevel,
     this.category,
     this.printedToKOT = false,
     this.printedAt,
@@ -69,9 +71,12 @@ class OrderItem {
       chefNote: data['chefNote'],
       captainName: data['captainName'],
       variantName: data['variantName'],
+      selectedSpiceLevel: data['selectedSpiceLevel'],
       category: data['category'],
       printedToKOT: data['printedToKOT'] ?? false,
-      printedAt: data['printedAt'] != null ? parseTime(data['printedAt']) : null,
+      printedAt: data['printedAt'] != null
+          ? parseTime(data['printedAt'])
+          : null,
       discountAmount: (data['discountAmount'] ?? 0).toDouble(),
       discountPercentage: (data['discountPercentage'] ?? 0).toDouble(),
     );
@@ -93,6 +98,7 @@ class OrderItem {
       'chefNote': chefNote,
       'captainName': captainName,
       'variantName': variantName,
+      'selectedSpiceLevel': selectedSpiceLevel,
       'category': category,
       'printedToKOT': printedToKOT,
       if (printedAt != null) 'printedAt': Timestamp.fromDate(printedAt!),
@@ -116,9 +122,12 @@ class OrderItem {
     String? chefNote,
     String? captainName,
     String? variantName,
+    String? selectedSpiceLevel,
     String? category,
     bool? printedToKOT,
     DateTime? printedAt,
+    double? discountAmount,
+    double? discountPercentage,
   }) {
     return OrderItem(
       id: id ?? this.id,
@@ -135,6 +144,7 @@ class OrderItem {
       chefNote: chefNote ?? this.chefNote,
       captainName: captainName ?? this.captainName,
       variantName: variantName ?? this.variantName,
+      selectedSpiceLevel: selectedSpiceLevel ?? this.selectedSpiceLevel,
       category: category ?? this.category,
       printedToKOT: printedToKOT ?? this.printedToKOT,
       printedAt: printedAt ?? this.printedAt,
@@ -165,7 +175,8 @@ class Order {
   final double discountPercentage;
   final double tax;
   final double total; // Final total (subtotal - discount + tax + adjustments)
-  final Map<String, double>? billAdjustments; // Admin-applied adjustments (rounding, manual tax, etc.)
+  final Map<String, double>?
+  billAdjustments; // Admin-applied adjustments (rounding, manual tax, etc.)
   final OrderStatus status;
   final PaymentStatus paymentStatus;
   final DateTime createdAt;
@@ -234,9 +245,13 @@ class Order {
       if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
       return DateTime.now();
     }
-    
+
     // Improved timestamp detection
-    final createdAt = data['createdAt'] ?? data['timestamp'] ?? data['paymentTimestamp'] ?? data['updatedAt'];
+    final createdAt =
+        data['createdAt'] ??
+        data['timestamp'] ??
+        data['paymentTimestamp'] ??
+        data['updatedAt'];
 
     return Order(
       id: doc.id,
@@ -251,7 +266,7 @@ class Order {
       discountPercentage: (data['discountPercentage'] ?? 0).toDouble(),
       tax: (data['tax'] ?? 0).toDouble(),
       total: (data['total'] ?? 0).toDouble(),
-      billAdjustments: data['billAdjustments'] != null 
+      billAdjustments: data['billAdjustments'] != null
           ? Map<String, double>.from(data['billAdjustments'])
           : null,
       status: data['status'] != null
@@ -259,7 +274,9 @@ class Order {
           : OrderStatus.pending,
       paymentStatus: PaymentStatus.fromString(data['paymentStatus']),
       createdAt: parseDateTime(createdAt),
-      updatedAt: data['updatedAt'] != null ? parseDateTime(data['updatedAt']) : null,
+      updatedAt: data['updatedAt'] != null
+          ? parseDateTime(data['updatedAt'])
+          : null,
       paymentMethod: data['paymentMethod'],
       paymentId: data['paymentId'],
       notes: data['notes'],
@@ -272,7 +289,9 @@ class Order {
       captainName: data['captainName'],
       sessionId: data['sessionId'],
       printedToKOT: data['printedToKOT'] ?? false,
-      printedAt: data['printedAt'] != null ? parseDateTime(data['printedAt']) : null,
+      printedAt: data['printedAt'] != null
+          ? parseDateTime(data['printedAt'])
+          : null,
       paidAt: data['paidAt'] != null ? parseDateTime(data['paidAt']) : null,
       paidBy: data['paidBy'],
       paymentNote: data['paymentNote'],
@@ -389,23 +408,44 @@ class Order {
     );
   }
 
+  static Order empty() => Order(
+    id: '',
+    tenantId: '',
+    items: const [],
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+    status: OrderStatus.pending,
+    createdAt: DateTime.now(),
+  );
+
   // REQUIREMENT 7: Sorting logic for Active Orders
   int get urgencyScore {
     switch (status) {
-      case OrderStatus.preparing: return 100;
-      case OrderStatus.ready: return 90;
-      case OrderStatus.pending: return 80;
-      case OrderStatus.served: return 70;
-      case OrderStatus.billRequested: return 110; // High priority for settlement
-      case OrderStatus.paymentPending: return 110; // High priority for settlement
-      case OrderStatus.completed: return 0;
-      case OrderStatus.cancelled: return 0;
-
+      case OrderStatus.preparing:
+        return 100;
+      case OrderStatus.ready:
+        return 90;
+      case OrderStatus.pending:
+        return 80;
+      case OrderStatus.served:
+        return 70;
+      case OrderStatus.billRequested:
+        return 110; // High priority for settlement
+      case OrderStatus.paymentPending:
+        return 110; // High priority for settlement
+      case OrderStatus.completed:
+        return 0;
+      case OrderStatus.cancelled:
+        return 0;
     }
   }
 
   bool get isUrgent {
-    if (status == OrderStatus.completed || status == OrderStatus.cancelled || status == OrderStatus.served) return false;
+    if (status == OrderStatus.completed ||
+        status == OrderStatus.cancelled ||
+        status == OrderStatus.served)
+      return false;
     return DateTime.now().difference(createdAt).inMinutes >= 15;
   }
 
@@ -413,9 +453,12 @@ class Order {
   String get elapsedText {
     final now = DateTime.now();
     final diff = now.difference(createdAt);
-    
+
     // If completed/cancelled or older than today, show formatted date
-    if (status == OrderStatus.completed || status == OrderStatus.cancelled || status == OrderStatus.served || diff.inHours > 12) {
+    if (status == OrderStatus.completed ||
+        status == OrderStatus.cancelled ||
+        status == OrderStatus.served ||
+        diff.inHours > 12) {
       return DateFormat('MMM d, h:mm a').format(createdAt);
     }
 
@@ -426,24 +469,32 @@ class Order {
 
   // Derived status from items - Production logic
   OrderStatus get derivedStatus {
-    if (status == OrderStatus.completed || status == OrderStatus.cancelled) return status;
+    if (status == OrderStatus.completed || status == OrderStatus.cancelled)
+      return status;
     if (items.isEmpty) return status;
 
     // 1. If any item is PREPARING, the whole order is PREPARING
-    if (items.any((i) => i.status == OrderItemStatus.preparing)) return OrderStatus.preparing;
-    
+    if (items.any((i) => i.status == OrderItemStatus.preparing))
+      return OrderStatus.preparing;
+
     // 2. If no item is preparing, but some are PENDING, the order is PENDING
-    if (items.any((i) => i.status == OrderItemStatus.pending)) return OrderStatus.pending;
+    if (items.any((i) => i.status == OrderItemStatus.pending))
+      return OrderStatus.pending;
 
     // 3. If all items are SERVED, the order is SERVED
-    if (items.every((i) => i.status == OrderItemStatus.served)) return OrderStatus.served;
+    if (items.every((i) => i.status == OrderItemStatus.served))
+      return OrderStatus.served;
 
     // 4. If all items are at least READY (none are preparing/pending), the order is READY
     // (This covers the case where some are READY and some are SERVED)
-    if (items.every((i) => i.status == OrderItemStatus.ready || i.status == OrderItemStatus.served)) {
+    if (items.every(
+      (i) =>
+          i.status == OrderItemStatus.ready ||
+          i.status == OrderItemStatus.served,
+    )) {
       return OrderStatus.ready;
     }
-    
+
     return status;
   }
 }

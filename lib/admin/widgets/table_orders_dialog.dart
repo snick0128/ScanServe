@@ -8,7 +8,6 @@ import '../../services/tables_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/admin_auth_provider.dart';
@@ -20,6 +19,7 @@ import '../theme/admin_theme.dart';
 import '../../../models/table_status.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
 import '../../../utils/bill_calculator.dart';
+import '../utils/bill_print_builder.dart';
 
 
 class TableOrdersDialog extends StatefulWidget {
@@ -82,6 +82,15 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     return _fallbackTaxRate;
   }
 
+  String _resolveTaxLabel(OrdersProvider ordersProvider) {
+    final label = ordersProvider.tenantSettings['taxLabel'];
+    if (label is String) {
+      final trimmed = label.trim();
+      if (trimmed.isNotEmpty) return trimmed;
+    }
+    return 'GST';
+  }
+
   void _rebuildPreservingScroll(VoidCallback update) {
     final offset = _scrollController.hasClients ? _scrollController.offset : null;
     setState(update);
@@ -112,7 +121,8 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
       try {
         final orderId = const Uuid().v4();
         final subtotal = selectedItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-        final tax = subtotal * 0.05; // 5% tax assumption
+        final taxRate = _resolveTaxRate(context.read<OrdersProvider>(), <model.Order>[]);
+        final tax = subtotal * taxRate;
         final total = subtotal + tax;
 
         final newOrder = model.Order(
@@ -415,6 +425,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                         // AGGREGATE STATS FOR THE TABLE (Requirement #3 & #1)
                         final discountValue = double.tryParse(_discountController.text) ?? 0.0;
                         final taxRate = _resolveTaxRate(ordersProvider, orders);
+                        final taxLabel = _resolveTaxLabel(ordersProvider);
                         final currentCalc = BillCalculator.calculateBill(
                           orders: orders,
                           discountValue: discountValue,
@@ -460,7 +471,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                                       if (orders.isNotEmpty && (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain)) {
                                           return Padding(
                                             padding: const EdgeInsets.only(top: 24, bottom: 80), // bottom padding for fixed bar
-                                            child: _buildBillSection(orders, taxRate),
+                                            child: _buildBillSection(orders, taxRate, taxLabel),
                                           );
                                       } else if (orders.isNotEmpty) {
                                         return const Padding(
@@ -493,10 +504,10 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     );
   }
 
-  Widget _buildBillSection(List<model.Order> orders, double taxRate) {
+  Widget _buildBillSection(List<model.Order> orders, double taxRate, String taxLabel) {
     return Column(
       children: [
-        _buildBillSummary(orders, taxRate),
+        _buildBillSummary(orders, taxRate, taxLabel),
         const SizedBox(height: 16),
         _buildGenerateBillButton(orders),
       ],
@@ -922,7 +933,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     );
   }
 
-  Widget _buildBillSummary(List<model.Order> orders, double taxRate) {
+  Widget _buildBillSummary(List<model.Order> orders, double taxRate, String taxLabel) {
     final discountValue = double.tryParse(_discountController.text) ?? 0.0;
     
     final calculations = BillCalculator.calculateBill(
@@ -950,7 +961,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
           const Text('BILLING DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
           const SizedBox(height: 20),
           _buildBillRow('Session Subtotal', '₹${subtotal.toStringAsFixed(2)}'),
-          _buildBillRow('Tax (${(taxRate * 100).toStringAsFixed(taxRate * 100 % 1 == 0 ? 0 : 2)}%)', '₹${newTax.toStringAsFixed(2)}'),
+          _buildBillRow('${taxLabel} (${(taxRate * 100).toStringAsFixed(taxRate * 100 % 1 == 0 ? 0 : 2)}%)', '₹${newTax.toStringAsFixed(2)}'),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1240,125 +1251,13 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
 
   Future<void> _printBill(BuildContext context, Map<String, dynamic> bill) async {
     try {
-      final pdf = pw.Document();
-      final font = await PdfGoogleFonts.notoSansDevanagariRegular();
-      final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
-
       final billId = bill['billId'] ?? 'Unknown';
-      final createdAt = (bill['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-      final tableId = bill['tableId'] ?? 'Unknown';
-      final subtotal = (bill['subtotal'] ?? 0).toDouble();
-      final tax = (bill['tax'] ?? 0).toDouble();
-      final discount = (bill['discount'] ?? 0).toDouble();
-      final discountAmount = (bill['discountAmount'] ?? 0).toDouble();
-      final finalTotal = (bill['finalTotal'] ?? 0).toDouble();
-      final orderDetails = (bill['orderDetails'] as List<dynamic>? ?? []);
-
-      pdf.addPage(
-        pw.Page(
-          theme: pw.ThemeData.withFont(base: font, bold: boldFont),
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Header(
-                  level: 0,
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text('ScanServe Invoice', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Bill #$billId', style: const pw.TextStyle(fontSize: 14)),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text('Date: ${DateFormat('MMM d, y').format(createdAt)}'),
-                        pw.Text('Time: ${DateFormat('h:mm a').format(createdAt)}'),
-                        pw.Text('Table: $tableId'),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 30),
-                pw.Table.fromTextArray(
-                  context: context,
-                  border: null,
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                  headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
-                  cellHeight: 30,
-                  cellAlignments: {
-                    0: pw.Alignment.centerLeft,
-                    1: pw.Alignment.centerRight,
-                    2: pw.Alignment.centerRight,
-                    3: pw.Alignment.centerRight,
-                  },
-                  headers: ['Item', 'Qty', 'Price', 'Total'],
-                  data: orderDetails.expand((order) {
-                    final items = (order['items'] as List<dynamic>? ?? []);
-                    return items.map((item) {
-                      return [
-                        item['name'],
-                        item['quantity'].toString(),
-                        '${(item['price'] as num).toStringAsFixed(2)}',
-                        '${(item['total'] as num).toStringAsFixed(2)}',
-                      ];
-                    });
-                  }).toList(),
-                ),
-                pw.Divider(),
-                pw.Container(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.SizedBox(height: 10),
-                      pw.Row(
-                        mainAxisSize: pw.MainAxisSize.min,
-                        children: [
-                          pw.Text('Subtotal: ', style: const pw.TextStyle(fontSize: 14)),
-                          pw.Text('${subtotal.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 14)),
-                        ],
-                      ),
-                      pw.Row(
-                        mainAxisSize: pw.MainAxisSize.min,
-                        children: [
-                          pw.Text('Tax: ', style: const pw.TextStyle(fontSize: 14)),
-                          pw.Text('${tax.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 14)),
-                        ],
-                      ),
-                      if (discount > 0)
-                        pw.Row(
-                          mainAxisSize: pw.MainAxisSize.min,
-                          children: [
-                            pw.Text('Discount ($discount%): ', style: const pw.TextStyle(fontSize: 14, color: PdfColors.green)),
-                            pw.Text('-${discountAmount.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 14, color: PdfColors.green)),
-                          ],
-                        ),
-                      pw.Divider(),
-                      pw.Row(
-                        mainAxisSize: pw.MainAxisSize.min,
-                        children: [
-                          pw.Text('Total: ', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                          pw.Text('${finalTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 40),
-                pw.Center(child: pw.Text('Thank you!', style: const pw.TextStyle(fontSize: 12))),
-              ],
-            );
-          },
-        ),
+      final taxLabel = _resolveTaxLabel(context.read<OrdersProvider>());
+      final pdf = await BillPrintBuilder.build(
+        bill: bill,
+        taxLabel: taxLabel,
+        receiptTitle: 'GUEST RECEIPT',
       );
-
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
         name: 'bill_$billId',

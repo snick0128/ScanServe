@@ -28,23 +28,29 @@ class MenuItemDialog extends StatefulWidget {
 class _MenuItemDialogState extends State<MenuItemDialog> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
-  
+
   late TextEditingController _nameController;
   late TextEditingController _descController;
   late TextEditingController _priceController;
   late TextEditingController _imageController;
-  
+  late TextEditingController _prepTimeController;
+  late TextEditingController _customSpiceLevelsController;
+
   String? _selectedCategoryId;
   String _itemType = 'veg';
   String? _imagePreviewUrl;
   bool _isManualAvailable = true;
   bool _isBestseller = false;
   bool _isSaving = false;
+  final Set<String> _selectedSpiceLevels = <String>{};
+  static const List<String> _defaultSpiceLevels = ['Mild', 'Spicy', 'Hot'];
 
   // Inventory Usage state
   late InventoryTrackingType _trackingType;
-  late Map<String, double> _ingredients; // itemId -> qty (ALWAYS in base units: kg, Liter, etc.)
-  final Map<String, String> _displayUnits = {}; // itemId -> displayed unit in UI (grams, ml, etc.)
+  late Map<String, double>
+  _ingredients; // itemId -> qty (ALWAYS in base units: kg, Liter, etc.)
+  final Map<String, String> _displayUnits =
+      {}; // itemId -> displayed unit in UI (grams, ml, etc.)
 
   // Variants state
   bool _hasVariants = false;
@@ -57,17 +63,28 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.item?.name);
     _descController = TextEditingController(text: widget.item?.description);
-    _priceController = TextEditingController(text: widget.item?.price.toString());
+    _priceController = TextEditingController(
+      text: widget.item?.price.toString(),
+    );
     _imageController = TextEditingController(text: widget.item?.imageUrl);
+    _prepTimeController = TextEditingController(
+      text: (widget.item?.prepTimeMinutes ?? 25).toString(),
+    );
+    _customSpiceLevelsController = TextEditingController();
     _itemType = widget.item?.itemType ?? 'veg';
     _imagePreviewUrl = widget.item?.imageUrl;
     _isManualAvailable = widget.item?.isManualAvailable ?? true;
     _isBestseller = widget.item?.isBestseller ?? false;
 
-    _trackingType = widget.item?.inventoryTrackingType ?? InventoryTrackingType.none;
+    _trackingType =
+        widget.item?.inventoryTrackingType ?? InventoryTrackingType.none;
     _ingredients = Map.from(widget.item?.inventoryIngredients ?? {});
     _hasVariants = widget.item?.hasVariants ?? false;
     _variants = List.from(widget.item?.variants ?? []);
+    _selectedSpiceLevels.addAll(widget.item?.spiceLevels ?? const []);
+    _customSpiceLevelsController.text = (widget.item?.spiceLevels ?? const [])
+        .where((level) => !_defaultSpiceLevels.contains(level))
+        .join(', ');
 
     // Initialize category
     if (widget.item != null) {
@@ -77,10 +94,11 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
           break;
         }
       }
-    } 
-    
+    }
+
     // Safety check: if _selectedCategoryId is not in categories, reset it
-    if (_selectedCategoryId != null && !widget.categories.any((c) => c.id == _selectedCategoryId)) {
+    if (_selectedCategoryId != null &&
+        !widget.categories.any((c) => c.id == _selectedCategoryId)) {
       _selectedCategoryId = null;
     }
 
@@ -89,7 +107,9 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     }
     _imageController.addListener(() {
       setState(() {
-        _imagePreviewUrl = _imageController.text.isNotEmpty ? _imageController.text : null;
+        _imagePreviewUrl = _imageController.text.isNotEmpty
+            ? _imageController.text
+            : null;
       });
     });
 
@@ -99,8 +119,19 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   void _initializeDisplayUnits() {
     final inventoryItems = context.read<InventoryProvider>().items;
     for (var entry in _ingredients.entries) {
-      final item = inventoryItems.firstWhere((i) => i.id == entry.key, orElse: () => InventoryItem(id: '', tenantId: '', name: '', category: '', unit: '', currentStock: 0, lastUpdated: DateTime.now()));
-      
+      final item = inventoryItems.firstWhere(
+        (i) => i.id == entry.key,
+        orElse: () => InventoryItem(
+          id: '',
+          tenantId: '',
+          name: '',
+          category: '',
+          unit: '',
+          currentStock: 0,
+          lastUpdated: DateTime.now(),
+        ),
+      );
+
       if (item.unit == 'kg' && entry.value < 1.0 && entry.value > 0) {
         _displayUnits[entry.key] = 'grams';
       } else if (item.unit == 'Liter' && entry.value < 1.0 && entry.value > 0) {
@@ -117,6 +148,8 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     _descController.dispose();
     _priceController.dispose();
     _imageController.dispose();
+    _prepTimeController.dispose();
+    _customSpiceLevelsController.dispose();
     _scrollController.dispose();
     _variantNameController.dispose();
     _variantPriceController.dispose();
@@ -133,12 +166,18 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     final maxHeight = size.height * 0.92;
 
     return Dialog(
-      insetPadding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 40.w, vertical: 24.h),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 40.w,
+        vertical: 24.h,
+      ),
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dialogWidth, maxHeight: maxHeight),
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: maxHeight,
+        ),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -216,7 +255,10 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
 
   Widget _buildStickyHeader(bool isEditing, bool isCompact) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 16.w : 40.w, vertical: 24.h),
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 16.w : 40.w,
+        vertical: 24.h,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -228,25 +270,50 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
               children: [
                 Text(
                   isEditing ? 'Edit Menu Item' : 'Add New Menu Item',
-                  style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.bold,
+                    color: AdminTheme.primaryText,
+                  ),
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  isEditing ? 'Update details, price and ingredients' : 'Configure your new dish for the digital menu',
-                  style: TextStyle(fontSize: 12.sp, color: AdminTheme.secondaryText),
+                  isEditing
+                      ? 'Update details, price and ingredients'
+                      : 'Configure your new dish for the digital menu',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: AdminTheme.secondaryText,
+                  ),
                 ),
                 SizedBox(height: 12.h),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isSaving ? null : () => Navigator.pop(context),
+                        onPressed: _isSaving
+                            ? null
+                            : () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-                          side: const BorderSide(color: AdminTheme.dividerColor),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 14.h,
+                          ),
+                          side: const BorderSide(
+                            color: AdminTheme.dividerColor,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
                         ),
-                        child: Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: AdminTheme.secondaryText,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.sp,
+                          ),
+                        ),
                       ),
                     ),
                     SizedBox(width: 12.w),
@@ -255,12 +322,30 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                         onPressed: _isSaving ? null : _saveItem,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AdminTheme.primaryColor,
-                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 14.h,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
                         ),
-                        child: _isSaving 
-                          ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text(isEditing ? 'Save' : 'Create', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                        child: _isSaving
+                            ? SizedBox(
+                                width: 18.w,
+                                height: 18.w,
+                                child: const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                isEditing ? 'Save' : 'Create',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.sp,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -276,11 +361,20 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     children: [
                       Text(
                         isEditing ? 'Edit Menu Item' : 'Add New Menu Item',
-                        style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                        style: TextStyle(
+                          fontSize: 24.sp,
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryText,
+                        ),
                       ),
                       Text(
-                        isEditing ? 'Update details, price and ingredients' : 'Configure your new dish for the digital menu',
-                        style: TextStyle(fontSize: 14.sp, color: AdminTheme.secondaryText),
+                        isEditing
+                            ? 'Update details, price and ingredients'
+                            : 'Configure your new dish for the digital menu',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: AdminTheme.secondaryText,
+                        ),
                       ),
                     ],
                   ),
@@ -288,23 +382,53 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 OutlinedButton(
                   onPressed: _isSaving ? null : () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 24.w,
+                      vertical: 20.h,
+                    ),
                     side: const BorderSide(color: AdminTheme.dividerColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                   ),
-                  child: Text('Cancel', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: AdminTheme.secondaryText,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.sp,
+                    ),
+                  ),
                 ),
                 SizedBox(width: 16.w),
                 ElevatedButton(
                   onPressed: _isSaving ? null : _saveItem,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AdminTheme.primaryColor,
-                    padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 32.w,
+                      vertical: 20.h,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
                   ),
-                  child: _isSaving 
-                    ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Text(isEditing ? 'Save Changes' : 'Create Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                  child: _isSaving
+                      ? SizedBox(
+                          width: 20.w,
+                          height: 20.w,
+                          child: const CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          isEditing ? 'Save Changes' : 'Create Item',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14.sp,
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -324,7 +448,14 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('General Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const Text(
+              'General Information',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.primaryText,
+              ),
+            ),
             const SizedBox(height: 24),
             TextFormField(
               controller: _nameController,
@@ -333,12 +464,24 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
               decoration: InputDecoration(
                 labelText: 'Item Name',
                 hintText: 'e.g. Traditional Paneer Tikka',
-                labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  color: AdminTheme.secondaryText,
+                ),
                 floatingLabelBehavior: FloatingLabelBehavior.auto,
                 contentPadding: const EdgeInsets.all(20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
-                prefixIcon: const Icon(Ionicons.restaurant_outline, color: AdminTheme.primaryColor),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AdminTheme.dividerColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AdminTheme.dividerColor),
+                ),
+                prefixIcon: const Icon(
+                  Ionicons.restaurant_outline,
+                  color: AdminTheme.primaryColor,
+                ),
               ),
               validator: (v) => v?.isEmpty == true ? 'Name is required' : null,
             ),
@@ -350,12 +493,23 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 labelText: 'Description (Optional)',
                 hintText: 'Describe ingredients, taste, or portion size...',
                 alignLabelWithHint: true,
-                labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  color: AdminTheme.secondaryText,
+                ),
                 contentPadding: const EdgeInsets.all(20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AdminTheme.dividerColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AdminTheme.dividerColor),
+                ),
               ),
             ),
+            const SizedBox(height: 20),
+            _buildSpiceConfigurationSection(),
           ],
         ),
       ),
@@ -375,24 +529,62 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Pricing & Categorization', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const Text(
+              'Pricing & Categorization',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.primaryText,
+              ),
+            ),
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: widget.categories.any((c) => c.id == _selectedCategoryId) ? _selectedCategoryId : null,
+                    value:
+                        widget.categories.any(
+                          (c) => c.id == _selectedCategoryId,
+                        )
+                        ? _selectedCategoryId
+                        : null,
                     isExpanded: true, // Prevent overflow
                     decoration: InputDecoration(
                       labelText: 'Category',
-                      labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        color: AdminTheme.secondaryText,
+                      ),
                       contentPadding: const EdgeInsets.all(20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AdminTheme.dividerColor,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AdminTheme.dividerColor,
+                        ),
+                      ),
                     ),
                     items: widget.categories
-                        .fold<List<Category>>([], (list, cat) => list.any((c) => c.id == cat.id) ? list : [...list, cat])
-                        .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis)))
+                        .fold<List<Category>>(
+                          [],
+                          (list, cat) => list.any((c) => c.id == cat.id)
+                              ? list
+                              : [...list, cat],
+                        )
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text(
+                              c.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setState(() => _selectedCategoryId = v),
                   ),
@@ -404,13 +596,27 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     decoration: InputDecoration(
                       labelText: 'Standard Price',
                       prefixText: '₹ ',
-                      labelStyle: const TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        color: AdminTheme.secondaryText,
+                      ),
                       contentPadding: const EdgeInsets.all(20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AdminTheme.dividerColor)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AdminTheme.dividerColor,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AdminTheme.dividerColor,
+                        ),
+                      ),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (v) => v?.isEmpty == true ? 'Price required' : null,
+                    validator: (v) =>
+                        v?.isEmpty == true ? 'Price required' : null,
                   ),
                 ),
               ],
@@ -418,7 +624,14 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
             const SizedBox(height: 24),
             _buildVariantsSection(),
             const SizedBox(height: 24),
-            const Text('Diet Preference', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+            const Text(
+              'Diet Preference',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.secondaryText,
+              ),
+            ),
             const SizedBox(height: 12),
             _buildDietSegmentedControl(),
           ],
@@ -454,7 +667,15 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -466,7 +687,9 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? AdminTheme.primaryText : AdminTheme.secondaryText,
+                  color: isSelected
+                      ? AdminTheme.primaryText
+                      : AdminTheme.secondaryText,
                 ),
               ),
             ],
@@ -478,7 +701,7 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
 
   Widget _buildRecipeBuilderSection() {
     final inventoryItems = context.watch<InventoryProvider>().items;
-    
+
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -497,12 +720,32 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Recipe & Ingredients', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+                    const Text(
+                      'Recipe & Ingredients',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AdminTheme.primaryText,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: AdminTheme.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-                      child: const Text('AUTO-DEDUCT STOCK ON SALE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.primaryColor)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AdminTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'AUTO-DEDUCT STOCK ON SALE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryColor,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -524,7 +767,10 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   Widget _buildTrackingTypeToggle() {
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: const Color(0xFFF1F3F4), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F3F4),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -558,9 +804,25 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                  ),
+                ]
+              : null,
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected
+                ? AdminTheme.primaryColor
+                : AdminTheme.secondaryText,
+          ),
+        ),
       ),
     );
   }
@@ -575,21 +837,38 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           key: ValueKey('ingredient_search_${_ingredients.length}'),
-          hint: const Text('Search or select ingredient...', style: TextStyle(fontSize: 14, color: AdminTheme.secondaryText)),
+          hint: const Text(
+            'Search or select ingredient...',
+            style: TextStyle(fontSize: 14, color: AdminTheme.secondaryText),
+          ),
           isExpanded: true,
           value: null,
-          icon: const Icon(Ionicons.search_outline, size: 20, color: AdminTheme.secondaryText),
+          icon: const Icon(
+            Ionicons.search_outline,
+            size: 20,
+            color: AdminTheme.secondaryText,
+          ),
           items: items
               .where((i) => !_ingredients.containsKey(i.id))
-              .fold<List<InventoryItem>>([], (list, item) => list.any((i) => i.id == item.id) ? list : [...list, item])
-              .map((i) => DropdownMenuItem(value: i.id, child: Text('${i.name} (${i.unit})')))
+              .fold<List<InventoryItem>>(
+                [],
+                (list, item) =>
+                    list.any((i) => i.id == item.id) ? list : [...list, item],
+              )
+              .map(
+                (i) => DropdownMenuItem(
+                  value: i.id,
+                  child: Text('${i.name} (${i.unit})'),
+                ),
+              )
               .toList(),
           onChanged: (val) {
             if (val != null) {
               setState(() {
                 final item = items.firstWhere((i) => i.id == val);
                 _ingredients[val] = 1.0;
-                _displayUnits[val] = item.unit; // Default to inventory base unit
+                _displayUnits[val] =
+                    item.unit; // Default to inventory base unit
 
                 if (_trackingType == InventoryTrackingType.simple) {
                   final currentVal = _ingredients[val];
@@ -613,17 +892,30 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     return Column(
       children: [
         ..._ingredients.entries.map((entry) {
-          final item = allItems.firstWhere((i) => i.id == entry.key, orElse: () => InventoryItem(id: '', tenantId: '', name: 'Unknown', category: '', unit: 'unit', currentStock: 0, lastUpdated: DateTime.now()));
-          
+          final item = allItems.firstWhere(
+            (i) => i.id == entry.key,
+            orElse: () => InventoryItem(
+              id: '',
+              tenantId: '',
+              name: 'Unknown',
+              category: '',
+              unit: 'unit',
+              currentStock: 0,
+              lastUpdated: DateTime.now(),
+            ),
+          );
+
           final displayUnit = _displayUnits[entry.key] ?? item.unit;
           final isKg = item.unit == 'kg';
           final isLiter = item.unit == 'Liter';
-          
+
           double factor = 1.0;
           if (displayUnit == 'grams' || displayUnit == 'ml') factor = 1000.0;
-          
+
           final displayValue = (entry.value * factor);
-          final displayValueStr = displayValue == displayValue.toInt() ? displayValue.toInt().toString() : displayValue.toStringAsFixed(2);
+          final displayValueStr = displayValue == displayValue.toInt()
+              ? displayValue.toInt().toString()
+              : displayValue.toStringAsFixed(2);
 
           List<String> availableUnits = [item.unit];
           if (isKg) availableUnits = ['kg', 'grams'];
@@ -643,8 +935,20 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
-                      Text('Stock: ${item.currentStock} ${item.unit} left', style: const TextStyle(fontSize: 11, color: AdminTheme.secondaryText)),
+                      Text(
+                        item.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryText,
+                        ),
+                      ),
+                      Text(
+                        'Stock: ${item.currentStock} ${item.unit} left',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AdminTheme.secondaryText,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -657,11 +961,16 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     textAlign: TextAlign.right,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     decoration: const InputDecoration(
-                      isDense: true, 
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8), 
-                      border: UnderlineInputBorder()
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 8,
+                      ),
+                      border: UnderlineInputBorder(),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: (v) {
                       final parsed = double.tryParse(v) ?? 0.0;
                       setState(() {
@@ -674,8 +983,14 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                   value: displayUnit,
                   underline: const SizedBox(),
                   icon: const Icon(Icons.arrow_drop_down, size: 16),
-                  style: const TextStyle(fontSize: 12, color: AdminTheme.primaryColor, fontWeight: FontWeight.bold),
-                  items: availableUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AdminTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  items: availableUnits
+                      .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                      .toList(),
                   onChanged: (newUnit) {
                     if (newUnit != null) {
                       setState(() {
@@ -690,7 +1005,11 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     _ingredients.remove(entry.key);
                     _displayUnits.remove(entry.key);
                   }),
-                  icon: const Icon(Ionicons.trash_outline, color: AdminTheme.critical, size: 20),
+                  icon: const Icon(
+                    Ionicons.trash_outline,
+                    color: AdminTheme.critical,
+                    size: 20,
+                  ),
                 ),
               ],
             ),
@@ -713,7 +1032,14 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Item Highlight Image', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const Text(
+              'Item Highlight Image',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.primaryText,
+              ),
+            ),
             const SizedBox(height: 24),
             Container(
               height: 240,
@@ -728,16 +1054,46 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                   _imagePreviewUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: Image.network(_imagePreviewUrl!, width: double.infinity, height: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Ionicons.cloud_upload_outline, size: 48, color: AdminTheme.secondaryText))),
+                          child: Image.network(
+                            _imagePreviewUrl!,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(
+                                Ionicons.cloud_upload_outline,
+                                size: 48,
+                                color: AdminTheme.secondaryText,
+                              ),
+                            ),
+                          ),
                         )
                       : Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Ionicons.image_outline, size: 48, color: AdminTheme.secondaryText),
+                              const Icon(
+                                Ionicons.image_outline,
+                                size: 48,
+                                color: AdminTheme.secondaryText,
+                              ),
                               const SizedBox(height: 12),
-                              const Text('No Image Selected', style: TextStyle(color: AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
-                              Text('Click to set URL', style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText.withOpacity(0.6))),
+                              const Text(
+                                'No Image Selected',
+                                style: TextStyle(
+                                  color: AdminTheme.secondaryText,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Click to set URL',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AdminTheme.secondaryText.withOpacity(
+                                    0.6,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -753,18 +1109,32 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                   ),
                   if (_imagePreviewUrl != null)
                     Positioned(
-                      top: 12, right: 12,
+                      top: 12,
+                      right: 12,
                       child: CircleAvatar(
                         backgroundColor: Colors.white,
                         radius: 18,
-                        child: IconButton(icon: const Icon(Ionicons.close, size: 16, color: AdminTheme.critical), onPressed: () => setState(() => _imagePreviewUrl = null)),
+                        child: IconButton(
+                          icon: const Icon(
+                            Ionicons.close,
+                            size: 16,
+                            color: AdminTheme.critical,
+                          ),
+                          onPressed: () =>
+                              setState(() => _imagePreviewUrl = null),
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            const Center(child: Text('Recommended size: 800x600px', style: TextStyle(fontSize: 11, color: AdminTheme.secondaryText))),
+            const Center(
+              child: Text(
+                'Recommended size: 800x600px',
+                style: TextStyle(fontSize: 11, color: AdminTheme.secondaryText),
+              ),
+            ),
           ],
         ),
       ),
@@ -778,11 +1148,24 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         title: const Text('Enter Image URL'),
         content: TextField(
           controller: _imageController,
-          decoration: const InputDecoration(hintText: 'https://example.com/image.jpg', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            hintText: 'https://example.com/image.jpg',
+            border: OutlineInputBorder(),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () { _imagePreviewUrl = _imageController.text; Navigator.pop(context); setState(() {}); }, child: const Text('Update')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _imagePreviewUrl = _imageController.text;
+              Navigator.pop(context);
+              setState(() {});
+            },
+            child: const Text('Update'),
+          ),
         ],
       ),
     );
@@ -801,7 +1184,14 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Availability & Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+            const Text(
+              'Availability & Settings',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.primaryText,
+              ),
+            ),
             const SizedBox(height: 24),
             _buildSettingsToggle(
               'Active Visibility',
@@ -830,15 +1220,33 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
     );
   }
 
-  Widget _buildSettingsToggle(String title, String subtitle, bool value, Function(bool) onChanged, {bool isDanger = false}) {
+  Widget _buildSettingsToggle(
+    String title,
+    String subtitle,
+    bool value,
+    Function(bool) onChanged, {
+    bool isDanger = false,
+  }) {
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text(subtitle, style: const TextStyle(fontSize: 11, color: AdminTheme.secondaryText)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AdminTheme.secondaryText,
+                ),
+              ),
             ],
           ),
         ),
@@ -860,23 +1268,126 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.1)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Ionicons.time_outline, color: AdminTheme.primaryColor, size: 24),
-          SizedBox(width: 12),
-          Expanded(child: Text('Avg. Preparation Time', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryColor, fontSize: 14))),
-          Text('25 mins', style: TextStyle(fontWeight: FontWeight.w900, color: AdminTheme.primaryColor, fontSize: 14)),
+          const Icon(
+            Ionicons.time_outline,
+            color: AdminTheme.primaryColor,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Avg. Preparation Time',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AdminTheme.primaryColor,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 120,
+            child: TextFormField(
+              controller: _prepTimeController,
+              textAlign: TextAlign.right,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                suffixText: 'mins',
+                filled: true,
+                fillColor: Colors.white,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                final minutes = int.tryParse(value ?? '');
+                if (minutes == null || minutes <= 0) {
+                  return 'Enter mins';
+                }
+                return null;
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
+  Widget _buildSpiceConfigurationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Spice Options',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: AdminTheme.secondaryText,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _defaultSpiceLevels.map((level) {
+            final isSelected = _selectedSpiceLevels.contains(level);
+            return FilterChip(
+              label: Text(level),
+              selected: isSelected,
+              onSelected: (_) => setState(() {
+                if (isSelected) {
+                  _selectedSpiceLevels.remove(level);
+                } else {
+                  _selectedSpiceLevels.add(level);
+                }
+              }),
+              selectedColor: AdminTheme.primaryColor.withOpacity(0.12),
+              checkmarkColor: AdminTheme.primaryColor,
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _customSpiceLevelsController,
+          decoration: InputDecoration(
+            labelText: 'Custom Spice Labels',
+            hintText: 'Comma separated, e.g. No Spice, Medium',
+            labelStyle: const TextStyle(
+              fontSize: 14,
+              color: AdminTheme.secondaryText,
+            ),
+            contentPadding: const EdgeInsets.all(20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AdminTheme.dividerColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AdminTheme.dividerColor),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDietDot(bool isVeg) {
     return Container(
-      width: 12, height: 12,
+      width: 12,
+      height: 12,
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: isVeg ? Colors.green : Colors.red, width: 1.5),
+        border: Border.all(
+          color: isVeg ? Colors.green : Colors.red,
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(2),
       ),
       padding: const EdgeInsets.all(1.5),
@@ -900,7 +1411,10 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
               onChanged: (val) => setState(() => _hasVariants = val ?? false),
               activeColor: AdminTheme.primaryColor,
             ),
-            const Text('Has Variants / Portions', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Has Variants / Portions',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         if (_hasVariants) ...[
@@ -922,12 +1436,25 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Row(
                       children: [
-                        Expanded(child: Text(variant.name, style: const TextStyle(fontWeight: FontWeight.w500))),
-                        Text('₹${variant.price}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Expanded(
+                          child: Text(
+                            variant.name,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Text(
+                          '₹${variant.price}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(width: 8),
                         IconButton(
-                          icon: const Icon(Ionicons.close_circle, size: 20, color: AdminTheme.critical),
-                          onPressed: () => setState(() => _variants.removeAt(index)),
+                          icon: const Icon(
+                            Ionicons.close_circle,
+                            size: 20,
+                            color: AdminTheme.critical,
+                          ),
+                          onPressed: () =>
+                              setState(() => _variants.removeAt(index)),
                         ),
                       ],
                     ),
@@ -965,14 +1492,25 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Ionicons.add_circle, color: AdminTheme.primaryColor, size: 28),
+                      icon: const Icon(
+                        Ionicons.add_circle,
+                        color: AdminTheme.primaryColor,
+                        size: 28,
+                      ),
                       onPressed: () {
-                        if (_variantNameController.text.isNotEmpty && _variantPriceController.text.isNotEmpty) {
+                        if (_variantNameController.text.isNotEmpty &&
+                            _variantPriceController.text.isNotEmpty) {
                           setState(() {
-                            _variants.add(Variant(
-                              name: _variantNameController.text,
-                              price: double.tryParse(_variantPriceController.text) ?? 0.0,
-                            ));
+                            _variants.add(
+                              Variant(
+                                name: _variantNameController.text,
+                                price:
+                                    double.tryParse(
+                                      _variantPriceController.text,
+                                    ) ??
+                                    0.0,
+                              ),
+                            );
                             _variantNameController.clear();
                             _variantPriceController.clear();
                           });
@@ -992,9 +1530,9 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
   void _saveItem() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCategoryId == null) return;
-      
+
       setState(() => _isSaving = true);
-      
+
       // Simulate network latency for UX satisfaction
       await Future.delayed(const Duration(milliseconds: 600));
 
@@ -1005,7 +1543,9 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         price: double.tryParse(_priceController.text) ?? 0.0,
         imageUrl: _imageController.text.isEmpty ? null : _imageController.text,
         itemType: _itemType,
-        category: widget.categories.firstWhere((c) => c.id == _selectedCategoryId).name,
+        category: widget.categories
+            .firstWhere((c) => c.id == _selectedCategoryId)
+            .name,
         subcategory: _itemType == 'veg' ? 'Veg' : 'Non-Veg',
         stockCount: widget.item?.stockCount ?? 100,
         isTracked: widget.item?.isTracked ?? true,
@@ -1015,21 +1555,33 @@ class _MenuItemDialogState extends State<MenuItemDialog> {
         inventoryIngredients: _ingredients,
         hasVariants: _hasVariants,
         variants: _variants,
+        spicy: _selectedSpiceLevels.isNotEmpty,
+        spiceLevels: {
+          ..._selectedSpiceLevels,
+          ..._customSpiceLevelsController.text
+              .split(',')
+              .map((level) => level.trim())
+              .where((level) => level.isNotEmpty),
+        }.toList(),
+        prepTimeMinutes: int.tryParse(_prepTimeController.text.trim()) ?? 25,
       );
 
       if (mounted) {
         setState(() => _isSaving = false);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${newItem.name} saved successfully'),
             backgroundColor: AdminTheme.success,
             behavior: SnackBarBehavior.floating,
             width: 400,
-          )
+          ),
         );
-        
-        Navigator.pop(context, {'item': newItem, 'categoryId': _selectedCategoryId});
+
+        Navigator.pop(context, {
+          'item': newItem,
+          'categoryId': _selectedCategoryId,
+        });
       }
     }
   }

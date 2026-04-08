@@ -22,6 +22,13 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
   // Selection state
   final Map<String, int> quantities = {};
   String _selectedCategory = 'All';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -49,8 +56,18 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
   }
 
   List<MenuItem> get _filteredItems {
-    if (_selectedCategory == 'All') return _items;
-    return _items.where((i) => i.category == _selectedCategory).toList();
+    final query = _searchController.text.toLowerCase();
+    List<MenuItem> result = _items;
+
+    if (_selectedCategory != 'All') {
+      result = result.where((i) => i.category == _selectedCategory).toList();
+    }
+
+    if (query.isNotEmpty) {
+      result = result.where((i) => i.name.toLowerCase().contains(query)).toList();
+    }
+
+    return result;
   }
 
   @override
@@ -80,6 +97,30 @@ class _MenuSelectorDialogState extends State<MenuSelectorDialog> {
               ],
             ),
             const Divider(),
+            
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search items...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty 
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
             
             // Categories
             SingleChildScrollView(

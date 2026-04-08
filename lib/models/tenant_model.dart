@@ -63,22 +63,14 @@ class Category {
   }
 }
 
-enum InventoryTrackingType {
-  none,
-  simple,
-  recipe
-}
+enum InventoryTrackingType { none, simple, recipe }
 
 class Variant {
   final String name;
   final double price;
   final bool isAvailable;
 
-  Variant({
-    required this.name,
-    required this.price,
-    this.isAvailable = true,
-  });
+  Variant({required this.name, required this.price, this.isAvailable = true});
 
   factory Variant.fromMap(Map<String, dynamic> map) {
     return Variant(
@@ -89,11 +81,7 @@ class Variant {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'price': price,
-      'isAvailable': isAvailable,
-    };
+    return {'name': name, 'price': price, 'isAvailable': isAvailable};
   }
 }
 
@@ -108,35 +96,42 @@ class MenuItem {
   late final String? itemType; // veg or nonveg
   final int stockCount;
   final bool isTracked;
-  
+
   // NEW: Inventory Linkage
   final InventoryTrackingType inventoryTrackingType;
-  final Map<String, double> inventoryIngredients; // Map of itemId to quantity per sale
+  final Map<String, double>
+  inventoryIngredients; // Map of itemId to quantity per sale
 
   final bool isBestseller;
-  
+
   final bool hasVariants;
   final List<Variant> variants;
-  
+
   // Rule-Based Suggestions
   final List<String> suggestedItemIds;
   final bool spicy;
+  final List<String> spiceLevels;
+  final int prepTimeMinutes;
 
   bool get isVeg {
     if (itemType == null) return true; // Default to veg if not specified
-    final type = itemType!.toLowerCase().replaceAll('-', '').replaceAll(' ', '').trim();
+    final type = itemType!
+        .toLowerCase()
+        .replaceAll('-', '')
+        .replaceAll(' ', '')
+        .trim();
     return type != 'nonveg';
   }
-  
+
   final bool isManualAvailable;
-  
+
   bool get isOutOfStock => !isManualAvailable || (isTracked && stockCount <= 0);
 
   /// Checks if the item is available based on linked inventory
   bool isAvailable(List<InventoryItem> inventory) {
     // If manually marked out of stock, return false
     if (isOutOfStock) return false;
-    
+
     // If not tracking inventory, it's available
     if (inventoryTrackingType == InventoryTrackingType.none) return true;
 
@@ -147,18 +142,18 @@ class MenuItem {
     for (var entry in inventoryIngredients.entries) {
       final itemId = entry.key;
       final qtyNeeded = entry.value;
-      
+
       try {
         final invItem = inventory.firstWhere((i) => i.id == itemId);
         // If any key ingredient is below needed qty, item is unavailable
         if (invItem.currentStock < qtyNeeded) return false;
       } catch (_) {
-        // If a linked item is missing from inventory list, assume available 
+        // If a linked item is missing from inventory list, assume available
         // unless we want to be strict. For now, let's keep it available.
-        continue; 
+        continue;
       }
     }
-    
+
     return true;
   }
 
@@ -181,13 +176,15 @@ class MenuItem {
     this.variants = const [],
     this.suggestedItemIds = const [],
     this.spicy = false,
+    this.spiceLevels = const [],
+    this.prepTimeMinutes = 25,
   }) {
     this.itemType = itemType;
   }
 
   factory MenuItem.fromMap(Map<String, dynamic> data) {
     final itemType = data['itemType'];
-    
+
     InventoryTrackingType trackingType = InventoryTrackingType.none;
     if (data['inventoryTrackingType'] != null) {
       try {
@@ -200,7 +197,8 @@ class MenuItem {
       }
     }
 
-    final ingredientsData = data['inventoryIngredients'] as Map<dynamic, dynamic>? ?? {};
+    final ingredientsData =
+        data['inventoryIngredients'] as Map<dynamic, dynamic>? ?? {};
     final Map<String, double> ingredients = {};
     ingredientsData.forEach((key, value) {
       if (value is num) {
@@ -212,25 +210,43 @@ class MenuItem {
       id: (data['id'] ?? '').toString(),
       name: (data['name'] ?? '').toString(),
       description: (data['description'] ?? '').toString(),
-      price: (data['price'] ?? 0.0) is num ? (data['price'] as num).toDouble() : 0.0,
+      price: (data['price'] ?? 0.0) is num
+          ? (data['price'] as num).toDouble()
+          : 0.0,
       imageUrl: data['image_url']?.toString(),
       category: (data['category'] ?? data['Category'])?.toString(),
       subcategory: (data['subcategory'] ?? data['Subcategory'])?.toString(),
       itemType: itemType?.toString(),
-      stockCount: (data['stockCount'] ?? 0) is num ? (data['stockCount'] as num).toInt() : 0,
+      stockCount: (data['stockCount'] ?? 0) is num
+          ? (data['stockCount'] as num).toInt()
+          : 0,
       isTracked: data['isTracked'] == true,
       isManualAvailable: data['isManualAvailable'] ?? true,
       inventoryTrackingType: trackingType,
       inventoryIngredients: ingredients,
       isBestseller: data['isBestseller'] == true,
       hasVariants: data['hasVariants'] == true,
-      variants: (data['variants'] as List<dynamic>?)
-          ?.map((v) => Variant.fromMap(Map<String, dynamic>.from(v)))
-          .toList() ?? const [],
-      suggestedItemIds: (data['suggestedItemIds'] as List<dynamic>?)
-          ?.map((id) => id.toString())
-          .toList() ?? const [],
+      variants:
+          (data['variants'] as List<dynamic>?)
+              ?.map((v) => Variant.fromMap(Map<String, dynamic>.from(v)))
+              .toList() ??
+          const [],
+      suggestedItemIds:
+          (data['suggestedItemIds'] as List<dynamic>?)
+              ?.map((id) => id.toString())
+              .toList() ??
+          const [],
       spicy: data['spicy'] == true,
+      spiceLevels:
+          (data['spiceLevels'] as List<dynamic>?)
+              ?.map((level) => level.toString().trim())
+              .where((level) => level.isNotEmpty)
+              .toList() ??
+          ((data['spicy'] == true) ? const ['Mild', 'Spicy', 'Hot'] : const []),
+      prepTimeMinutes: (() {
+        final value = data['prepTimeMinutes'] ?? data['prepTime'] ?? 25;
+        return value is num ? value.toInt() : 25;
+      })(),
     );
   }
 
@@ -254,6 +270,9 @@ class MenuItem {
       'variants': variants.map((v) => v.toMap()).toList(),
       'suggestedItemIds': suggestedItemIds,
       'spicy': spicy,
+      'spiceLevels': spiceLevels,
+      'prepTimeMinutes': prepTimeMinutes,
+      'prepTime': prepTimeMinutes,
     };
   }
 
@@ -276,6 +295,8 @@ class MenuItem {
     List<Variant>? variants,
     List<String>? suggestedItemIds,
     bool? spicy,
+    List<String>? spiceLevels,
+    int? prepTimeMinutes,
   }) {
     return MenuItem(
       id: id ?? this.id,
@@ -289,13 +310,16 @@ class MenuItem {
       stockCount: stockCount ?? this.stockCount,
       isTracked: isTracked ?? this.isTracked,
       isManualAvailable: isManualAvailable ?? this.isManualAvailable,
-      inventoryTrackingType: inventoryTrackingType ?? this.inventoryTrackingType,
+      inventoryTrackingType:
+          inventoryTrackingType ?? this.inventoryTrackingType,
       inventoryIngredients: inventoryIngredients ?? this.inventoryIngredients,
       isBestseller: isBestseller ?? this.isBestseller,
       hasVariants: hasVariants ?? this.hasVariants,
       variants: variants ?? this.variants,
       suggestedItemIds: suggestedItemIds ?? this.suggestedItemIds,
       spicy: spicy ?? this.spicy,
+      spiceLevels: spiceLevels ?? this.spiceLevels,
+      prepTimeMinutes: prepTimeMinutes ?? this.prepTimeMinutes,
     );
   }
 }
@@ -336,7 +360,7 @@ class RestaurantTable {
     }
 
     final status = TableStatus.fromString(data['status']);
-    
+
     return RestaurantTable(
       id: data['id'] ?? docId ?? '',
       name: data['name'] ?? '',
@@ -362,18 +386,20 @@ class RestaurantTable {
       'isOccupied': isOccupied,
       'currentSessionId': currentSessionId,
       'occupiedAt': occupiedAt != null ? Timestamp.fromDate(occupiedAt!) : null,
-      'lastReleasedAt': lastReleasedAt != null ? Timestamp.fromDate(lastReleasedAt!) : null,
+      'lastReleasedAt': lastReleasedAt != null
+          ? Timestamp.fromDate(lastReleasedAt!)
+          : null,
       'section': section,
       'orderIndex': orderIndex,
     };
   }
-  
+
   String getTimeOccupied() {
     if (occupiedAt == null) return '';
-    
+
     final now = DateTime.now();
     final difference = now.difference(occupiedAt!);
-    
+
     if (difference.inMinutes < 60) {
       return '${difference.inMinutes} min';
     } else if (difference.inHours < 24) {

@@ -6,17 +6,31 @@ import '../models/order_details.dart' as model_details;
 import '../controllers/cart_controller.dart';
 import '../utils/session_validator.dart';
 import '../utils/request_debouncer.dart';
+import 'inventory_service.dart';
+import 'menu_service.dart';
 
 class OrderService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
   final RequestDebouncer _debouncer = RequestDebouncer();
+  final InventoryService _inventoryService = InventoryService();
+  final MenuService _menuService = MenuService();
+
+  int _estimateWaitTime(List<CartItem> cartItems) {
+    if (cartItems.isEmpty) return 25;
+    final prepTimes = cartItems
+        .map((item) => item.item.prepTimeMinutes)
+        .where((minutes) => minutes > 0)
+        .toList();
+    if (prepTimes.isEmpty) return 25;
+    return prepTimes.reduce((a, b) => a > b ? a : b);
+  }
 
   /// Create or append to an order
   Future<String> createOrder({
     required String tenantId,
     required String guestId,
-    required orm.OrderType orderType, 
+    required orm.OrderType orderType,
     String? tableId,
     required List<CartItem> cartItems,
     String? notes,
@@ -54,8 +68,14 @@ class OrderService {
       // 1. Check for existing active order for this table (Dine-in only)
       if (orderType == orm.OrderType.dineIn && tableId != null) {
         // Bug #6: Robust Order Merge Validation
-        final tableDoc = await _firestore.collection('tenants').doc(tenantId).collection('tables').doc(tableId).get();
-        final lastReleasedAt = (tableDoc.data()?['lastReleasedAt'] as Timestamp?)?.toDate();
+        final tableDoc = await _firestore
+            .collection('tenants')
+            .doc(tenantId)
+            .collection('tables')
+            .doc(tableId)
+            .get();
+        final lastReleasedAt =
+            (tableDoc.data()?['lastReleasedAt'] as Timestamp?)?.toDate();
         final fourHoursAgo = DateTime.now().subtract(const Duration(hours: 4));
 
         final existingOrdersQuery = await _firestore
@@ -63,29 +83,34 @@ class OrderService {
             .doc(tenantId)
             .collection('orders')
             .where('tableId', isEqualTo: tableId)
-            .where('status', whereIn: [
-              model.OrderStatus.pending.name,
-              model.OrderStatus.preparing.name,
-              model.OrderStatus.ready.name,
-              model.OrderStatus.served.name,
-            ])
+            .where(
+              'status',
+              whereIn: [
+                model.OrderStatus.pending.name,
+                model.OrderStatus.preparing.name,
+                model.OrderStatus.ready.name,
+                model.OrderStatus.served.name,
+              ],
+            )
             .get();
 
         model.Order? orderToMerge;
-        
+
         for (final doc in existingOrdersQuery.docs) {
           final order = model.Order.fromFirestore(doc);
-          
+
           // CRITICAL VALIDATION (Bug #6):
           // 1. Matches sessionId (Highest confidence)
           // 2. Created AFTER last table release (New session)
           // 3. Not older than 4 hours (Archive threshold)
           bool canMerge = false;
-          
+
           if (sessionId != null && order.sessionId == sessionId) {
             canMerge = true;
-          } else if (order.createdAt.isAfter(lastReleasedAt ?? DateTime(2000)) && 
-                     order.createdAt.isAfter(fourHoursAgo)) {
+          } else if (order.createdAt.isAfter(
+                lastReleasedAt ?? DateTime(2000),
+              ) &&
+              order.createdAt.isAfter(fourHoursAgo)) {
             // If session ID matches but we don't have it on order yet (legacy)
             // or if it's the same physical session but guest refreshed
             canMerge = true;
@@ -99,35 +124,44 @@ class OrderService {
 
         if (orderToMerge != null) {
           final existingOrder = orderToMerge;
-          
-          print('🔄 Appending add-ons to order ${existingOrder.id} for table $tableId');
+
+          print(
+            '🔄 Appending add-ons to order ${existingOrder.id} for table $tableId',
+          );
 
           // Add-on items must be visually marked and maintained with timestamps
           List<model.OrderItem> updatedItems = List.from(existingOrder.items);
           for (var cartItem in cartItems) {
-            final price = cartItem.selectedVariant?.price ?? cartItem.item.price;
-            updatedItems.add(model.OrderItem(
-              id: cartItem.item.id,
-              name: cartItem.item.name,
-              price: price,
-              quantity: cartItem.quantity,
-              notes: cartItem.note,
-              imageUrl: cartItem.item.imageUrl,
-              timestamp: DateTime.now(),
-              isAddon: true, // Mark as add-on (Requirement 4)
-              chefNote: chefNote,
-              variantName: cartItem.selectedVariant?.name,
-              category: cartItem.item.category,
-            ));
+            final price =
+                cartItem.selectedVariant?.price ?? cartItem.item.price;
+            updatedItems.add(
+              model.OrderItem(
+                id: cartItem.item.id,
+                name: cartItem.item.name,
+                price: price,
+                quantity: cartItem.quantity,
+                notes: cartItem.note,
+                imageUrl: cartItem.item.imageUrl,
+                timestamp: DateTime.now(),
+                isAddon: true, // Mark as add-on (Requirement 4)
+                chefNote: chefNote,
+                variantName: cartItem.selectedVariant?.name,
+                selectedSpiceLevel: cartItem.selectedSpiceLevel,
+                category: cartItem.item.category,
+              ),
+            );
           }
 
           // Recalculate totals
-          final newSubtotal = updatedItems.fold<double>(0, (sum, item) => sum + item.total);
+          final newSubtotal = updatedItems.fold<double>(
+            0,
+            (sum, item) => sum + item.total,
+          );
           // Apply existing discounts if any
-          final discountAmount = existingOrder.discountPercentage > 0 
-              ? (newSubtotal * existingOrder.discountPercentage / 100) 
+          final discountAmount = existingOrder.discountPercentage > 0
+              ? (newSubtotal * existingOrder.discountPercentage / 100)
               : existingOrder.discountAmount;
-          
+
           final taxAmount = (newSubtotal - discountAmount) * taxRate;
           final newTotal = (newSubtotal - discountAmount) + taxAmount;
 
@@ -137,17 +171,27 @@ class OrderService {
               .collection('orders')
               .doc(existingOrder.id)
               .update({
-            'items': updatedItems.map((i) => i.toMap()).toList(),
-            'subtotal': newSubtotal,
-            'tax': taxAmount,
-            'total': newTotal,
-            'updatedAt': FieldValue.serverTimestamp(),
-            // Append chef notes if provided
-            if (chefNote != null && chefNote.isNotEmpty) 
-              'chefNote': existingOrder.chefNote != null 
-                  ? '${existingOrder.chefNote} | $chefNote' 
-                  : chefNote,
-          });
+                'items': updatedItems.map((i) => i.toMap()).toList(),
+                'subtotal': newSubtotal,
+                'tax': taxAmount,
+                'total': newTotal,
+                'estimatedWaitTime': _estimateWaitTime(cartItems),
+                'updatedAt': FieldValue.serverTimestamp(),
+                // Append chef notes if provided
+                if (chefNote != null && chefNote.isNotEmpty)
+                  'chefNote': existingOrder.chefNote != null
+                      ? '${existingOrder.chefNote} | $chefNote'
+                      : chefNote,
+              });
+
+          final menuDefinitions = await _menuService.getMenuItems(tenantId);
+          await _inventoryService.deductStockForOrder(
+            tenantId: tenantId,
+            orderId: existingOrder.id,
+            orderItems: cartItems,
+            menuDefinitions: menuDefinitions,
+            performedBy: customerName.isNotEmpty ? customerName : 'Guest',
+          );
 
           return existingOrder.id;
         }
@@ -155,11 +199,16 @@ class OrderService {
 
       // 2. Create New Order
       final orderId = _uuid.v4();
-      
+
       // Get table name
       String? tableName;
       if (orderType == orm.OrderType.dineIn && tableId != null) {
-        final tableDoc = await _firestore.collection('tenants').doc(tenantId).collection('tables').doc(tableId).get();
+        final tableDoc = await _firestore
+            .collection('tenants')
+            .doc(tenantId)
+            .collection('tables')
+            .doc(tableId)
+            .get();
         tableName = tableDoc.data()?['name'] as String?;
       }
 
@@ -175,6 +224,7 @@ class OrderService {
           timestamp: DateTime.now(),
           isAddon: false,
           variantName: c.selectedVariant?.name,
+          selectedSpiceLevel: c.selectedSpiceLevel,
           category: c.item.category,
         );
       }).toList();
@@ -202,6 +252,7 @@ class OrderService {
         paymentMethod: paymentMethod,
         notes: notes,
         chefNote: chefNote,
+        estimatedWaitTime: _estimateWaitTime(cartItems),
         sessionId: sessionId,
       );
 
@@ -212,15 +263,30 @@ class OrderService {
           .doc(orderId)
           .set(order.toMap());
 
+      final menuDefinitions = await _menuService.getMenuItems(tenantId);
+      await _inventoryService.deductStockForOrder(
+        tenantId: tenantId,
+        orderId: orderId,
+        orderItems: cartItems,
+        menuDefinitions: menuDefinitions,
+        performedBy: customerName.isNotEmpty ? customerName : 'Guest',
+      );
+
       // 3. Update table status (Requirement 7)
       if (orderType == orm.OrderType.dineIn && tableId != null) {
-        await _firestore.collection('tenants').doc(tenantId).collection('tables').doc(tableId).update({
-          'status': 'occupied',
-          'isOccupied': true,
-          'isAvailable': false,
-          'occupiedAt': FieldValue.serverTimestamp(),
-          'currentSessionId': sessionId ?? orderId, // Use sessionId if available
-        });
+        await _firestore
+            .collection('tenants')
+            .doc(tenantId)
+            .collection('tables')
+            .doc(tableId)
+            .update({
+              'status': 'occupied',
+              'isOccupied': true,
+              'isAvailable': false,
+              'occupiedAt': FieldValue.serverTimestamp(),
+              'currentSessionId':
+                  sessionId ?? orderId, // Use sessionId if available
+            });
       }
 
       // Mark request as completed
@@ -234,7 +300,7 @@ class OrderService {
       if (requestId != null) {
         _debouncer.markRequestFailed(requestId);
       }
-      
+
       print('Error in OrderService.createOrder: $e');
       rethrow;
     }
@@ -270,7 +336,7 @@ class OrderService {
             .doc(tenantId)
             .collection('tables')
             .doc(tableId);
-        
+
         transaction.update(tableRef, {
           'status': 'available', // Consistent with Table lifecycle
           'isAvailable': true,
@@ -280,7 +346,7 @@ class OrderService {
           'lastReleasedAt': FieldValue.serverTimestamp(),
         });
       });
-      
+
       print('✅ Atomic PaymentSuccess completed for table $tableId');
     } catch (e) {
       print('❌ Error in markTableOrdersAsPaid: $e');
@@ -289,7 +355,11 @@ class OrderService {
   }
 
   /// Update order status (Strict lifecycle)
-  Future<void> updateOrderStatus(String tenantId, String orderId, model.OrderStatus status) async {
+  Future<void> updateOrderStatus(
+    String tenantId,
+    String orderId,
+    model.OrderStatus status,
+  ) async {
     // Note: 'Completed' should ideally be via payment callback
     await _firestore
         .collection('tenants')
@@ -297,9 +367,9 @@ class OrderService {
         .collection('orders')
         .doc(orderId)
         .update({
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+          'status': status.name,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<Map<String, dynamic>> getTenantSettings(String tenantId) async {
@@ -308,7 +378,10 @@ class OrderService {
   }
 
   /// Get active orders for a specific table
-  Stream<List<model_details.OrderDetails>> getTableOrders(String tenantId, String tableId) {
+  Stream<List<model_details.OrderDetails>> getTableOrders(
+    String tenantId,
+    String tableId,
+  ) {
     return _firestore
         .collection('tenants')
         .doc(tenantId)
@@ -322,19 +395,22 @@ class OrderService {
                 return status != model.OrderStatus.completed.name &&
                     status != model.OrderStatus.cancelled.name;
               })
-              .map((doc) => model_details.OrderDetails.fromMap({
-                    ...doc.data(),
-                    'orderId': doc.id, // Ensure ID is mapped correctly
-                  }))
+              .map(
+                (doc) => model_details.OrderDetails.fromMap({
+                  ...doc.data(),
+                  'orderId': doc.id, // Ensure ID is mapped correctly
+                }),
+              )
               .toList();
         });
   }
 
-  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _getActiveOrdersForTable(
-    String tenantId,
-    String tableId,
-  ) async {
-    final ordersRef = _firestore.collection('tenants').doc(tenantId).collection('orders');
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  _getActiveOrdersForTable(String tenantId, String tableId) async {
+    final ordersRef = _firestore
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('orders');
     final completed = model.OrderStatus.completed.name;
     final cancelled = model.OrderStatus.cancelled.name;
 
@@ -346,7 +422,9 @@ class OrderService {
       return query.docs;
     } on FirebaseException catch (e) {
       if (e.code != 'failed-precondition') rethrow;
-      final fallback = await ordersRef.where('tableId', isEqualTo: tableId).get();
+      final fallback = await ordersRef
+          .where('tableId', isEqualTo: tableId)
+          .get();
       return fallback.docs.where((doc) {
         final status = doc.data()['status']?.toString() ?? '';
         return status != completed && status != cancelled;

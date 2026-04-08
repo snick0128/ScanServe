@@ -43,7 +43,6 @@ dependencies:
   firebase_auth_web: ^6.0.4
   cloud_firestore: ^6.0.3
   cloud_firestore_web: ^5.0.3
-
   # State Management
   provider: ^6.1.1
   flutter_hooks: ^0.20.3
@@ -64,6 +63,8 @@ dependencies:
   responsive_framework: ^1.1.1
   flutter_staggered_grid_view: ^0.7.0
   audioplayers: ^6.1.0
+  flutter_local_notifications: ^17.2.3
+  flutter_tts: ^4.0.2
 
   # Routing
   go_router: ^10.0.0

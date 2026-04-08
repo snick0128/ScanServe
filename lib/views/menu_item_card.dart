@@ -47,7 +47,7 @@ class _MenuItemCardState extends State<MenuItemCard>
     _scaleController.forward().then((_) {
       _scaleController.reverse();
     });
-    if (widget.item.hasVariants) {
+    if (widget.item.hasVariants || widget.item.spiceLevels.isNotEmpty) {
       _showItemPreview();
     } else {
       widget.onAddPressed();
@@ -59,10 +59,8 @@ class _MenuItemCardState extends State<MenuItemCard>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ItemPreviewSheet(
-        item: widget.item,
-        onAdd: widget.onAddPressed,
-      ),
+      builder: (context) =>
+          ItemPreviewSheet(item: widget.item, onAdd: widget.onAddPressed),
     );
   }
 
@@ -98,7 +96,9 @@ class _MenuItemCardState extends State<MenuItemCard>
                 LayoutBuilder(
                   builder: (context, constraints) {
                     return Container(
-                      height: constraints.maxWidth * 0.74, // Slightly taller for richer card fill
+                      height:
+                          constraints.maxWidth *
+                          0.74, // Slightly taller for richer card fill
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
                       child: ClipRRect(
@@ -113,7 +113,7 @@ class _MenuItemCardState extends State<MenuItemCard>
                             : Container(color: const Color(0xFFF2F2F7)),
                       ),
                     );
-                  }
+                  },
                 ),
                 Positioned(
                   left: 10,
@@ -144,20 +144,24 @@ class _MenuItemCardState extends State<MenuItemCard>
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
+                        color: widget.item.isVeg
+                            ? const Color(0xFF0F6D3F)
+                            : Colors.red,
                         width: 1,
                       ),
                     ),
                     child: Icon(
                       Icons.fiber_manual_record,
-                      color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
+                      color: widget.item.isVeg
+                          ? const Color(0xFF0F6D3F)
+                          : Colors.red,
                       size: 8,
                     ),
                   ),
                 ),
               ],
             ),
-  
+
             // Content Section
             Expanded(
               child: Padding(
@@ -169,11 +173,23 @@ class _MenuItemCardState extends State<MenuItemCard>
                     Row(
                       children: [
                         if (widget.item.isBestseller)
-                          _buildTag('Bestseller', AppTheme.lightGreen, AppTheme.starGreen)
+                          _buildTag(
+                            'Bestseller',
+                            AppTheme.lightGreen,
+                            AppTheme.starGreen,
+                          )
                         else if (widget.item.isVeg)
-                          _buildTag('Veg', AppTheme.lightGreen, AppTheme.primaryColor)
+                          _buildTag(
+                            'Veg',
+                            AppTheme.lightGreen,
+                            AppTheme.primaryColor,
+                          )
                         else
-                          _buildTag('Non-Veg', AppTheme.lightOrange, Colors.red),
+                          _buildTag(
+                            'Non-Veg',
+                            AppTheme.lightOrange,
+                            Colors.red,
+                          ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -217,11 +233,14 @@ class _MenuItemCardState extends State<MenuItemCard>
                         ),
                         if (isInCart)
                           Padding(
-                            padding: const EdgeInsets.only(left: 8), // Reduced padding
+                            padding: const EdgeInsets.only(
+                              left: 8,
+                            ), // Reduced padding
                             child: _QuantityControls(
                               itemId: widget.item.id,
                               quantity: quantity,
-                              onUpdateQuantity: (id, q) => cartController.updateQuantity(id, q),
+                              onUpdateQuantity: (id, q) =>
+                                  cartController.updateQuantity(id, q),
                             ),
                           )
                         else
@@ -262,7 +281,7 @@ class _MenuItemCardState extends State<MenuItemCard>
   Widget _buildAddButton() {
     return Container(
       height: 38, // Increased from 32 for better touch target (Requirement #9)
-      width: 80,  // Slightly wider
+      width: 80, // Slightly wider
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -307,7 +326,7 @@ class _QuantityControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 38, // Increased height for better tap area
-      width: 90,  // Increased width
+      width: 90, // Increased width
       decoration: BoxDecoration(
         color: AppTheme.primaryColor,
         borderRadius: BorderRadius.circular(10),

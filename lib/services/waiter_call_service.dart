@@ -159,6 +159,50 @@ class WaiterCallService {
     }
   }
 
+  /// Complete all active waiter calls for a table
+  Future<void> completeWaiterCallsForTable({
+    required String tenantId,
+    required String tableId,
+  }) async {
+    try {
+      final query = await _firestore
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('waiterCalls')
+          .where('tableId', isEqualTo: tableId)
+          .where('status', whereIn: ['pending', 'acknowledged'])
+          .get();
+
+      if (query.docs.isEmpty) return;
+
+      var batch = _firestore.batch();
+      var opCount = 0;
+      for (final doc in query.docs) {
+        batch.update(doc.reference, {
+          'status': 'completed',
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+        opCount++;
+
+        // Firestore batch limit is 500 writes
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = _firestore.batch();
+          opCount = 0;
+        }
+      }
+
+      if (opCount > 0) {
+        await batch.commit();
+      }
+
+      print('✅ Waiter calls completed for table $tableId');
+    } catch (e) {
+      print('❌ Error completing waiter calls for table $tableId: $e');
+      rethrow;
+    }
+  }
+
   /// Delete waiter call
   Future<void> deleteWaiterCall({
     required String tenantId,

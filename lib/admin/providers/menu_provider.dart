@@ -1,10 +1,14 @@
 import 'package:flutter/foundation.dart' hide Category;
 import '../../models/tenant_model.dart';
 import '../../services/menu_service.dart';
+import '../../utils/request_debouncer.dart';
 
 class MenuProvider with ChangeNotifier {
   final MenuService _menuService = MenuService();
-  
+  final UIDebouncer _searchDebouncer = UIDebouncer(
+    delay: const Duration(milliseconds: 250),
+  );
+
   List<MenuItem> _allItems = [];
   List<Category> _categories = [];
   bool _isLoading = false;
@@ -12,6 +16,7 @@ class MenuProvider with ChangeNotifier {
 
   // Search & Filter state
   String _searchQuery = '';
+  String _searchInput = '';
   String _selectedCategory = 'All Items';
   String _selectedType = 'All'; // All, Veg, Non-Veg
   bool _isBestsellerOnly = false;
@@ -22,6 +27,7 @@ class MenuProvider with ChangeNotifier {
   String get selectedCategory => _selectedCategory;
   String get selectedType => _selectedType;
   bool get isBestsellerOnly => _isBestsellerOnly;
+  String get searchInput => _searchInput;
 
   // Filtered items based on current search & filter state
   List<MenuItem> get filteredItems {
@@ -30,10 +36,13 @@ class MenuProvider with ChangeNotifier {
     // Search
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      items = items.where((i) => 
-        i.name.toLowerCase().contains(query) || 
-        (i.category?.toLowerCase().contains(query) ?? false)
-      ).toList();
+      items = items
+          .where(
+            (i) =>
+                i.name.toLowerCase().contains(query) ||
+                (i.category?.toLowerCase().contains(query) ?? false),
+          )
+          .toList();
     }
 
     // Category
@@ -60,7 +69,7 @@ class MenuProvider with ChangeNotifier {
 
   Future<void> initialize(String tenantId) async {
     if (_tenantId == tenantId && _allItems.isNotEmpty) return;
-    
+
     _tenantId = tenantId;
     _isLoading = true;
     notifyListeners();
@@ -85,7 +94,12 @@ class MenuProvider with ChangeNotifier {
   }
 
   void setSearchQuery(String query) {
-    _searchQuery = query;
+    _searchInput = query;
+    _searchDebouncer.run(() {
+      if (_searchQuery == query) return;
+      _searchQuery = query;
+      notifyListeners();
+    });
     notifyListeners();
   }
 
@@ -104,7 +118,11 @@ class MenuProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateBestsellerStatus(String categoryId, String itemId, bool isBestseller) async {
+  Future<void> updateBestsellerStatus(
+    String categoryId,
+    String itemId,
+    bool isBestseller,
+  ) async {
     if (_tenantId == null) return;
 
     final index = _allItems.indexWhere((i) => i.id == itemId);
@@ -134,7 +152,9 @@ class MenuProvider with ChangeNotifier {
     if (index == -1) return;
 
     final originalItem = _allItems[index];
-    final updatedItem = originalItem.copyWith(isManualAvailable: !originalItem.isManualAvailable);
+    final updatedItem = originalItem.copyWith(
+      isManualAvailable: !originalItem.isManualAvailable,
+    );
 
     // Optimistic UI Update
     _allItems[index] = updatedItem;
@@ -184,5 +204,11 @@ class MenuProvider with ChangeNotifier {
     if (_tenantId == null) return;
     await _menuService.deleteCategory(_tenantId!, categoryId);
     await refreshData();
+  }
+
+  @override
+  void dispose() {
+    _searchDebouncer.dispose();
+    super.dispose();
   }
 }

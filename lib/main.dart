@@ -9,14 +9,14 @@ import 'package:scan_serve/admin/admin_app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseService.initialize();
-  
+
   if (kIsWeb && Uri.base.path.startsWith('/admin')) {
     runApp(const AdminApp());
     return;
   }
-  
+
   // Initialize configuration from URL parameters
   final appConfig = AppConfig.init();
-  
+
   runApp(App(config: appConfig));
 }

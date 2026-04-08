@@ -28,7 +28,7 @@ class ActiveSession {
 class BillsProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const double _fallbackTaxRate = 0.05;
-  
+
   List<Map<String, dynamic>> _allBills = [];
   bool _isLoading = false;
   String? _tenantId;
@@ -40,7 +40,7 @@ class BillsProvider with ChangeNotifier {
 
   void initialize(String tenantId, {OrdersProvider? ordersProvider}) {
     if (_tenantId == tenantId) return;
-    
+
     _tenantId = tenantId;
     _ordersProvider = ordersProvider;
     _listenToBills();
@@ -63,36 +63,41 @@ class BillsProvider with ChangeNotifier {
           .collection('bills');
     }
 
-    _billsSubscription = query
-        .snapshots()
-        .listen((snapshot) {
-      _allBills = snapshot.docs.map((doc) => {
-        ...(doc.data() as Map<String, dynamic>), 
-        'id': doc.id
-      }).toList();
-      _isLoading = false;
-      notifyListeners();
-    }, onError: (e) {
-      print('❌ BillsProvider Error: $e');
-      _isLoading = false;
-      notifyListeners();
-    });
+    _billsSubscription = query.snapshots().listen(
+      (snapshot) {
+        _allBills = snapshot.docs
+            .map(
+              (doc) => {...(doc.data() as Map<String, dynamic>), 'id': doc.id},
+            )
+            .toList();
+        _isLoading = false;
+        notifyListeners();
+      },
+      onError: (e) {
+        print('❌ BillsProvider Error: $e');
+        _isLoading = false;
+        notifyListeners();
+      },
+    );
   }
 
   // Active Sessions (Pending Bills)
   List<ActiveSession> get activeSessions {
     if (_ordersProvider == null) return [];
-    
-    final activeOrders = _ordersProvider!.allOrders.where((o) => 
-      o.status != model.OrderStatus.completed && 
-      o.status != model.OrderStatus.cancelled
-    ).toList();
+
+    final activeOrders = _ordersProvider!.allOrders
+        .where(
+          (o) =>
+              o.status != model.OrderStatus.completed &&
+              o.status != model.OrderStatus.cancelled,
+        )
+        .toList();
 
     final sessionsMap = <String, ActiveSession>{};
 
     for (var order in activeOrders) {
       if (order.tableId == null) continue;
-      
+
       if (sessionsMap.containsKey(order.tableId)) {
         final existing = sessionsMap[order.tableId]!;
         sessionsMap[order.tableId!] = ActiveSession(
@@ -101,8 +106,8 @@ class BillsProvider with ChangeNotifier {
           guestId: existing.guestId,
           customerName: existing.customerName ?? order.customerName,
           totalAmount: existing.totalAmount + order.total,
-          sessionStartedAt: existing.sessionStartedAt.isBefore(order.createdAt) 
-              ? existing.sessionStartedAt 
+          sessionStartedAt: existing.sessionStartedAt.isBefore(order.createdAt)
+              ? existing.sessionStartedAt
               : order.createdAt,
           orderIds: [...existing.orderIds, order.id],
         );
@@ -134,41 +139,50 @@ class BillsProvider with ChangeNotifier {
     return _allBills.where((bill) {
       final createdAt = (bill['createdAt'] as Timestamp?)?.toDate();
       if (createdAt == null) return false;
-      return createdAt.day == today.day && 
-             createdAt.month == today.month && 
-             createdAt.year == today.year;
+      return createdAt.day == today.day &&
+          createdAt.month == today.month &&
+          createdAt.year == today.year;
     }).length;
   }
 
   double get completedTodayVolume {
     final today = DateTime.now();
-    return _allBills.where((bill) {
-      final createdAt = (bill['createdAt'] as Timestamp?)?.toDate();
-      if (createdAt == null) return false;
-      return createdAt.day == today.day && 
-             createdAt.month == today.month && 
-             createdAt.year == today.year;
-    }).fold(0, (sum, bill) => sum + (bill['finalTotal'] ?? 0).toDouble());
+    return _allBills
+        .where((bill) {
+          final createdAt = (bill['createdAt'] as Timestamp?)?.toDate();
+          if (createdAt == null) return false;
+          return createdAt.day == today.day &&
+              createdAt.month == today.month &&
+              createdAt.year == today.year;
+        })
+        .fold(0, (sum, bill) => sum + (bill['finalTotal'] ?? 0).toDouble());
   }
 
   double get yesterdayCompletedVolume {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return _allBills.where((bill) {
-      final createdAt = (bill['createdAt'] as Timestamp?)?.toDate();
-      if (createdAt == null) return false;
-      return createdAt.day == yesterday.day && 
-             createdAt.month == yesterday.month && 
-             createdAt.year == yesterday.year;
-    }).fold(0, (sum, bill) => sum + (bill['finalTotal'] ?? 0).toDouble());
+    return _allBills
+        .where((bill) {
+          final createdAt = (bill['createdAt'] as Timestamp?)?.toDate();
+          if (createdAt == null) return false;
+          return createdAt.day == yesterday.day &&
+              createdAt.month == yesterday.month &&
+              createdAt.year == yesterday.year;
+        })
+        .fold(0, (sum, bill) => sum + (bill['finalTotal'] ?? 0).toDouble());
   }
 
   String get pendingTrend {
     if (yesterdayCompletedVolume == 0) return '0%';
-    final trend = ((completedTodayVolume - yesterdayCompletedVolume) / yesterdayCompletedVolume) * 100;
+    final trend =
+        ((completedTodayVolume - yesterdayCompletedVolume) /
+            yesterdayCompletedVolume) *
+        100;
     return '${trend > 0 ? '+' : ''}${trend.toStringAsFixed(1)}%';
   }
 
-  Future<String?> markAsPaid(String tableId, List<String> orderIds, {
+  Future<String?> markAsPaid(
+    String tableId,
+    List<String> orderIds, {
     double discount = 0,
     bool isPercentage = true,
     String? paymentMethod,
@@ -178,39 +192,48 @@ class BillsProvider with ChangeNotifier {
     String? correctionReason,
   }) async {
     if (_tenantId == null || _ordersProvider == null) return null;
-    
+
     try {
       // 1. Get current orders for this session
       final orders = _ordersProvider!.allOrders
           .where((o) => orderIds.contains(o.id))
           .toList();
-      
+
       if (orders.isEmpty) return null;
- 
+
       final taxRate = _resolveTaxRate(orders);
 
       // 2. Generate the bill record (Atomic transactional creation)
       final billService = BillService();
-      final billId = await billService.generateBill(
-        tenantId: _tenantId!,
-        tableId: tableId,
-        orders: orders,
-        discount: discount,
-        isPercentage: isPercentage,
-        taxRate: taxRate,
-        paymentMethod: paymentMethod,
-        note: note,
-      );
+      final billId =
+          await Future<String>.sync(() {
+            return billService.generateBill(
+              tenantId: _tenantId!,
+              tableId: tableId,
+              orders: orders,
+              discount: discount,
+              isPercentage: isPercentage,
+              taxRate: taxRate,
+              paymentMethod: paymentMethod,
+              note: note,
+            );
+          }).catchError((error) {
+            throw Exception('Bill generation failed: $error');
+          });
 
       // 3. Finalize settlement and release table
-      await _ordersProvider!.markTableAsPaid(
-        tableId,
-        finalAmount: finalAmount,
-        correctionAmount: correctionAmount,
-        correctionReason: correctionReason,
-        paymentMethod: paymentMethod,
-      );
-      
+      await Future<void>.sync(() {
+        return _ordersProvider!.markTableAsPaid(
+          tableId,
+          finalAmount: finalAmount,
+          correctionAmount: correctionAmount,
+          correctionReason: correctionReason,
+          paymentMethod: paymentMethod,
+        );
+      }).catchError((error) {
+        throw Exception('Settlement failed: $error');
+      });
+
       return billId;
     } catch (e) {
       print('❌ Error in markAsPaid flow: $e');
@@ -219,7 +242,8 @@ class BillsProvider with ChangeNotifier {
   }
 
   double _resolveTaxRate(List<model.Order> orders) {
-    final settingsRate = (_ordersProvider?.tenantSettings['taxRate'] as num?)?.toDouble();
+    final settingsRate = (_ordersProvider?.tenantSettings['taxRate'] as num?)
+        ?.toDouble();
     if (settingsRate != null && settingsRate >= 0) return settingsRate;
 
     final subtotal = orders.fold(0.0, (sum, o) => sum + o.subtotal);

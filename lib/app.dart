@@ -31,17 +31,24 @@ class App extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => app_controller.MenuController()),
         ChangeNotifierProvider(create: (_) => CartController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
-        ChangeNotifierProxyProvider3<CartController, app_controller.MenuController, OrderController, RecommendationController>(
+        ChangeNotifierProxyProvider3<
+          CartController,
+          app_controller.MenuController,
+          OrderController,
+          RecommendationController
+        >(
           create: (context) => RecommendationController(
             cartController: context.read<CartController>(),
             menuController: context.read<app_controller.MenuController>(),
             orderController: context.read<OrderController>(),
           ),
-          update: (context, cart, menu, order, previous) => previous ?? RecommendationController(
-            cartController: cart,
-            menuController: menu,
-            orderController: order,
-          ),
+          update: (context, cart, menu, order, previous) =>
+              previous ??
+              RecommendationController(
+                cartController: cart,
+                menuController: menu,
+                orderController: order,
+              ),
         ),
         Provider<OfflineService>(
           create: (_) => OfflineService()..initialize(),
@@ -55,21 +62,21 @@ class App extends StatelessWidget {
             title: 'ScanServe',
             theme: AppTheme.themeData,
             home: Initializer(config: config),
-        onGenerateRoute: (settings) {
-          if (settings.name == '/checkout') {
-            final args = settings.arguments as Map<String, dynamic>;
-            return MaterialPageRoute(
-              builder: (context) => CheckoutPage(
-                tenantId: args['tenantId'],
-                orderType: args['orderType'],
-                tableId: args['tableId'],
-              ),
-            );
-          }
-          return null;
-        },
+            onGenerateRoute: (settings) {
+              if (settings.name == '/checkout') {
+                final args = settings.arguments as Map<String, dynamic>;
+                return MaterialPageRoute(
+                  builder: (context) => CheckoutPage(
+                    tenantId: args['tenantId'],
+                    orderType: args['orderType'],
+                    tableId: args['tableId'],
+                  ),
+                );
+              }
+              return null;
+            },
           );
-        }
+        },
       ),
     );
   }
@@ -101,24 +108,32 @@ class _InitializerState extends State<Initializer> {
     _isInitStarted = true;
 
     final startTime = DateTime.now();
-    
+
     // MANDATORY URL VALIDITY CHECK
     if (!widget.config.isValid) {
-      _showError(widget.config.errorMessage ?? 'Invalid or Partial URL detected. Please scan a valid QR code.');
+      _showError(
+        widget.config.errorMessage ??
+            'Invalid or Partial URL detected. Please scan a valid QR code.',
+      );
       return;
     }
 
     final tenantId = widget.config.tenantId!;
     final tableId = widget.config.tableId;
-    final orderType = widget.config.orderType ?? 
-        (tableId != null && tableId.isNotEmpty ? OrderType.dineIn : OrderType.parcel);
+    final orderType =
+        widget.config.orderType ??
+        (tableId != null && tableId.isNotEmpty
+            ? OrderType.dineIn
+            : OrderType.parcel);
 
-    debugPrint('🚀 [INIT] Parsed URL - Tenant: "$tenantId", Table: "$tableId", Type: $orderType');
+    debugPrint(
+      '🚀 [INIT] Parsed URL - Tenant: "$tenantId", Table: "$tableId", Type: $orderType',
+    );
 
     try {
       final tenantService = TenantService();
       final guestSession = GuestSessionService();
-      
+
       // 1. Initialize Session (Guest ID)
       final guestId = await guestSession.getOrCreateGuestId();
 
@@ -128,7 +143,7 @@ class _InitializerState extends State<Initializer> {
         _showError('Invalid Store. Please contact staff.');
         return;
       }
-      
+
       if (mounted) {
         setState(() {
           _tenantName = tenant.name;
@@ -137,16 +152,18 @@ class _InitializerState extends State<Initializer> {
 
       // 3. Strict Logic for Dine-in
       String? activeSessionId;
-      
-      if (orderType == OrderType.dineIn) {
 
+      if (orderType == OrderType.dineIn) {
         if (tableId == null || tableId.isEmpty) {
           _showError('Table number is required for Dine-in.');
           return;
         }
 
         // Validate Table Exists
-        final tableExists = await tenantService.verifyTableExists(tenantId, tableId);
+        final tableExists = await tenantService.verifyTableExists(
+          tenantId,
+          tableId,
+        );
         if (!tableExists) {
           _showError('Invalid Table. Please contact staff.');
           return;
@@ -155,9 +172,12 @@ class _InitializerState extends State<Initializer> {
         // --- SESSION REJOIN LOGIC ---
 
         final localSession = await guestSession.getCustomerSession();
-        
-        if (localSession != null && localSession.isValidFor(tenantId, tableId)) {
-          debugPrint('🔍 [INIT] Checking if local session ${localSession.sessionId} can rejoin...');
+
+        if (localSession != null &&
+            localSession.isValidFor(tenantId, tableId)) {
+          debugPrint(
+            '🔍 [INIT] Checking if local session ${localSession.sessionId} can rejoin...',
+          );
           final canRejoin = await tenantService.verifySession(
             tenantId: tenantId,
             tableId: tableId,
@@ -165,10 +185,14 @@ class _InitializerState extends State<Initializer> {
           );
 
           if (canRejoin) {
-            debugPrint('✅ [INIT] Rejoining existing session: ${localSession.sessionId}');
+            debugPrint(
+              '✅ [INIT] Rejoining existing session: ${localSession.sessionId}',
+            );
             activeSessionId = localSession.sessionId;
           } else {
-            debugPrint('⚠️ [INIT] Local session invalid or expired. Clearing...');
+            debugPrint(
+              '⚠️ [INIT] Local session invalid or expired. Clearing...',
+            );
             await guestSession.clearCustomerSession();
           }
         }
@@ -176,14 +200,19 @@ class _InitializerState extends State<Initializer> {
         // Lock Table / Check Active Session if no valid re-join found
         if (activeSessionId == null) {
           // New session needed
-          final newSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
-          final isLocked = await tenantService.lockTable(tenantId, tableId, newSessionId);
-          
+          final newSessionId =
+              'session_${DateTime.now().millisecondsSinceEpoch}_$guestId';
+          final isLocked = await tenantService.lockTable(
+            tenantId,
+            tableId,
+            newSessionId,
+          );
+
           if (!isLocked) {
             _showError('This table already has an active order.');
             return;
           }
-          
+
           // Store new session locally
           final newSession = CustomerSession(
             tenantId: tenantId,
@@ -197,27 +226,26 @@ class _InitializerState extends State<Initializer> {
         }
       }
 
-
       // 4. Start Session
-      await guestSession.startSession(
-        tenantId: tenantId,
-        tableId: tableId,
-      );
+      await guestSession.startSession(tenantId: tenantId, tableId: tableId);
 
       // 5. Setup Controllers
       if (!mounted) return;
-      
+
       final orderController = context.read<OrderController>();
       await orderController.setOrderType(orderType);
-      await orderController.setSession(tenantId, tableId, sessionId: activeSessionId);
-
+      await orderController.setSession(
+        tenantId,
+        tableId,
+        sessionId: activeSessionId,
+      );
 
       // Initialize Cart Persistence
       final cartController = context.read<CartController>();
       await cartController.initialize(
-        tenantId, 
-        tableId, 
-        isParcel: orderType == OrderType.parcel
+        tenantId,
+        tableId,
+        isParcel: orderType == OrderType.parcel,
       );
 
       final menuController = context.read<app_controller.MenuController>();
@@ -233,10 +261,12 @@ class _InitializerState extends State<Initializer> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => HomePage(tenantId: tenantId),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                HomePage(tenantId: tenantId),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 400),
           ),
         );
@@ -266,12 +296,19 @@ class _InitializerState extends State<Initializer> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.redAccent,
+                ),
                 const SizedBox(height: 24),
                 Text(
                   _errorMessage,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -282,14 +319,20 @@ class _InitializerState extends State<Initializer> {
                 const SizedBox(height: 32),
                 ElevatedButton.icon(
                   onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init()))
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          Initializer(config: AppConfig.init()),
+                    ),
                   ),
                   icon: const Icon(Icons.refresh),
                   label: const Text('RETRY / RELOAD'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
                   ),
                 ),
               ],

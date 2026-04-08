@@ -2,11 +2,32 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/order_details.dart';
 import 'order_service.dart';
+import 'inventory_service.dart';
+import 'menu_service.dart';
 
 class PaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
   final OrderService _orderService = OrderService();
+  final InventoryService _inventoryService = InventoryService();
+  final MenuService _menuService = MenuService();
+
+  Future<T> _withRetry<T>(
+    Future<T> Function() action, {
+    int maxAttempts = 2,
+  }) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await action();
+      } catch (error) {
+        lastError = error;
+        if (attempt == maxAttempts) break;
+        await Future<void>.delayed(Duration(milliseconds: 250 * attempt));
+      }
+    }
+    throw Exception('Payment operation failed after retry: $lastError');
+  }
 
   /// Process payment for an order
   Future<String> processPayment({
@@ -47,21 +68,33 @@ class PaymentService {
           break;
         case PaymentMethod.upi:
           // For UPI payments, simulate processing
-          await Future.delayed(const Duration(seconds: 2)); // Simulate processing time
+          await Future.delayed(
+            const Duration(seconds: 2),
+          ); // Simulate processing time
           finalStatus = PaymentStatus.paid; // Assume success for demo
           break;
       }
 
       // Update payment status
-      await _firestore.collection('payments').doc(paymentId).update({
-        'status': finalStatus.name,
-        'completedAt': finalStatus == PaymentStatus.paid
-            ? Timestamp.fromDate(DateTime.now())
-            : null,
+      await _withRetry(() async {
+        await _firestore.collection('payments').doc(paymentId).update({
+          'status': finalStatus.name,
+          'completedAt': finalStatus == PaymentStatus.paid
+              ? Timestamp.fromDate(DateTime.now())
+              : null,
+        });
       });
 
       // Update order payment status
-      await _updateOrderPaymentStatus(orderId, tenantId, finalStatus, paymentId, tableId);
+      await _withRetry(() async {
+        await _updateOrderPaymentStatus(
+          orderId,
+          tenantId,
+          finalStatus,
+          paymentId,
+          tableId,
+        );
+      });
 
       return paymentId;
     } catch (e) {
@@ -99,7 +132,10 @@ class PaymentService {
           .update(updateData);
 
       // If dine-in payment succeeded, settle all table orders and release table
-      if (paymentStatus == PaymentStatus.paid && tableId != null && tableId.isNotEmpty && tableId != 'PARCEL') {
+      if (paymentStatus == PaymentStatus.paid &&
+          tableId != null &&
+          tableId.isNotEmpty &&
+          tableId != 'PARCEL') {
         await _orderService.markTableOrdersAsPaid(
           tenantId: tenantId,
           tableId: tableId,
@@ -112,7 +148,10 @@ class PaymentService {
   }
 
   /// Get payment status for an order
-  Future<PaymentStatus> getPaymentStatus(String orderId, String tenantId) async {
+  Future<PaymentStatus> getPaymentStatus(
+    String orderId,
+    String tenantId,
+  ) async {
     try {
       // Try to find the order in both locations
       DocumentSnapshot? orderDoc;
@@ -153,7 +192,10 @@ class PaymentService {
       });
 
       // Get payment details to find the order
-      final paymentDoc = await _firestore.collection('payments').doc(paymentId).get();
+      final paymentDoc = await _firestore
+          .collection('payments')
+          .doc(paymentId)
+          .get();
       if (paymentDoc.exists) {
         final data = paymentDoc.data() as Map<String, dynamic>;
         final orderId = data['orderId'] as String?;
@@ -161,6 +203,24 @@ class PaymentService {
         final tableId = data['tableId'] as String?;
 
         if (orderId != null && tenantId != null) {
+          final orderDoc = await _firestore
+              .collection('tenants')
+              .doc(tenantId)
+              .collection('orders')
+              .doc(orderId)
+              .get();
+          if (orderDoc.exists) {
+            final orderData = orderDoc.data()!;
+            final items = (orderData['items'] as List<dynamic>? ?? const []);
+            final menuDefinitions = await _menuService.getMenuItems(tenantId);
+            await _inventoryService.restoreStockForOrder(
+              tenantId: tenantId,
+              orderId: orderId,
+              orderItems: items,
+              menuDefinitions: menuDefinitions,
+              performedBy: 'Refund',
+            );
+          }
           // Update order status to refunded
           await _updateOrderPaymentStatus(
             orderId,
@@ -189,7 +249,10 @@ class PaymentService {
       });
 
       // Get payment details to find the order
-      final paymentDoc = await _firestore.collection('payments').doc(paymentId).get();
+      final paymentDoc = await _firestore
+          .collection('payments')
+          .doc(paymentId)
+          .get();
       if (paymentDoc.exists) {
         final data = paymentDoc.data() as Map<String, dynamic>;
         final orderId = data['orderId'] as String?;
@@ -216,7 +279,10 @@ class PaymentService {
   }
 
   /// Get payment history for a customer
-  Stream<List<Map<String, dynamic>>> getPaymentHistory(String tenantId, String? customerId) {
+  Stream<List<Map<String, dynamic>>> getPaymentHistory(
+    String tenantId,
+    String? customerId,
+  ) {
     return _firestore
         .collection('payments')
         .where('tenantId', isEqualTo: tenantId)

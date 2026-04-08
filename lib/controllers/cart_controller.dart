@@ -8,6 +8,7 @@ import '../utils/order_confirmation_tracker.dart';
 class CartItem {
   final MenuItem item;
   final Variant? selectedVariant;
+  final String? selectedSpiceLevel;
   int quantity;
   String? note;
   final bool quickReorder;
@@ -15,6 +16,7 @@ class CartItem {
   CartItem({
     required this.item,
     this.selectedVariant,
+    this.selectedSpiceLevel,
     this.quantity = 1,
     this.note,
     this.quickReorder = false,
@@ -25,6 +27,7 @@ class CartItem {
   Map<String, dynamic> toJson() => {
     'item': item.toMap(),
     'selectedVariant': selectedVariant?.toMap(),
+    'selectedSpiceLevel': selectedSpiceLevel,
     'quantity': quantity,
     'note': note,
     'quickReorder': quickReorder,
@@ -33,9 +36,10 @@ class CartItem {
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
       item: MenuItem.fromMap(json['item']),
-      selectedVariant: json['selectedVariant'] != null 
-          ? Variant.fromMap(json['selectedVariant']) 
+      selectedVariant: json['selectedVariant'] != null
+          ? Variant.fromMap(json['selectedVariant'])
           : null,
+      selectedSpiceLevel: json['selectedSpiceLevel']?.toString(),
       quantity: json['quantity'],
       note: json['note'],
       quickReorder: json['quickReorder'] ?? false,
@@ -62,21 +66,26 @@ class CartController extends ChangeNotifier {
   String? get tenantId => _tenantId;
   String? get tableId => _tableId;
   bool get isParcelOrder => _isParcelOrder;
-  bool get hasValidSession => _tenantId != null && (_isParcelOrder || _tableId != null);
+  bool get hasValidSession =>
+      _tenantId != null && (_isParcelOrder || _tableId != null);
 
   // Initialize and load cart for specific session context
-  Future<void> initialize(String tenantId, String? tableId, {bool isParcel = false}) async {
+  Future<void> initialize(
+    String tenantId,
+    String? tableId, {
+    bool isParcel = false,
+  }) async {
     _tenantId = tenantId;
     _tableId = tableId;
     _isParcelOrder = isParcel;
     _storageKey = 'cart_${tenantId}_${tableId ?? 'parcel'}';
-    
+
     // CRITICAL: Check if order was confirmed (prevents duplicate orders on refresh)
     final shouldClear = await OrderConfirmationTracker.shouldClearCart(
       tenantId: tenantId,
       tableId: tableId,
     );
-    
+
     if (shouldClear) {
       print('🔄 Order was confirmed - clearing cart to prevent duplicates');
       _items.clear();
@@ -84,18 +93,18 @@ class CartController extends ChangeNotifier {
     } else {
       await _loadCart();
     }
-    
+
     // Cleanup old confirmations periodically
     OrderConfirmationTracker.cleanupOldConfirmations();
   }
 
   Future<void> _loadCart() async {
     if (_storageKey == null) return;
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? cartJson = prefs.getString(_storageKey!);
-      
+
       if (cartJson != null) {
         final List<dynamic> decoded = jsonDecode(cartJson);
         _items.clear();
@@ -115,7 +124,7 @@ class CartController extends ChangeNotifier {
 
   Future<void> _saveCart() async {
     if (_storageKey == null) return;
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final String encoded = jsonEncode(_items.values.toList());
@@ -125,12 +134,25 @@ class CartController extends ChangeNotifier {
     }
   }
 
-  String _generateKey(String itemId, Variant? variant) {
-    if (variant == null) return itemId;
-    return '${itemId}_${variant.name}';
+  String _generateKey(
+    String itemId,
+    Variant? variant, [
+    String? selectedSpiceLevel,
+  ]) {
+    final variantKey = variant?.name ?? 'default';
+    final spiceKey =
+        (selectedSpiceLevel == null || selectedSpiceLevel.trim().isEmpty)
+        ? 'regular'
+        : selectedSpiceLevel.trim().toLowerCase().replaceAll(' ', '_');
+    return '${itemId}_${variantKey}_$spiceKey';
   }
 
-  void addItem(MenuItem item, [Variant? variant, bool quickReorder = false]) {
+  void addItem(
+    MenuItem item, [
+    Variant? variant,
+    bool quickReorder = false,
+    String? selectedSpiceLevel,
+  ]) {
     // CRITICAL: Validate session before adding items
     final validation = SessionValidator.validateForCart(
       tenantId: _tenantId,
@@ -142,13 +164,14 @@ class CartController extends ChangeNotifier {
       throw Exception(validation.errorMessage ?? 'Invalid session');
     }
 
-    final key = _generateKey(item.id, variant);
+    final key = _generateKey(item.id, variant, selectedSpiceLevel);
     if (_items.containsKey(key)) {
       _items[key]!.quantity++;
     } else {
       _items[key] = CartItem(
         item: item,
         selectedVariant: variant,
+        selectedSpiceLevel: selectedSpiceLevel,
         quickReorder: quickReorder,
       );
     }
@@ -182,7 +205,8 @@ class CartController extends ChangeNotifier {
     }
   }
 
-  bool isItemInCart(String itemId) => _items.values.any((i) => i.item.id == itemId);
+  bool isItemInCart(String itemId) =>
+      _items.values.any((i) => i.item.id == itemId);
 
   int getItemQuantity(String itemId) {
     // Return total quantity of an item (sum of all variants)
@@ -191,8 +215,12 @@ class CartController extends ChangeNotifier {
         .fold(0, (sum, i) => sum + i.quantity);
   }
 
-  String getCartKey(String itemId, [Variant? variant]) {
-    return _generateKey(itemId, variant);
+  String getCartKey(
+    String itemId, [
+    Variant? variant,
+    String? selectedSpiceLevel,
+  ]) {
+    return _generateKey(itemId, variant, selectedSpiceLevel);
   }
 
   void clear() {

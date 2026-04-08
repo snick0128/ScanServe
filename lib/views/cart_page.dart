@@ -134,6 +134,7 @@ class _CartPageState extends State<CartPage> {
                               final key = cartController.getCartKey(
                                 item.item.id,
                                 item.selectedVariant,
+                                item.selectedSpiceLevel,
                               );
                               if (newQuantity <= 0) {
                                 cartController.removeItem(key);
@@ -145,6 +146,7 @@ class _CartPageState extends State<CartPage> {
                               final key = cartController.getCartKey(
                                 item.item.id,
                                 item.selectedVariant,
+                                item.selectedSpiceLevel,
                               );
                               cartController.updateNote(key, note);
                             },
@@ -198,7 +200,11 @@ class _CartPageState extends State<CartPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 20, offset: const Offset(0, 10))
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
         ],
         border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
       ),
@@ -209,7 +215,10 @@ class _CartPageState extends State<CartPage> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
                 child: const Icon(Icons.timer_outlined, color: Colors.orange),
               ),
               const SizedBox(width: 12),
@@ -222,7 +231,7 @@ class _CartPageState extends State<CartPage> {
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
                 onPressed: () => reco.dismissRotiReminder(),
-              )
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -246,15 +255,18 @@ class _CartPageState extends State<CartPage> {
                     reco.repeatLastRoti();
                     reco.dismissRotiReminder();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Added to cart!'))
+                      const SnackBar(content: Text('Added to cart!')),
                     );
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text('Yes'),
                 ),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -262,33 +274,39 @@ class _CartPageState extends State<CartPage> {
 
   Widget _buildRecommendations(BuildContext context, bool isMobile) {
     final reco = context.watch<RecommendationController>();
-    
+
     // Feature 1: "1 More Roti" Quick Reorder
     final lastRoti = reco.lastOrderedRotiInfo;
     final rotiFromCart = reco.rotiItemFromCart;
-    
+
     // Feature 2: Often ordered with
     final suggested = reco.getSuggestionsForItemsInCart();
-    final fallbackSuggested = suggested.isEmpty ? reco.getFallbackSuggestionsForItemsInCart() : const <tenant_model.MenuItem>[];
-    
+    final fallbackSuggested = suggested.isEmpty
+        ? reco.getFallbackSuggestionsForItemsInCart()
+        : const <tenant_model.MenuItem>[];
+
     // Feature 3: Meal Completion
     final mealSuggestions = reco.getMealCompletionSuggestions();
-    
+
     // Feature 5: Drink Suggestions
     final drinkSuggestions = reco.getDrinkSuggestions();
-    
+
     // Feature 6: Dessert Suggestions
     final dessertSuggestions = reco.getDessertSuggestions();
 
     final allSuggestions = [
-      if (mealSuggestions.isNotEmpty) ...mealSuggestions.map((m) => (m, 'Complete your meal')),
+      if (mealSuggestions.isNotEmpty)
+        ...mealSuggestions.map((m) => (m, 'Complete your meal')),
       ...suggested.map((s) => (s, 'Often ordered with this')),
       ...fallbackSuggested.map((s) => (s, 'Recommended with your order')),
-      if (drinkSuggestions.isNotEmpty) ...drinkSuggestions.map((d) => (d, 'Recommended Drinks')),
-      if (dessertSuggestions.isNotEmpty) ...dessertSuggestions.map((d) => (d, 'Finish with dessert')),
+      if (drinkSuggestions.isNotEmpty)
+        ...drinkSuggestions.map((d) => (d, 'Recommended Drinks')),
+      if (dessertSuggestions.isNotEmpty)
+        ...dessertSuggestions.map((d) => (d, 'Finish with dessert')),
     ];
 
-    if (allSuggestions.isEmpty && lastRoti == null && rotiFromCart == null) return const SizedBox.shrink();
+    if (allSuggestions.isEmpty && lastRoti == null && rotiFromCart == null)
+      return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
@@ -303,18 +321,35 @@ class _CartPageState extends State<CartPage> {
               decoration: BoxDecoration(
                 color: AppTheme.primaryColor.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+                border: Border.all(
+                  color: AppTheme.primaryColor.withOpacity(0.2),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.replay_outlined, color: AppTheme.primaryColor),
+                  const Icon(
+                    Icons.replay_outlined,
+                    color: AppTheme.primaryColor,
+                  ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('1 More Roti', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        Text('Quick add last ordered bread', style: TextStyle(fontSize: 12, color: AppTheme.secondaryText)),
+                        Text(
+                          '1 More Roti',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          'Quick add last ordered bread',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.secondaryText,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -330,7 +365,9 @@ class _CartPageState extends State<CartPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: const Text('ADD'),
                   ),
@@ -339,7 +376,7 @@ class _CartPageState extends State<CartPage> {
             ),
             const SizedBox(height: 24),
           ],
-          
+
           if (allSuggestions.isNotEmpty) ...[
             Text(
               'REMARKABLE SUGGESTIONS',
@@ -355,7 +392,9 @@ class _CartPageState extends State<CartPage> {
               height: 170,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: allSuggestions.length > 6 ? 6 : allSuggestions.length,
+                itemCount: allSuggestions.length > 6
+                    ? 6
+                    : allSuggestions.length,
                 itemBuilder: (context, index) {
                   final item = allSuggestions[index].$1;
                   final reason = allSuggestions[index].$2;
@@ -369,7 +408,12 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildRecoCard(BuildContext context, tenant_model.MenuItem item, String reason, bool isMobile) {
+  Widget _buildRecoCard(
+    BuildContext context,
+    tenant_model.MenuItem item,
+    String reason,
+    bool isMobile,
+  ) {
     return Container(
       width: 150,
       margin: const EdgeInsets.only(right: 12),
@@ -383,9 +427,15 @@ class _CartPageState extends State<CartPage> {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-            child: item.imageUrl != null 
-              ? Image.network(item.imageUrl!, height: 80, width: 150, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildPlaceholder())
-              : _buildPlaceholder(),
+            child: item.imageUrl != null
+                ? Image.network(
+                    item.imageUrl!,
+                    height: 80,
+                    width: 150,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                  )
+                : _buildPlaceholder(),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -394,20 +444,33 @@ class _CartPageState extends State<CartPage> {
               children: [
                 Text(
                   reason.toUpperCase(),
-                  style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.orange),
+                  style: const TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
                   maxLines: 1,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   item.name,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('₹${item.price}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text(
+                      '₹${item.price}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     InkWell(
                       onTap: () {
                         HapticHelper.light();
@@ -415,8 +478,15 @@ class _CartPageState extends State<CartPage> {
                       },
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: AppTheme.primaryColor, shape: BoxShape.circle),
-                        child: const Icon(Icons.add, size: 14, color: Colors.white),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -433,7 +503,9 @@ class _CartPageState extends State<CartPage> {
     return Container(
       height: 80,
       color: Colors.grey[100],
-      child: const Center(child: Icon(Icons.restaurant, color: Colors.grey, size: 24)),
+      child: const Center(
+        child: Icon(Icons.restaurant, color: Colors.grey, size: 24),
+      ),
     );
   }
 }
@@ -786,6 +858,18 @@ class _CartItemsWithNotes extends StatelessWidget {
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                             color: AppTheme.primaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    if (item.selectedSpiceLevel != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          'Spice: ${item.selectedSpiceLevel}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.deepOrange.shade400,
                                           ),
                                         ),
                                       ),

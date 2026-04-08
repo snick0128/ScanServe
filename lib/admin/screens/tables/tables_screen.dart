@@ -296,64 +296,140 @@ class _TablesScreenState extends State<TablesScreen> {
   }
 
   void _showManageTablesDialog(BuildContext context, TablesProvider provider) {
+    String _tableBadge(RestaurantTable table) {
+      final match = RegExp(r'\d+').firstMatch(table.name);
+      if (match != null) return match.group(0)!;
+      final trimmed = table.name.trim();
+      return trimmed.isEmpty ? '?' : trimmed.substring(0, 1).toUpperCase();
+    }
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Manage Tables'),
-          content: Builder(
-            builder: (context) {
-              final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(300.0, 650.0);
-              final maxHeight = MediaQuery.of(context).size.height * 0.7;
-              final listHeight = (maxHeight - 120).clamp(200.0, maxHeight);
+        builder: (context, setState) {
+          final size = MediaQuery.of(context).size;
+          final maxWidth = (size.width - 32).clamp(320.0, 560.0);
+          final maxHeight = size.height * 0.78;
 
-              return ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () => _showAddEditTableDialog(context, provider, null),
-                      icon: const Icon(Ionicons.add_outline),
-                      label: const Text('Add New Table'),
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 12, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Manage Tables',
+                            style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Ionicons.close_outline, size: 20, color: AdminTheme.secondaryText),
+                          splashRadius: 18,
+                        ),
+                      ],
                     ),
-                    const Divider(height: 32),
-                    SizedBox(
-                      height: listHeight,
-                      child: ListView.builder(
-                        itemCount: provider.tables.length,
-                        itemBuilder: (context, index) {
-                          final table = provider.tables[index];
-                          return ListTile(
-                            leading: CircleAvatar(child: Text(table.name.replaceAll(RegExp(r'[^0-9]'), ''))),
-                            title: Text(table.name),
-                            subtitle: Text('${table.section} • Max Pax: ${table.capacity}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Ionicons.create_outline, size: 18),
-                                  onPressed: () => _showAddEditTableDialog(context, provider, table),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Ionicons.trash_outline, size: 18, color: AdminTheme.critical),
-                                  onPressed: () => provider.deleteTable(table.id),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showAddEditTableDialog(context, provider, null),
+                        icon: const Icon(Ionicons.add_outline, size: 18),
+                        label: const Text('Add New Table'),
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-          ],
-        ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: AdminTheme.dividerColor),
+                  Expanded(
+                    child: provider.tables.isEmpty
+                        ? const Center(
+                            child: Text('No tables yet', style: TextStyle(color: AdminTheme.secondaryText)),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                            itemCount: provider.tables.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final table = provider.tables[index];
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AdminTheme.dividerColor),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: AdminTheme.primaryColor,
+                                      child: Text(
+                                        _tableBadge(table),
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            table.name,
+                                            style: const TextStyle(fontWeight: FontWeight.w600, color: AdminTheme.primaryText),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${table.section} • Max Pax: ${table.capacity}',
+                                            style: const TextStyle(color: AdminTheme.secondaryText, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Ionicons.create_outline, size: 18, color: AdminTheme.secondaryText),
+                                          onPressed: () => _showAddEditTableDialog(context, provider, table),
+                                          tooltip: 'Edit',
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Ionicons.trash_outline, size: 18, color: AdminTheme.critical),
+                                          onPressed: () => provider.deleteTable(table.id),
+                                          tooltip: 'Delete',
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -683,14 +759,12 @@ class _TableCard extends StatelessWidget {
 
   void _handleAction(BuildContext context) {
     if (table.status == TableStatus.available) {
-      // Open Session - Skip table selector by passing preselected data
-       showDialog(
-        context: context,
-        builder: (context) => StaffOrderDialog(
-          tenantId: context.read<AdminAuthProvider>().tenantId!,
-          preselectedTableId: table.id,
-          preselectedTableName: table.name,
-        ),
+      // Open Session - direct menu flow without popup
+      StaffOrderDialog.startQuickOrder(
+        context,
+        tenantId: context.read<AdminAuthProvider>().tenantId!,
+        tableId: table.id,
+        tableName: table.name,
       );
     } else {
       // View Details or Process Payment

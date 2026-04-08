@@ -15,11 +15,8 @@ class ItemPreviewSheet extends StatefulWidget {
   final MenuItem item;
   final VoidCallback onAdd;
 
-  const ItemPreviewSheet({
-    Key? key,
-    required this.item,
-    required this.onAdd,
-  }) : super(key: key);
+  const ItemPreviewSheet({Key? key, required this.item, required this.onAdd})
+    : super(key: key);
 
   @override
   State<ItemPreviewSheet> createState() => _ItemPreviewSheetState();
@@ -27,18 +24,23 @@ class ItemPreviewSheet extends StatefulWidget {
 
 class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
   Variant? _selectedVariant;
+  String? _selectedSpiceLevel;
 
   @override
   void initState() {
     super.initState();
     // REQUIREMENT 8: Do not auto-select first variant silently. Force explicit user action.
+    if (widget.item.spiceLevels.isNotEmpty) {
+      _selectedSpiceLevel = widget.item.spiceLevels.first;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     // Determine price to show
     final displayPrice = _selectedVariant?.price ?? widget.item.price;
-    final bool isVariantRequired = widget.item.hasVariants && _selectedVariant == null;
+    final bool isVariantRequired =
+        widget.item.hasVariants && _selectedVariant == null;
 
     return Container(
       // We wrap in a Stack so we can have the floating close button
@@ -70,15 +72,21 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
                             child: Image.network(
-                              widget.item.imageUrl ?? 'https://via.placeholder.com/400x300',
+                              widget.item.imageUrl ??
+                                  'https://via.placeholder.com/400x300',
                               width: double.infinity,
                               height: 280,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                height: 280,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.fastfood, size: 80, color: Colors.grey),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    height: 280,
+                                    color: Colors.grey[200],
+                                    child: const Icon(
+                                      Icons.fastfood,
+                                      size: 80,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                             ),
                           ),
                         ),
@@ -97,23 +105,38 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                                     width: 16,
                                     height: 16,
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red, width: 1),
+                                      border: Border.all(
+                                        color: widget.item.isVeg
+                                            ? const Color(0xFF0F6D3F)
+                                            : Colors.red,
+                                        width: 1,
+                                      ),
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                     padding: const EdgeInsets.all(2),
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: widget.item.isVeg ? const Color(0xFF0F6D3F) : Colors.red,
+                                        color: widget.item.isVeg
+                                            ? const Color(0xFF0F6D3F)
+                                            : Colors.red,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   if (widget.item.isBestseller) ...[
-                                    _buildTag('Bestseller', const Color(0xFFE6F4EC), const Color(0xFF0F6D3F)),
+                                    _buildTag(
+                                      'Bestseller',
+                                      const Color(0xFFE6F4EC),
+                                      const Color(0xFF0F6D3F),
+                                    ),
                                     const SizedBox(width: 8),
                                   ],
-                                  _buildTag('New', const Color(0xFFFFF4E6), const Color(0xFFE67E22)),
+                                  _buildTag(
+                                    'New',
+                                    const Color(0xFFFFF4E6),
+                                    const Color(0xFFE67E22),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -152,7 +175,7 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                                   height: 1.4,
                                 ),
                               ),
-                              
+
                               // Variants Selection
                               if (widget.item.hasVariants) ...[
                                 const SizedBox(height: 24),
@@ -165,13 +188,56 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                ...widget.item.variants.map((v) => _buildVariantOption(v)),
+                                ...widget.item.variants.map(
+                                  (v) => _buildVariantOption(v),
+                                ),
                               ],
-                              
+                              if (widget.item.spiceLevels.isNotEmpty) ...[
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Choose Spice Level',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF1C1C1E),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: widget.item.spiceLevels.map((
+                                    level,
+                                  ) {
+                                    final isSelected =
+                                        _selectedSpiceLevel == level;
+                                    return ChoiceChip(
+                                      label: Text(level),
+                                      selected: isSelected,
+                                      onSelected: (_) {
+                                        setState(
+                                          () => _selectedSpiceLevel = level,
+                                        );
+                                      },
+                                      selectedColor: AppTheme.primaryColor
+                                          .withOpacity(0.14),
+                                      labelStyle: TextStyle(
+                                        color: isSelected
+                                            ? AppTheme.primaryColor
+                                            : AppTheme.primaryText,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+
                               // FEATURE 2: Often Ordered With
                               _buildSuggestedItemsSection(context),
-                              
-                              const SizedBox(height: 100), // Reserve space for footer
+
+                              const SizedBox(
+                                height: 100,
+                              ), // Reserve space for footer
                             ],
                           ),
                         ),
@@ -189,10 +255,17 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
             right: 0,
             bottom: 0,
             child: Container(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).padding.bottom,
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
@@ -206,20 +279,24 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                 height: 54,
                 decoration: BoxDecoration(
                   gradient: isVariantRequired
-                    ? LinearGradient(
-                        colors: [Colors.grey[400]!, Colors.grey[600]!],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      )
-                    : const LinearGradient(
-                        colors: [Color(0xFF0F6D3F), Color(0xFF0B522F)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
+                      ? LinearGradient(
+                          colors: [Colors.grey[400]!, Colors.grey[600]!],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : const LinearGradient(
+                          colors: [Color(0xFF0F6D3F), Color(0xFF0B522F)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: (isVariantRequired ? Colors.grey : const Color(0xFF0F6D3F)).withOpacity(0.3),
+                      color:
+                          (isVariantRequired
+                                  ? Colors.grey
+                                  : const Color(0xFF0F6D3F))
+                              .withOpacity(0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -228,50 +305,71 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: isVariantRequired ? null : () async {
-                      HapticHelper.medium();
-                      try {
-                        if (widget.item.hasVariants) {
-                          if (_selectedVariant != null) {
-                            context.read<CartController>().addItem(widget.item, _selectedVariant);
-                            SnackbarHelper.showTopSnackBar(
-                              context,
-                              '${widget.item.name} (${_selectedVariant!.name}) added to cart',
-                              duration: const Duration(seconds: 1),
-                            );
-                          }
-                        } else {
-                          widget.onAdd();
-                        }
-                        Navigator.pop(context);
-                      } catch (e) {
-                        final cart = context.read<CartController>();
-                        final validation = SessionValidator.validateForCart(
-                          tenantId: cart.tenantId,
-                          tableId: cart.tableId,
-                          isParcelOrder: cart.isParcelOrder,
-                        );
-                        
-                        if (!validation.isValid) {
-                          SessionValidator.showValidationDialog(
-                            context: context,
-                            result: validation,
-                            onScanQR: () => Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(builder: (context) => Initializer(config: AppConfig.init())),
-                              (route) => false,
-                            ),
-                          );
-                        } else {
-                          SnackbarHelper.showTopSnackBar(context, 'Error: $e');
-                        }
-                      }
-                    },
+                    onTap: isVariantRequired
+                        ? null
+                        : () async {
+                            HapticHelper.medium();
+                            try {
+                              if (widget.item.hasVariants) {
+                                if (_selectedVariant != null) {
+                                  context.read<CartController>().addItem(
+                                    widget.item,
+                                    _selectedVariant,
+                                    false,
+                                    _selectedSpiceLevel,
+                                  );
+                                  SnackbarHelper.showTopSnackBar(
+                                    context,
+                                    '${widget.item.name} (${_selectedVariant!.name}) added to cart',
+                                    duration: const Duration(seconds: 1),
+                                  );
+                                }
+                              } else {
+                                context.read<CartController>().addItem(
+                                  widget.item,
+                                  null,
+                                  false,
+                                  _selectedSpiceLevel,
+                                );
+                              }
+                              Navigator.pop(context);
+                            } catch (e) {
+                              final cart = context.read<CartController>();
+                              final validation =
+                                  SessionValidator.validateForCart(
+                                    tenantId: cart.tenantId,
+                                    tableId: cart.tableId,
+                                    isParcelOrder: cart.isParcelOrder,
+                                  );
+
+                              if (!validation.isValid) {
+                                SessionValidator.showValidationDialog(
+                                  context: context,
+                                  result: validation,
+                                  onScanQR: () =>
+                                      Navigator.of(context).pushAndRemoveUntil(
+                                        MaterialPageRoute(
+                                          builder: (context) => Initializer(
+                                            config: AppConfig.init(),
+                                          ),
+                                        ),
+                                        (route) => false,
+                                      ),
+                                );
+                              } else {
+                                SnackbarHelper.showTopSnackBar(
+                                  context,
+                                  'Error: $e',
+                                );
+                              }
+                            }
+                          },
                     borderRadius: BorderRadius.circular(16),
                     child: Center(
                       child: Text(
-                        isVariantRequired 
-                          ? 'PLEASE SELECT A VARIANT'
-                          : 'ADD TO PLATE - ₹${displayPrice.toInt()}',
+                        isVariantRequired
+                            ? 'PLEASE SELECT A VARIANT'
+                            : 'ADD TO PLATE - ₹${displayPrice.toInt()}',
                         style: GoogleFonts.outfit(
                           color: Colors.white,
                           fontSize: 14,
@@ -366,13 +464,19 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF0F6D3F) : Colors.grey[400]!,
+                  color: isSelected
+                      ? const Color(0xFF0F6D3F)
+                      : Colors.grey[400]!,
                   width: 2,
                 ),
-                color: isSelected ? const Color(0xFF0F6D3F) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFF0F6D3F)
+                    : Colors.transparent,
               ),
               child: isSelected
-                  ? const Center(child: Icon(Icons.check, size: 14, color: Colors.white))
+                  ? const Center(
+                      child: Icon(Icons.check, size: 14, color: Colors.white),
+                    )
                   : null,
             ),
           ],
@@ -383,7 +487,7 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
 
   Widget _buildSuggestedItemsSection(BuildContext context) {
     if (widget.item.suggestedItemIds.isEmpty) return const SizedBox.shrink();
-    
+
     final menuController = context.watch<app_controller.MenuController>();
     final suggestedItems = menuController.items
         .where((i) => widget.item.suggestedItemIds.contains(i.id))
@@ -491,7 +595,11 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
                           color: Color(0xFF0F6D3F),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.add, size: 14, color: Colors.white),
+                        child: const Icon(
+                          Icons.add,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -508,7 +616,9 @@ class _ItemPreviewSheetState extends State<ItemPreviewSheet> {
     return Container(
       height: 70,
       color: Colors.grey[100],
-      child: const Center(child: Icon(Icons.fastfood, size: 24, color: Colors.grey)),
+      child: const Center(
+        child: Icon(Icons.fastfood, size: 24, color: Colors.grey),
+      ),
     );
   }
 

@@ -7,20 +7,31 @@ import 'menu_service.dart';
 class InventoryService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  CollectionReference _itemsRef(String tenantId) =>
-      _firestore.collection('tenants').doc(tenantId).collection('inventory_items');
+  CollectionReference _itemsRef(String tenantId) => _firestore
+      .collection('tenants')
+      .doc(tenantId)
+      .collection('inventory_items');
 
-  CollectionReference _logsRef(String tenantId) =>
-      _firestore.collection('tenants').doc(tenantId).collection('inventory_logs');
+  CollectionReference _logsRef(String tenantId) => _firestore
+      .collection('tenants')
+      .doc(tenantId)
+      .collection('inventory_logs');
 
   /// Stream of all inventory items for a tenant
   Stream<List<InventoryItem>> getInventoryStream(String tenantId) {
     return _itemsRef(tenantId)
         .orderBy('name')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => InventoryItem.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => InventoryItem.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList(),
+        );
   }
 
   /// Get a single inventory item
@@ -31,23 +42,37 @@ class InventoryService {
   }
 
   /// Stream of recent inventory logs
-  Stream<List<InventoryLog>> getRecentLogsStream(String tenantId, {int limit = 50}) {
+  Stream<List<InventoryLog>> getRecentLogsStream(
+    String tenantId, {
+    int limit = 50,
+  }) {
     return _logsRef(tenantId)
         .orderBy('timestamp', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => InventoryLog.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => InventoryLog.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList(),
+        );
   }
 
   /// Add a new primary inventory item
-  Future<void> addItem(String tenantId, InventoryItem item, String adminName) async {
+  Future<void> addItem(
+    String tenantId,
+    InventoryItem item,
+    String adminName,
+  ) async {
     final batch = _firestore.batch();
     final itemDoc = _itemsRef(tenantId).doc();
-    
+
     batch.set(itemDoc, item.toMap());
-    
+
     // Initial log entry
     final logDoc = _logsRef(tenantId).doc();
     final log = InventoryLog(
@@ -80,9 +105,9 @@ class InventoryService {
     return _firestore.runTransaction((transaction) async {
       final docRef = _itemsRef(tenantId).doc(itemId);
       final snapshot = await transaction.get(docRef);
-      
+
       if (!snapshot.exists) throw Exception("Item not found");
-      
+
       final data = snapshot.data() as Map<String, dynamic>;
       final double before = (data['currentStock'] ?? 0).toDouble();
       final double after = before + quantityChange;
@@ -122,9 +147,9 @@ class InventoryService {
     return _firestore.runTransaction((transaction) async {
       final docRef = _itemsRef(tenantId).doc(itemId);
       final snapshot = await transaction.get(docRef);
-      
+
       if (!snapshot.exists) throw Exception("Item not found");
-      
+
       final data = snapshot.data() as Map<String, dynamic>;
       final double before = (data['currentStock'] ?? 0).toDouble();
       final double difference = actualQuantity - before;
@@ -159,7 +184,7 @@ class InventoryService {
   Future<void> deductStockForOrder({
     required String tenantId,
     required String orderId,
-    required List<dynamic> orderItems, 
+    required List<dynamic> orderItems,
     required List<MenuItem> menuDefinitions,
     required String performedBy,
   }) async {
@@ -170,7 +195,8 @@ class InventoryService {
         orElse: () => MenuItem(id: '', name: '', description: '', price: 0),
       );
 
-      if (definition.inventoryTrackingType == InventoryTrackingType.none) continue;
+      if (definition.inventoryTrackingType == InventoryTrackingType.none)
+        continue;
 
       // 2. Process each ingredient
       for (var entry in definition.inventoryIngredients.entries) {
@@ -192,7 +218,7 @@ class InventoryService {
           // Check if stock is now zero and update menu availability
           final updatedItem = await getItem(tenantId, itemId);
           if (updatedItem != null && updatedItem.currentStock <= 0) {
-             _markLinkedMenuItemsUnavailable(tenantId, itemId, menuDefinitions);
+            _markLinkedMenuItemsUnavailable(tenantId, itemId, menuDefinitions);
           }
         } catch (e) {
           print('Failed to deduct stock for $itemId: $e');
@@ -201,11 +227,55 @@ class InventoryService {
     }
   }
 
-  Future<void> _markLinkedMenuItemsUnavailable(String tenantId, String ingredientId, List<MenuItem> menuDefinitions) async {
+  Future<void> restoreStockForOrder({
+    required String tenantId,
+    required String orderId,
+    required List<dynamic> orderItems,
+    required List<MenuItem> menuDefinitions,
+    required String performedBy,
+  }) async {
+    for (var orderItem in orderItems) {
+      final definition = menuDefinitions.firstWhere(
+        (m) => m.id == (orderItem as dynamic).id,
+        orElse: () => MenuItem(id: '', name: '', description: '', price: 0),
+      );
+
+      if (definition.inventoryTrackingType == InventoryTrackingType.none) {
+        continue;
+      }
+
+      for (final entry in definition.inventoryIngredients.entries) {
+        final itemId = entry.key;
+        final qtyPerSale = entry.value;
+        final totalRestore = qtyPerSale * (orderItem as dynamic).quantity;
+
+        try {
+          await updateStock(
+            tenantId: tenantId,
+            itemId: itemId,
+            quantityChange: totalRestore,
+            type: InventoryChangeType.stockIn,
+            reason: InventoryChangeReason.manual,
+            performedBy: performedBy,
+            sourceId: 'Order restore: ${orderId.substring(0, 8)}',
+          );
+        } catch (e) {
+          print('Failed to restore stock for $itemId: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _markLinkedMenuItemsUnavailable(
+    String tenantId,
+    String ingredientId,
+    List<MenuItem> menuDefinitions,
+  ) async {
     final menuService = MenuService();
     final Map<String, Future<String?>> categoryIdCache = {};
     for (var menuItem in menuDefinitions) {
-      if (menuItem.inventoryIngredients.containsKey(ingredientId) && menuItem.isManualAvailable) {
+      if (menuItem.inventoryIngredients.containsKey(ingredientId) &&
+          menuItem.isManualAvailable) {
         final updatedMenuItem = menuItem.copyWith(isManualAvailable: false);
         final rawCategory = menuItem.category;
         if (rawCategory == null || rawCategory.trim().isEmpty) continue;
@@ -217,7 +287,9 @@ class InventoryService {
         );
         final categoryId = await categoryIdCache[normalizedKey]!;
         if (categoryId == null) {
-          print('⚠️ Could not resolve category ID for "${menuItem.category}" while updating ${menuItem.name}');
+          print(
+            '⚠️ Could not resolve category ID for "${menuItem.category}" while updating ${menuItem.name}',
+          );
           continue;
         }
         await menuService.updateMenuItem(tenantId, categoryId, updatedMenuItem);
@@ -229,7 +301,10 @@ class InventoryService {
     return value.trim().toLowerCase().replaceAll(RegExp(r'[_\-\s]+'), '');
   }
 
-  Future<String?> _resolveCategoryId(String tenantId, String categoryValue) async {
+  Future<String?> _resolveCategoryId(
+    String tenantId,
+    String categoryValue,
+  ) async {
     final categoriesSnapshot = await _firestore
         .collection('tenants')
         .doc(tenantId)

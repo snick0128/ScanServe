@@ -23,7 +23,9 @@ class _SearchBarState extends State<SearchBar> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
+    _controller = TextEditingController(
+      text: context.read<app_controller.MenuController>().searchInput,
+    );
     _focusNode = FocusNode();
     _focusNode.addListener(_handleFocusChange);
   }
@@ -40,6 +42,7 @@ class _SearchBarState extends State<SearchBar> {
     if (!mounted) return;
     setState(() => _isFocused = _focusNode.hasFocus);
   }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -62,7 +65,7 @@ class _SearchBarState extends State<SearchBar> {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 4), 
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
@@ -85,11 +88,7 @@ class _SearchBarState extends State<SearchBar> {
           ),
           prefixIcon: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(
-              Icons.search,
-              color: Color(0xFF8E8E93),
-              size: 20,
-            ),
+            child: Icon(Icons.search, color: Color(0xFF8E8E93), size: 20),
           ),
           prefixIconConstraints: const BoxConstraints(
             minWidth: 40,
@@ -97,7 +96,8 @@ class _SearchBarState extends State<SearchBar> {
           ),
           suffixIcon: Consumer<app_controller.MenuController>(
             builder: (context, controller, child) {
-              if (controller.searchQuery.isNotEmpty) {
+              final hasValue = controller.searchInput.isNotEmpty;
+              if (hasValue) {
                 return GestureDetector(
                   onTap: () {
                     HapticHelper.light();

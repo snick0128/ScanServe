@@ -4,6 +4,7 @@ import '../models/tenant_model.dart';
 import '../models/inventory_item.dart';
 import '../services/menu_service.dart';
 import '../services/inventory_service.dart';
+import '../utils/request_debouncer.dart';
 
 enum SortOrder { none, priceLowToHigh, priceHighToLow }
 
@@ -11,6 +12,10 @@ class MenuController extends ChangeNotifier {
   final MenuService _menuService = MenuService();
   final InventoryService _inventoryService = InventoryService();
   StreamSubscription? _inventorySub;
+  final UIDebouncer _searchDebouncer = UIDebouncer(
+    delay: const Duration(milliseconds: 250),
+  );
+  String _searchInput = '';
 
   String _selectedMealTime = ''; // Start with no filter
   String? _selectedSubcategory;
@@ -29,6 +34,7 @@ class MenuController extends ChangeNotifier {
   String? get selectedSubcategory => _selectedSubcategory;
   List<String> get selectedCategories => _selectedCategories;
   String get searchQuery => _searchQuery;
+  String get searchInput => _searchInput;
   int get searchResultsCount => filteredItems.length;
   bool get isSearching => _searchQuery.isNotEmpty;
   bool get isVegOnly => _isVegOnly || _isStrictVeg;
@@ -59,22 +65,28 @@ class MenuController extends ChangeNotifier {
     if (_sortOrder != SortOrder.none) count++;
     return count;
   }
-  
+
   List<MenuItem> get filteredItems {
     var filtered = _items.where((item) {
       // Search filter
-      final matchesSearch = item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      final matchesSearch =
+          item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           item.description.toLowerCase().contains(_searchQuery.toLowerCase());
       if (!matchesSearch) return false;
 
       // Category (Meal Time) filter
-      if (_selectedMealTime.isNotEmpty && item.category != _selectedMealTime) return false;
+      if (_selectedMealTime.isNotEmpty && item.category != _selectedMealTime)
+        return false;
 
       // Subcategory filter
-      if (_selectedSubcategory != null && item.subcategory != _selectedSubcategory) return false;
+      if (_selectedSubcategory != null &&
+          item.subcategory != _selectedSubcategory)
+        return false;
 
       // Filter Bottom Sheet Categories filter
-      if (_selectedCategories.isNotEmpty && (item.category == null || !_selectedCategories.contains(item.category))) {
+      if (_selectedCategories.isNotEmpty &&
+          (item.category == null ||
+              !_selectedCategories.contains(item.category))) {
         return false;
       }
 
@@ -91,7 +103,7 @@ class MenuController extends ChangeNotifier {
       if (!item.isAvailable(_inventory)) {
         return false;
       }
-      
+
       return true;
     }).toList();
 
@@ -114,7 +126,9 @@ class MenuController extends ChangeNotifier {
 
   void startInventoryListener(String tenantId) {
     _inventorySub?.cancel();
-    _inventorySub = _inventoryService.getInventoryStream(tenantId).listen((inventory) {
+    _inventorySub = _inventoryService.getInventoryStream(tenantId).listen((
+      inventory,
+    ) {
       updateInventory(inventory);
     });
   }
@@ -146,7 +160,12 @@ class MenuController extends ChangeNotifier {
   }
 
   void setSearchQuery(String query) {
-    _searchQuery = query;
+    _searchInput = query;
+    _searchDebouncer.run(() {
+      if (_searchQuery == query) return;
+      _searchQuery = query;
+      notifyListeners();
+    });
     notifyListeners();
   }
 
@@ -253,8 +272,8 @@ class MenuController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     _inventorySub?.cancel();
     super.dispose();
   }
 }
-

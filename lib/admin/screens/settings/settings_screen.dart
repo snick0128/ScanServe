@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import '../../../models/notification_preferences.dart';
 import '../../providers/admin_auth_provider.dart';
 import '../../providers/orders_provider.dart';
+import '../../../services/notification_preferences_service.dart';
+import '../../../services/order_notification_orchestrator.dart';
 import '../subscription/subscription_plans_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -17,7 +20,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _isLoading = true;
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
@@ -26,6 +29,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isVegOnly = false;
   bool _captainCanDeleteItems = true;
   bool _captainRequiresApproval = false;
+  NotificationPreferences _notificationPreferences =
+      const NotificationPreferences();
+  final NotificationPreferencesService _notificationPreferencesService =
+      NotificationPreferencesService();
 
   // Password Change
   final _currentPasswordController = TextEditingController();
@@ -56,27 +63,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
     try {
-      final doc = await _firestore.collection('tenants').doc(widget.tenantId).get();
-      
+      final doc = await _firestore
+          .collection('tenants')
+          .doc(widget.tenantId)
+          .get();
+
       if (doc.exists) {
         final data = doc.data()!;
+        final notificationPreferences = await _notificationPreferencesService
+            .load();
         setState(() {
           _nameController.text = data['name'] ?? '';
           _descriptionController.text = data['description'] ?? '';
-          _taxRateController.text = ((data['taxRate'] ?? 0.18) * 100).toString();
+          _taxRateController.text = ((data['taxRate'] ?? 0.18) * 100)
+              .toString();
           _avgPrepTimeController.text = (data['avgPrepTime'] ?? 25).toString();
           _isVegOnly = data['isVegOnly'] ?? false;
           final captainSettings = data['settings']?['captainPermissions'] ?? {};
           _captainCanDeleteItems = captainSettings['canDeleteItems'] ?? true;
-          _captainRequiresApproval = captainSettings['requiresApproval'] ?? false;
+          _captainRequiresApproval =
+              captainSettings['requiresApproval'] ?? false;
+          _notificationPreferences = notificationPreferences;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading settings: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading settings: $e')));
         setState(() => _isLoading = false);
       }
     }
@@ -97,6 +112,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'requiresApproval': _captainRequiresApproval,
         },
       });
+      await OrderNotificationOrchestrator.instance.updatePreferences(
+        _notificationPreferences,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -105,9 +123,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving settings: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving settings: $e')));
       }
     }
   }
@@ -126,13 +144,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password changed successfully'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Password changed successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error changing password: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error changing password: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -156,7 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
-            
+
             // Subscription Plan Section
             Container(
               padding: const EdgeInsets.all(20),
@@ -170,11 +194,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.verified, color: Colors.green.shade700, size: 24),
+                      Icon(
+                        Icons.verified,
+                        color: Colors.green.shade700,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       const Text(
                         'Current Plan',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -187,11 +218,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             const Text(
                               'Demo Plan',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.green,
                                 borderRadius: BorderRadius.circular(6),
@@ -213,7 +250,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const SubscriptionPlansScreen(tenantId: 'demo'),
+                              builder: (context) =>
+                                  const SubscriptionPlansScreen(
+                                    tenantId: 'demo',
+                                  ),
                             ),
                           );
                         },
@@ -230,7 +270,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -240,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               validator: (val) => val?.isEmpty == true ? 'Required' : null,
             ),
             const SizedBox(height: 16),
-            
+
             TextFormField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -250,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            
+
             TextFormField(
               controller: _taxRateController,
               decoration: const InputDecoration(
@@ -269,7 +309,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 16),
-            
+
             TextFormField(
               controller: _avgPrepTimeController,
               decoration: const InputDecoration(
@@ -288,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 16),
-            
+
             SwitchListTile(
               title: const Text('Vegetarian Only Restaurant'),
               value: _isVegOnly,
@@ -303,16 +343,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
             SwitchListTile(
               title: const Text('Can Delete Order Items'),
-              subtitle: const Text('Allow captains to remove items before kitchen acceptance'),
+              subtitle: const Text(
+                'Allow captains to remove items before kitchen acceptance',
+              ),
               value: _captainCanDeleteItems,
               onChanged: (val) => setState(() => _captainCanDeleteItems = val),
               contentPadding: EdgeInsets.zero,
             ),
             SwitchListTile(
               title: const Text('Require Supervisor Approval'),
-              subtitle: const Text('Require a supervisor pin for item deletions'),
+              subtitle: const Text(
+                'Require a supervisor pin for item deletions',
+              ),
               value: _captainRequiresApproval,
-              onChanged: (val) => setState(() => _captainRequiresApproval = val),
+              onChanged: (val) =>
+                  setState(() => _captainRequiresApproval = val),
               contentPadding: EdgeInsets.zero,
             ),
             const Divider(height: 32),
@@ -323,12 +368,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
             Consumer<OrdersProvider>(
               builder: (context, ordersProvider, _) {
-                return SwitchListTile(
-                  title: const Text('Enable Sound Alerts'),
-                  subtitle: const Text('🔊 Play a sound when new orders arrive'),
-                  value: ordersProvider.isSoundEnabled,
-                  onChanged: (val) => ordersProvider.toggleSound(val),
-                  contentPadding: EdgeInsets.zero,
+                return Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Enable Sound Alerts'),
+                      subtitle: const Text(
+                        'Play a sound when new orders arrive',
+                      ),
+                      value: ordersProvider.isSoundEnabled,
+                      onChanged: (val) => ordersProvider.toggleSound(val),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    DropdownButtonFormField<NotificationMode>(
+                      value: _notificationPreferences.mode,
+                      decoration: const InputDecoration(
+                        labelText: 'Notification Mode',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: NotificationMode.values.map((mode) {
+                        return DropdownMenuItem(
+                          value: mode,
+                          child: Text(mode.name),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _notificationPreferences = _notificationPreferences
+                              .copyWith(mode: value);
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text('Repeat Alarm Until Acknowledged'),
+                      value: _notificationPreferences.repeatAlarm,
+                      onChanged: (value) {
+                        setState(() {
+                          _notificationPreferences = _notificationPreferences
+                              .copyWith(repeatAlarm: value);
+                        });
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    DropdownButtonFormField<int>(
+                      value: _notificationPreferences.snoozeSeconds,
+                      decoration: const InputDecoration(
+                        labelText: 'Default Snooze',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [10, 30].map((seconds) {
+                        return DropdownMenuItem(
+                          value: seconds,
+                          child: Text('$seconds seconds'),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _notificationPreferences = _notificationPreferences
+                              .copyWith(snoozeSeconds: value);
+                        });
+                      },
+                    ),
+                  ],
                 );
               },
             ),
@@ -342,14 +445,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               key: _passwordFormKey,
               child: Column(
                 children: [
-                   TextFormField(
+                  TextFormField(
                     controller: _currentPasswordController,
                     decoration: const InputDecoration(
                       labelText: 'Current Password',
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
-                    validator: (val) => val?.isEmpty == true ? 'Required' : null,
+                    validator: (val) =>
+                        val?.isEmpty == true ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -359,7 +463,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
-                    validator: (val) => (val?.length ?? 0) < 6 ? 'Min 6 characters' : null,
+                    validator: (val) =>
+                        (val?.length ?? 0) < 6 ? 'Min 6 characters' : null,
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -376,7 +481,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
