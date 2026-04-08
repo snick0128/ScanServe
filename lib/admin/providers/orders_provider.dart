@@ -165,10 +165,10 @@ class OrdersProvider with ChangeNotifier {
     OrderNotificationOrchestrator.instance.initialize(
       role: auth?.role ?? 'captain',
     );
-    OrderNotificationOrchestrator.instance.syncFcmToken(
-      tenantId,
-      auth?.role ?? 'captain',
-    );
+    // OrderNotificationOrchestrator.instance.syncFcmToken(
+    //   tenantId,
+    //   auth?.role ?? 'captain',
+    // );
     _listenToOrders();
     _listenToPastOrders();
   }
