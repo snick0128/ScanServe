@@ -48,10 +48,12 @@ class OrdersProvider with ChangeNotifier {
   final Map<String, StreamSubscription> _orderSubscriptions = {};
   final Map<String, Timer> _prepTimers = {};
   model.Order? _latestNewOrder;
+  String? _latestSpeechOverride;
   model.Order? get latestNewOrder => _latestNewOrder;
 
   void clearLatestNewOrder() {
     _latestNewOrder = null;
+    _latestSpeechOverride = null;
     notifyListeners();
   }
 
@@ -186,6 +188,8 @@ class OrdersProvider with ChangeNotifier {
     }
   }
 
+  Future<void> refreshTenantSettings() => _fetchTenantSettings();
+
   void _listenToPastOrders() {
     if (_tenantId == null) return;
     print(
@@ -286,6 +290,7 @@ class OrdersProvider with ChangeNotifier {
                   if (existingOrder.id.isEmpty) {
                     shouldAlert = true;
                     _latestNewOrder = order;
+                    _latestSpeechOverride = null;
                     print('🔔 New Order Alert: ${order.id}');
                     // Trigger Auto-Print for New Order
                     _printService.printKOT(order, isAddon: false);
@@ -303,6 +308,10 @@ class OrdersProvider with ChangeNotifier {
                     if (newTotalQuantity > existingTotalQuantity) {
                       shouldAlert = true;
                       _latestNewOrder = order;
+                      _latestSpeechOverride = _buildAddonSpeech(
+                        existingOrder,
+                        order,
+                      );
                       print(
                         '🔔 Add-on Alert for Order: ${order.id} (Quantity increased)',
                       );
@@ -312,6 +321,7 @@ class OrdersProvider with ChangeNotifier {
                         order.chefNote!.isNotEmpty) {
                       shouldAlert = true;
                       _latestNewOrder = order;
+                      _latestSpeechOverride = null;
                       print('🔔 Chef Note Alert for Order: ${order.id}');
                       _printService.printKOT(order, isAddon: true);
                     }
@@ -475,7 +485,9 @@ class OrdersProvider with ChangeNotifier {
         await OrderNotificationOrchestrator.instance.handleForegroundOrderEvent(
           type: OrderAlertType.newOrder,
           order: _latestNewOrder!,
+          speechOverride: _latestSpeechOverride,
         );
+        _latestSpeechOverride = null;
         return;
       }
       // For web support: ensure we use lowLatency and resume/play
@@ -489,6 +501,73 @@ class OrdersProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Error playing sound: $e');
     }
+  }
+
+  String _buildAddonSpeech(
+    model.Order previousOrder,
+    model.Order updatedOrder,
+  ) {
+    final previousQuantities = <String, int>{};
+    for (final item in previousOrder.items) {
+      final key = _itemSpeechKey(item);
+      previousQuantities[key] = (previousQuantities[key] ?? 0) + item.quantity;
+    }
+
+    final additions = <String, int>{};
+    final namesByKey = <String, String>{};
+    for (final item in updatedOrder.items) {
+      final key = _itemSpeechKey(item);
+      final updatedQty = (additions[key] ?? 0) + item.quantity;
+      additions[key] = updatedQty;
+      namesByKey[key] = _speechItemName(item);
+    }
+
+    final spokenAddons = <String>[];
+    additions.forEach((key, totalQty) {
+      final oldQty = previousQuantities[key] ?? 0;
+      final delta = totalQty - oldQty;
+      if (delta > 0) {
+        spokenAddons.add('$delta ${namesByKey[key] ?? "item"}');
+      }
+    });
+
+    if (spokenAddons.isEmpty) {
+      return 'Order updated for ${updatedOrder.tableName ?? "pickup"}';
+    }
+
+    return '${spokenAddons.join(", ")} added for ${updatedOrder.tableName ?? "pickup"}';
+  }
+
+  String _itemSpeechKey(model.OrderItem item) {
+    final variant = (item.variantName ?? '').trim().toLowerCase();
+    final spice = (item.selectedSpiceLevel ?? '').trim().toLowerCase();
+    return '${item.id}|${item.name.toLowerCase()}|$variant|$spice|${item.price.toStringAsFixed(2)}';
+  }
+
+  String _speechItemName(model.OrderItem item) {
+    final spice = item.selectedSpiceLevel?.trim();
+    final spokenName = _normalizeSpeechName(item.name);
+    if (spice == null || spice.isEmpty) return spokenName;
+    return '$spokenName $spice';
+  }
+
+  String _normalizeSpeechName(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return raw;
+
+    final looksAllCaps =
+        trimmed == trimmed.toUpperCase() &&
+        RegExp(r'[A-Z]').hasMatch(trimmed) &&
+        !RegExp(r'[a-z]').hasMatch(trimmed);
+
+    if (!looksAllCaps) return trimmed;
+
+    return trimmed
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 
   Future<void> updateOrderStatus(
@@ -687,17 +766,12 @@ class OrdersProvider with ChangeNotifier {
           final status = model.OrderStatus.fromString(statusStr);
 
           if (status == model.OrderStatus.completed ||
-              status == model.OrderStatus.cancelled)
+              status == model.OrderStatus.cancelled) {
             continue;
-
-          // REQUIREMENT: Admin should NOT be able to mark paid if Order is not SERVED
-          if (status != model.OrderStatus.served) {
-            throw Exception(
-              'Cannot settle table: Order #${doc.id.substring(0, 8)} is in ${status.displayName} state. All orders must be SERVED before payment.',
-            );
           }
 
-          transaction.update(doc.reference, {
+          // Auto-advance orders that aren't served yet so settlement never blocks
+          final Map<String, dynamic> orderUpdate = {
             'status': model.OrderStatus.completed.name,
             'paymentStatus': model.PaymentStatus.paid.name,
             'paymentMethod': paymentMethod ?? 'Cash',
@@ -708,7 +782,30 @@ class OrdersProvider with ChangeNotifier {
             if (finalAmount != null) 'finalSettledAmount': finalAmount,
             if (correctionAmount != null) 'correctionAmount': correctionAmount,
             if (correctionReason != null) 'correctionReason': correctionReason,
-          });
+          };
+
+          // If items aren't served yet, mark them all served inline
+          if (status != model.OrderStatus.served) {
+            final rawItems = (data['items'] as List? ?? []);
+            final now = DateTime.now();
+            final servedItems = rawItems
+                .map(
+                  (raw) =>
+                      model.OrderItem.fromMap(Map<String, dynamic>.from(raw)),
+                )
+                .map(
+                  (item) => item
+                      .copyWith(
+                        status: model.OrderItemStatus.served,
+                        servedAt: now,
+                      )
+                      .toMap(),
+                )
+                .toList();
+            orderUpdate['items'] = servedItems;
+          }
+
+          transaction.update(doc.reference, orderUpdate);
         }
 
         if (tableId != 'PARCEL') {

@@ -93,6 +93,7 @@ class AdminSidebar extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 12.w),
               children: [
                 if (role == 'admin' || role == 'superadmin') ...[
+                  // P3-14: Dashboard → Table → Order → Bill → Staff → KDS → Menu → Inventory
                   _buildNavItem(
                     context: context,
                     index: 0,
@@ -103,10 +104,26 @@ class AdminSidebar extends StatelessWidget {
                   ),
                   _buildNavItem(
                     context: context,
+                    index: 2,
+                    icon: Ionicons.tablet_landscape_outline,
+                    activeIcon: Ionicons.tablet_landscape,
+                    label: 'Tables',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
                     index: 3,
                     icon: Ionicons.list_outline,
                     activeIcon: Ionicons.list,
                     label: 'Orders',
+                    isCollapsed: isCollapsed,
+                  ),
+                  _buildNavItem(
+                    context: context,
+                    index: 4,
+                    icon: Ionicons.receipt_outline,
+                    activeIcon: Ionicons.receipt,
+                    label: 'Bill',
                     isCollapsed: isCollapsed,
                   ),
                   _buildNavItem(
@@ -135,26 +152,10 @@ class AdminSidebar extends StatelessWidget {
                   ),
                   _buildNavItem(
                     context: context,
-                    index: 2,
-                    icon: Ionicons.tablet_landscape_outline,
-                    activeIcon: Ionicons.tablet_landscape,
-                    label: 'Tables',
-                    isCollapsed: isCollapsed,
-                  ),
-                  _buildNavItem(
-                    context: context,
                     index: 8,
                     icon: Ionicons.cube_outline,
                     activeIcon: Ionicons.cube,
                     label: 'Inventory',
-                    isCollapsed: isCollapsed,
-                  ),
-                  _buildNavItem(
-                    context: context,
-                    index: 4,
-                    icon: Ionicons.receipt_outline,
-                    activeIcon: Ionicons.receipt,
-                    label: 'Billing',
                     isCollapsed: isCollapsed,
                   ),
                   _buildNavItem(
@@ -309,7 +310,7 @@ class AdminSidebar extends StatelessWidget {
   }
 
   Widget _buildUserProfile(BuildContext context) {
-    final auth = context.read<AdminAuthProvider>();
+    final auth = context.watch<AdminAuthProvider>();
 
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -324,20 +325,10 @@ class AdminSidebar extends StatelessWidget {
           CircleAvatar(
             radius: 18.r,
             backgroundColor: AdminTheme.primaryColor.withOpacity(0.2),
-            child: ClipOval(
-              child: Image.network(
-                'https://i.pravatar.cc/150?u=manager',
-                width: 36.w,
-                height: 36.w,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Ionicons.person_outline,
-                    size: 18.w,
-                    color: AdminTheme.secondaryText,
-                  );
-                },
-              ),
+            child: Icon(
+              Ionicons.person_outline,
+              size: 18.w,
+              color: AdminTheme.primaryColor,
             ),
           ),
           if (!isCollapsed) ...[
@@ -347,8 +338,11 @@ class AdminSidebar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // P1-9: Show actual logged-in user name
                   Text(
-                    'James Wilson',
+                    auth.displayName ??
+                        auth.user?.email?.split('@').first ??
+                        'User',
                     style: TextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.bold,

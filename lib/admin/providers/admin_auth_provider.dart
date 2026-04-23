@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AdminAuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   bool _isLoading = true;
   bool _isAdmin = false;
   String? _role;
@@ -16,7 +16,7 @@ class AdminAuthProvider with ChangeNotifier {
   String? _name;
   String? _kitchenStationId;
   bool _isSwitching = false;
-  
+
   String? get displayName => _name;
   String? get userName => _name;
   String? get kitchenStationId => _kitchenStationId;
@@ -26,7 +26,8 @@ class AdminAuthProvider with ChangeNotifier {
   bool get isCaptain => _role == 'captain';
   bool get isKitchen => _role == 'kitchen';
   bool get isSuperAdmin => _role == 'superadmin';
-  bool get canAccessAdminPanel => isAdmin || isCaptain || isKitchen || isSuperAdmin;
+  bool get canAccessAdminPanel =>
+      isAdmin || isCaptain || isKitchen || isSuperAdmin;
   String? get role => _role;
   User? get user => _user;
   String? get tenantId => _tenantId;
@@ -52,7 +53,7 @@ class AdminAuthProvider with ChangeNotifier {
   Future<void> _init() async {
     // Load persisted session first to avoid flicker
     await _loadPersistedSession();
-    
+
     _auth.authStateChanges().listen((User? user) async {
       _user = user;
       if (user != null) {
@@ -76,7 +77,7 @@ class AdminAuthProvider with ChangeNotifier {
       _tenantId = prefs.getString('admin_tenantId');
       _tenantName = prefs.getString('admin_tenantName');
       _kitchenStationId = prefs.getString('admin_kitchenStationId');
-      
+
       if (_role != null) {
         _isAdmin = _role == 'admin' || _role == 'superadmin';
         print('🔥 Auth: Restored persisted session for $_role');
@@ -91,9 +92,12 @@ class AdminAuthProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       if (_role != null) {
         await prefs.setString('admin_role', _role!);
-        if (_tenantId != null) await prefs.setString('admin_tenantId', _tenantId!);
-        if (_tenantName != null) await prefs.setString('admin_tenantName', _tenantName!);
-        if (_kitchenStationId != null) await prefs.setString('admin_kitchenStationId', _kitchenStationId!);
+        if (_tenantId != null)
+          await prefs.setString('admin_tenantId', _tenantId!);
+        if (_tenantName != null)
+          await prefs.setString('admin_tenantName', _tenantName!);
+        if (_kitchenStationId != null)
+          await prefs.setString('admin_kitchenStationId', _kitchenStationId!);
       }
     } catch (e) {
       print('🔥 Auth: Error persisting session: $e');
@@ -102,24 +106,33 @@ class AdminAuthProvider with ChangeNotifier {
 
   Future<bool> _checkAdminStatus() async {
     if (_user == null) return false;
-    
+
     try {
-      final userDoc = await _firestore.collection('users').doc(_user!.uid).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(_user!.uid)
+          .get();
       if (userDoc.exists) {
+        // P0-4: Block deactivated accounts mid-session
+        final isActive = userDoc.data()?['isActive'];
+        if (isActive == false) {
+          await signOut();
+          return false;
+        }
         _role = _normalizeRole(userDoc.data()?['role']?.toString());
         _isAdmin = _role == 'admin' || _role == 'superadmin';
         _tenantId = userDoc['tenantId'];
         _tenantName = userDoc['tenantName'];
         _name = userDoc.data()?['name'] ?? userDoc.data()?['displayName'];
         _kitchenStationId = userDoc.data()?['kitchenStationId'];
-        
+
         if (_role == 'captain') {
           final tables = userDoc.data()?['assignedTables'];
           _assignedTables = tables != null ? List<String>.from(tables) : [];
         } else {
           _assignedTables = [];
         }
-        
+
         return canAccessAdminPanel;
       }
       return false;
@@ -156,19 +169,40 @@ class AdminAuthProvider with ChangeNotifier {
         email: normalizedEmail,
         password: password,
       );
-      
+
       // Then check admin/staff status and tenant info from Firestore
       final hasAccess = await _checkAdminStatus();
-      
+
       if (!hasAccess) {
-        print('🔥 Auth: Access denied for $normalizedEmail - No role or tenant info found');
+        print(
+          '🔥 Auth: Access denied for $normalizedEmail - No role or tenant info found',
+        );
         await _auth.signOut();
-        throw Exception('Access denied. No administrative record found for this account.');
+        throw Exception(
+          'Access denied. No administrative record found for this account.',
+        );
       }
-      
+
+      // P0-4: Block deactivated accounts immediately on login
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .get();
+      final isActive = userDoc.data()?['isActive'];
+      if (isActive == false) {
+        await _auth.signOut();
+        _isLoading = false;
+        _isAdmin = false;
+        _role = null;
+        _tenantId = null;
+        _tenantName = null;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+        throw Exception('Your account has been deactivated.');
+      }
+
       print('🔥 Auth: Login successful. Role: $_role, Tenant: $_tenantId');
       await _persistSession();
-      
     } catch (e) {
       print('🔥 Auth Error: $e');
       _isLoading = false;
@@ -176,10 +210,10 @@ class AdminAuthProvider with ChangeNotifier {
       _role = null;
       _tenantId = null;
       _tenantName = null;
-      
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      
+
       rethrow;
     } finally {
       _isLoading = false;
@@ -189,27 +223,30 @@ class AdminAuthProvider with ChangeNotifier {
 
   Future<void> switchTenant(String id, String name) async {
     if (!isSuperAdmin) return;
-    
+
     _tenantId = id;
     _tenantName = name;
     _isSwitching = true;
-    
+
     await _persistSession();
     notifyListeners();
   }
 
   Future<void> resetToGlobal() async {
     if (!isSuperAdmin) return;
-    
+
     _tenantId = 'global';
     _tenantName = 'Global Console';
     _isSwitching = false;
-    
+
     await _persistSession();
     notifyListeners();
   }
 
-  Future<void> changePassword(String currentPassword, String newPassword) async {
+  Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
     final user = _auth.currentUser;
     if (user == null || user.email == null) {
       throw Exception('No user signed in');
@@ -221,10 +258,10 @@ class AdminAuthProvider with ChangeNotifier {
         email: user.email!,
         password: currentPassword,
       );
-      
+
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
-      
+
       print('🔥 Auth: Password updated successfully for ${user.email}');
     } catch (e) {
       print('🔥 Auth: Error changing password: $e');
@@ -239,10 +276,10 @@ class AdminAuthProvider with ChangeNotifier {
     _tenantId = null;
     _tenantName = null;
     _isSwitching = false;
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    
+
     notifyListeners();
   }
 }

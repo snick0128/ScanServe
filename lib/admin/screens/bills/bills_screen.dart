@@ -62,74 +62,109 @@ class _BillsScreenState extends State<BillsScreen> {
                 _buildHeader(provider, isMobile),
                 SizedBox(height: isMobile ? 12.h : 24.h),
                 Expanded(
-                  child: isMobile 
-                    ? SingleChildScrollView(
-                        child: Column(
+                  child: isMobile
+                      ? SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildKPICards(provider, isMobile),
+                              SizedBox(height: 24.h),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Pending Settlement',
+                                    style: TextStyle(
+                                      fontSize: 18.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: AdminTheme.primaryText,
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () =>
+                                        _showHistoryDialog(context, provider),
+                                    icon: Icon(
+                                      Ionicons.time_outline,
+                                      size: 16.w,
+                                    ),
+                                    label: Text(
+                                      'History',
+                                      style: TextStyle(fontSize: 12.sp),
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AdminTheme.primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 12.h),
+                              _buildPendingBillsTable(provider),
+                              SizedBox(height: 24.h),
+                              _buildBulkOperations(provider, isMobile),
+                            ],
+                          ),
+                        )
+                      : Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildKPICards(provider, isMobile),
-                            SizedBox(height: 24.h),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Pending Settlement', 
-                                  style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
-                                TextButton.icon(
-                                  onPressed: () => _showHistoryDialog(context, provider),
-                                  icon: Icon(Ionicons.time_outline, size: 16.w),
-                                  label: Text('History', style: TextStyle(fontSize: 12.sp)),
-                                  style: TextButton.styleFrom(foregroundColor: AdminTheme.primaryColor),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 12.h),
-                            _buildPendingBillsTable(provider),
-                            SizedBox(height: 24.h),
-                            _buildBulkOperations(provider, isMobile),
-                          ],
-                        ),
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('Pending Settlement', 
-                                      style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
-                                    TextButton.icon(
-                                      onPressed: () => _showHistoryDialog(context, provider),
-                                      icon: Icon(Ionicons.time_outline, size: 18.w),
-                                      label: Text('View All History', style: TextStyle(fontSize: 14.sp)),
-                                      style: TextButton.styleFrom(foregroundColor: AdminTheme.primaryColor),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 16.h),
-                                Expanded(child: _buildPendingBillsTable(provider)),
-                                SizedBox(height: 24.h),
-                                _buildBulkOperations(provider, false),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 32.w),
-                          SizedBox(
-                            width: 300.w,
-                            child: SingleChildScrollView(
+                            Expanded(
+                              flex: 4,
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildKPICards(provider, false),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Pending Settlement',
+                                        style: TextStyle(
+                                          fontSize: 20.sp,
+                                          fontWeight: FontWeight.bold,
+                                          color: AdminTheme.primaryText,
+                                        ),
+                                      ),
+                                      TextButton.icon(
+                                        onPressed: () => _showHistoryDialog(
+                                          context,
+                                          provider,
+                                        ),
+                                        icon: Icon(
+                                          Ionicons.time_outline,
+                                          size: 18.w,
+                                        ),
+                                        label: Text(
+                                          'View All History',
+                                          style: TextStyle(fontSize: 14.sp),
+                                        ),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor:
+                                              AdminTheme.primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 16.h),
+                                  Expanded(
+                                    child: _buildPendingBillsTable(provider),
+                                  ),
+                                  SizedBox(height: 24.h),
+                                  _buildBulkOperations(provider, false),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                            SizedBox(width: 32.w),
+                            SizedBox(
+                              width: 300.w,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: [_buildKPICards(provider, false)],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ],
             ),
@@ -149,7 +184,11 @@ class _BillsScreenState extends State<BillsScreen> {
             children: [
               Text(
                 'Billing',
-                style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                style: TextStyle(
+                  fontSize: 24.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.primaryText,
+                ),
               ),
               IconButton(
                 onPressed: () => provider.refreshBills(),
@@ -194,7 +233,10 @@ class _BillsScreenState extends State<BillsScreen> {
             ),
             Text(
               'Live financial control panel',
-              style: TextStyle(color: AdminTheme.secondaryText, fontSize: 14.sp),
+              style: TextStyle(
+                color: AdminTheme.secondaryText,
+                fontSize: 14.sp,
+              ),
             ),
           ],
         ),
@@ -208,7 +250,11 @@ class _BillsScreenState extends State<BillsScreen> {
               borderRadius: BorderRadius.circular(10.r),
               border: Border.all(color: AdminTheme.dividerColor),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4.w, offset: const Offset(0, 2)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 4.w,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: TextField(
@@ -216,10 +262,20 @@ class _BillsScreenState extends State<BillsScreen> {
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
                 hintText: 'Search by table, bill ID, or session...',
-                hintStyle: TextStyle(color: AdminTheme.secondaryText, fontSize: 13.sp),
-                prefixIcon: Icon(Ionicons.search_outline, size: 18.w, color: AdminTheme.secondaryText),
+                hintStyle: TextStyle(
+                  color: AdminTheme.secondaryText,
+                  fontSize: 13.sp,
+                ),
+                prefixIcon: Icon(
+                  Ionicons.search_outline,
+                  size: 18.w,
+                  color: AdminTheme.secondaryText,
+                ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 12.w),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 12.h,
+                  horizontal: 12.w,
+                ),
               ),
             ),
           ),
@@ -230,16 +286,24 @@ class _BillsScreenState extends State<BillsScreen> {
           children: [
             Text(
               DateFormat('EEEE, MMM d').format(_now),
-              style: TextStyle(fontWeight: FontWeight.w600, color: AdminTheme.primaryText, fontSize: 14.sp),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AdminTheme.primaryText,
+                fontSize: 14.sp,
+              ),
             ),
             Text(
               DateFormat('h:mm:ss a').format(_now),
-              style: TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 18.sp),
+              style: TextStyle(
+                color: AdminTheme.primaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18.sp,
+              ),
             ),
           ],
         ),
         SizedBox(width: 24.w),
-          IconButton(
+        IconButton(
           onPressed: () {
             provider.refreshBills();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -313,16 +377,30 @@ class _BillsScreenState extends State<BillsScreen> {
     );
   }
 
-  Widget _buildKPICard(String title, String value, String subtitle, IconData icon, Color color, {bool isMobile = false}) {
+  Widget _buildKPICard(
+    String title,
+    String value,
+    String subtitle,
+    IconData icon,
+    Color color, {
+    bool isMobile = false,
+  }) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 12 : 24),
       decoration: BoxDecoration(
         color: AdminTheme.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.1), width: 1.5),
+        border: Border.all(
+          color: AdminTheme.primaryColor.withOpacity(0.1),
+          width: 1.5,
+        ),
         boxShadow: [
-          BoxShadow(color: AdminTheme.primaryColor.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: AdminTheme.primaryColor.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -331,17 +409,40 @@ class _BillsScreenState extends State<BillsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: TextStyle(color: AdminTheme.secondaryText, fontSize: isMobile ? 11 : 13, fontWeight: FontWeight.w600)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: AdminTheme.secondaryText,
+                  fontSize: isMobile ? 11 : 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               Icon(icon, color: color, size: isMobile ? 18 : 22),
             ],
           ),
           SizedBox(height: isMobile ? 8 : 12),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(value, style: TextStyle(color: AdminTheme.primaryText, fontSize: isMobile ? 24 : 32, fontWeight: FontWeight.bold)),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: AdminTheme.primaryText,
+                fontSize: isMobile ? 24 : 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(color: subtitle.contains('+') ? AdminTheme.success : AdminTheme.secondaryText, fontSize: isMobile ? 9 : 11, fontWeight: FontWeight.bold)),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: subtitle.contains('+')
+                  ? AdminTheme.success
+                  : AdminTheme.secondaryText,
+              fontSize: isMobile ? 9 : 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -354,11 +455,17 @@ class _BillsScreenState extends State<BillsScreen> {
         title: const Text('Billing History'),
         content: Builder(
           builder: (context) {
-            final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(300.0, 700.0);
+            final maxWidth = (MediaQuery.of(context).size.width - 48).clamp(
+              300.0,
+              700.0,
+            );
             final maxHeight = MediaQuery.of(context).size.height * 0.7;
             return ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-              child: provider.allBills.isEmpty 
+              constraints: BoxConstraints(
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+              ),
+              child: provider.allBills.isEmpty
                   ? const Center(child: Text('No history found'))
                   : ListView.builder(
                       itemCount: provider.allBills.length,
@@ -370,47 +477,78 @@ class _BillsScreenState extends State<BillsScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => BillDetailsScreen(bill: bill, tenantId: widget.tenantId),
+                                builder: (context) => BillDetailsScreen(
+                                  bill: bill,
+                                  tenantId: widget.tenantId,
+                                ),
                               ),
                             );
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 20,
+                            ),
                             decoration: const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: AdminTheme.dividerColor)),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: AdminTheme.dividerColor,
+                                ),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: AdminTheme.primaryColor.withOpacity(0.1),
+                                    color: AdminTheme.primaryColor.withOpacity(
+                                      0.1,
+                                    ),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Ionicons.receipt_outline, color: AdminTheme.primaryColor, size: 20),
+                                  child: const Icon(
+                                    Ionicons.receipt_outline,
+                                    color: AdminTheme.primaryColor,
+                                    size: 20,
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Bill #${bill['billId']?.toString().substring(0, 8) ?? 'N/A'}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AdminTheme.primaryText,
+                                        ),
                                       ),
                                       Text(
                                         'Table: ${bill['tableId']} • ${DateFormat('MMM d, h:mm a').format((bill['createdAt'] as Timestamp).toDate())}',
-                                        style: const TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AdminTheme.secondaryText,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                                 Text(
                                   '₹${bill['finalTotal']}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AdminTheme.primaryText),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: AdminTheme.primaryText,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Icon(Ionicons.chevron_forward, size: 16, color: AdminTheme.secondaryText),
+                                const Icon(
+                                  Ionicons.chevron_forward,
+                                  size: 16,
+                                  color: AdminTheme.secondaryText,
+                                ),
                               ],
                             ),
                           ),
@@ -421,7 +559,10 @@ class _BillsScreenState extends State<BillsScreen> {
           },
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -430,7 +571,11 @@ class _BillsScreenState extends State<BillsScreen> {
   Widget _buildPendingBillsTable(BillsProvider provider) {
     final canSettle = context.read<AdminAuthProvider>().isAdmin;
     final sessions = provider.activeSessions
-        .where((s) => s.tableName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true)
+        .where(
+          (s) =>
+              s.tableName?.toLowerCase().contains(_searchQuery.toLowerCase()) ??
+              true,
+        )
         .toList();
 
     if (sessions.isEmpty) {
@@ -438,9 +583,16 @@ class _BillsScreenState extends State<BillsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Ionicons.receipt_outline, size: 48, color: AdminTheme.secondaryText.withOpacity(0.3)),
+            Icon(
+              Ionicons.receipt_outline,
+              size: 48,
+              color: AdminTheme.secondaryText.withOpacity(0.3),
+            ),
             const SizedBox(height: 16),
-            const Text('No pending bills available', style: TextStyle(color: AdminTheme.secondaryText)),
+            const Text(
+              'No pending bills available',
+              style: TextStyle(color: AdminTheme.secondaryText),
+            ),
           ],
         ),
       );
@@ -457,10 +609,12 @@ class _BillsScreenState extends State<BillsScreen> {
           final session = sessions[index];
           final diff = _now.difference(session.sessionStartedAt);
           final mins = diff.inMinutes;
-          
+
           Color statusColor = AdminTheme.success;
-          if (mins > 30) statusColor = AdminTheme.critical;
-          else if (mins > 10) statusColor = AdminTheme.warning;
+          if (mins > 30)
+            statusColor = AdminTheme.critical;
+          else if (mins > 10)
+            statusColor = AdminTheme.warning;
 
           return Card(
             margin: EdgeInsets.only(bottom: 12.h),
@@ -479,30 +633,64 @@ class _BillsScreenState extends State<BillsScreen> {
                       Row(
                         children: [
                           Container(
-                            width: 8.w, height: 8.w,
-                            decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                            width: 8.w,
+                            height: 8.w,
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                           SizedBox(width: 8.w),
-                          Text(session.tableName ?? 'T-#', 
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp)),
+                          Text(
+                            session.tableName ?? 'T-#',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16.sp,
+                            ),
+                          ),
                         ],
                       ),
-                      Text('₹${NumberFormat('#,##,###.00').format(session.totalAmount)}', 
-                        style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryColor, fontSize: 16.sp)),
+                      Text(
+                        '₹${NumberFormat('#,##,###.00').format(session.totalAmount)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryColor,
+                          fontSize: 16.sp,
+                        ),
+                      ),
                     ],
                   ),
                   Divider(height: 24.h),
                   Row(
                     children: [
-                      Icon(Ionicons.person_outline, size: 14.w, color: AdminTheme.secondaryText),
+                      Icon(
+                        Ionicons.person_outline,
+                        size: 14.w,
+                        color: AdminTheme.secondaryText,
+                      ),
                       SizedBox(width: 8.w),
-                      Text(session.customerName ?? 'Guest User', 
-                        style: TextStyle(fontSize: 13.sp, color: AdminTheme.primaryText)),
+                      Text(
+                        session.customerName ?? 'Guest User',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: AdminTheme.primaryText,
+                        ),
+                      ),
                       const Spacer(),
-                      Icon(Ionicons.time_outline, size: 14.w, color: AdminTheme.secondaryText),
+                      Icon(
+                        Ionicons.time_outline,
+                        size: 14.w,
+                        color: AdminTheme.secondaryText,
+                      ),
                       SizedBox(width: 8.w),
-                      Text('$mins mins', 
-                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13.sp)),
+                      Text(
+                        '$mins mins',
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.sp,
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: 16.h),
@@ -511,25 +699,41 @@ class _BillsScreenState extends State<BillsScreen> {
                       if (canSettle) ...[
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => _handleMarkAsPaid(context, provider, session),
+                            onPressed: () =>
+                                _handleMarkAsPaid(context, provider, session),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AdminTheme.primaryColor,
                               foregroundColor: Colors.white,
                               padding: EdgeInsets.symmetric(vertical: 12.h),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
                               elevation: 0,
                             ),
-                            child: Text('Mark as Paid', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)),
+                            child: Text(
+                              'Mark as Paid',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14.sp,
+                              ),
+                            ),
                           ),
                         ),
                         SizedBox(width: 12.w),
                       ],
                       IconButton(
-                        onPressed: () => _confirmCancelSession(context, provider, session),
-                        icon: Icon(Ionicons.close_circle_outline, color: AdminTheme.critical, size: 20.w),
+                        onPressed: () =>
+                            _confirmCancelSession(context, provider, session),
+                        icon: Icon(
+                          Ionicons.close_circle_outline,
+                          color: AdminTheme.critical,
+                          size: 20.w,
+                        ),
                         style: IconButton.styleFrom(
                           backgroundColor: AdminTheme.critical.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
                         ),
                       ),
                     ],
@@ -555,19 +759,66 @@ class _BillsScreenState extends State<BillsScreen> {
           headingRowHeight: 56,
           dataRowHeight: 72,
           horizontalMargin: 24,
-          headingRowColor: MaterialStateProperty.all(AdminTheme.scaffoldBackground),
+          headingRowColor: MaterialStateProperty.all(
+            AdminTheme.scaffoldBackground,
+          ),
           columnSpacing: 64,
           columns: const [
-            DataColumn(label: Text('TABLE #', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
-            DataColumn(label: Text('CUSTOMER / SESSION', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
-            DataColumn(label: Text('BILL AMOUNT', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
-            DataColumn(label: Text('TIME ELAPSED', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
-            DataColumn(label: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, fontSize: 14))),
+            DataColumn(
+              label: Text(
+                'TABLE #',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.secondaryText,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'CUSTOMER / SESSION',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.secondaryText,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'BILL AMOUNT',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.secondaryText,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'TIME ELAPSED',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.secondaryText,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                'ACTIONS',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.secondaryText,
+                  fontSize: 14,
+                ),
+              ),
+            ),
           ],
           rows: sessions.map((session) {
             final diff = _now.difference(session.sessionStartedAt);
             final mins = diff.inMinutes;
-            
+
             Color statusColor = AdminTheme.success;
             if (mins > 30) {
               statusColor = AdminTheme.critical;
@@ -575,61 +826,138 @@ class _BillsScreenState extends State<BillsScreen> {
               statusColor = AdminTheme.warning;
             }
 
-            return DataRow(cells: [
-              DataCell(Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(session.tableName ?? 'T-#', style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
-                ],
-              )),
-              DataCell(Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(session.customerName ?? 'Guest User', style: const TextStyle(fontWeight: FontWeight.w600, color: AdminTheme.primaryText)),
-                  Text(session.guestId?.substring(0, 8).toUpperCase() ?? 'SID-0000', style: const TextStyle(fontSize: 11, color: AdminTheme.secondaryText)),
-                ],
-              )),
-              DataCell(Text('₹${NumberFormat('#,##,###.00').format(session.totalAmount)}', style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText, fontSize: 15))),
-              DataCell(Text('$mins mins', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 15))),
-              DataCell(Row(
-                children: [
-                  if (canSettle) ...[
-                    _processingTableId == session.tableId 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : ElevatedButton(
-                          onPressed: () => _handleMarkAsPaid(context, provider, session),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AdminTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: const Text('Mark as Paid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            return DataRow(
+              cells: [
+                DataCell(
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
                         ),
-                    const SizedBox(width: 8),
-                  ],
-                  IconButton(
-                    onPressed: () => _confirmCancelSession(context, provider, session),
-                    icon: const Icon(Ionicons.close_circle_outline, color: AdminTheme.critical, size: 20),
-                    tooltip: 'Cancel Session',
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        session.tableName ?? 'T-#',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryText,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              )),
-            ]);
-        }).toList(),
+                ),
+                DataCell(
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.customerName ?? 'Guest User',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AdminTheme.primaryText,
+                        ),
+                      ),
+                      Text(
+                        session.guestId?.substring(0, 8).toUpperCase() ??
+                            'SID-0000',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AdminTheme.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '₹${NumberFormat('#,##,###.00').format(session.totalAmount)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AdminTheme.primaryText,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    '$mins mins',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Row(
+                    children: [
+                      if (canSettle) ...[
+                        _processingTableId == session.tableId
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : ElevatedButton(
+                                onPressed: () => _handleMarkAsPaid(
+                                  context,
+                                  provider,
+                                  session,
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AdminTheme.primaryColor,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Mark as Paid',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                        const SizedBox(width: 8),
+                      ],
+                      IconButton(
+                        onPressed: () =>
+                            _confirmCancelSession(context, provider, session),
+                        icon: const Icon(
+                          Ionicons.close_circle_outline,
+                          color: AdminTheme.critical,
+                          size: 20,
+                        ),
+                        tooltip: 'Cancel Session',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-  void _confirmCancelSession(BuildContext context, BillsProvider provider, dynamic session) {
+  void _confirmCancelSession(
+    BuildContext context,
+    BillsProvider provider,
+    dynamic session,
+  ) {
     final reasonController = TextEditingController();
     showDialog(
       context: context,
@@ -638,7 +966,9 @@ class _BillsScreenState extends State<BillsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Are you sure you want to cancel the session for table ${session.tableName}?'),
+            Text(
+              'Are you sure you want to cancel the session for table ${session.tableName}? All active orders will be cancelled.',
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: reasonController,
@@ -650,15 +980,44 @@ class _BillsScreenState extends State<BillsScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Go Back')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Go Back'),
+          ),
           ElevatedButton(
-            onPressed: () {
-              if (reasonController.text.isNotEmpty) {
-                // Handle cancellation logic
-                Navigator.pop(context);
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) return;
+              Navigator.pop(context);
+              try {
+                final ordersProvider = context.read<OrdersProvider>();
+                await ordersProvider.forceReleaseTable(
+                  session.tableId,
+                  reason: reasonController.text.trim(),
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Session for ${session.tableName} cancelled successfully.',
+                      ),
+                      backgroundColor: AdminTheme.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to cancel session: $e'),
+                      backgroundColor: AdminTheme.critical,
+                    ),
+                  );
+                }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.critical),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.critical,
+            ),
             child: const Text('Confirm Close'),
           ),
         ],
@@ -668,12 +1027,14 @@ class _BillsScreenState extends State<BillsScreen> {
 
   Widget _buildBulkOperations(BillsProvider provider, bool isMobile) {
     final isAdmin = context.read<AdminAuthProvider>().role == 'admin';
-    
+
     if (isMobile) {
       return Column(
         children: [
           OutlinedButton.icon(
-            onPressed: isAdmin ? () => _confirmBulkClose(context, provider) : null,
+            onPressed: isAdmin
+                ? () => _confirmBulkClose(context, provider)
+                : null,
             icon: const Icon(Ionicons.layers_outline, size: 18),
             label: const Text('Bulk Close All'),
             style: OutlinedButton.styleFrom(
@@ -705,18 +1066,32 @@ class _BillsScreenState extends State<BillsScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Ionicons.shield_checkmark_outline, color: AdminTheme.primaryColor),
+          const Icon(
+            Ionicons.shield_checkmark_outline,
+            color: AdminTheme.primaryColor,
+          ),
           const SizedBox(width: 16),
           const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Manual Reconciliation', style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
-              Text('Admin-only bulk checkout operations', style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText)),
+              Text(
+                'Manual Reconciliation',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AdminTheme.primaryText,
+                ),
+              ),
+              Text(
+                'Admin-only bulk checkout operations',
+                style: TextStyle(fontSize: 12, color: AdminTheme.secondaryText),
+              ),
             ],
           ),
           const Spacer(),
           OutlinedButton.icon(
-            onPressed: isAdmin ? () => _confirmBulkClose(context, provider) : null,
+            onPressed: isAdmin
+                ? () => _confirmBulkClose(context, provider)
+                : null,
             icon: const Icon(Ionicons.layers_outline, size: 18),
             label: const Text('Bulk Close Sessions'),
             style: OutlinedButton.styleFrom(
@@ -744,16 +1119,27 @@ class _BillsScreenState extends State<BillsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Bulk Close All Sessions'),
-        content: Text('This will mark all ${provider.activeSessionsCount} active tables as PAID and clear the dashboard. This action is irreversible. Proceed?'),
+        content: Text(
+          'This will mark all ${provider.activeSessionsCount} active tables as PAID and clear the dashboard. This action is irreversible. Proceed?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await provider.bulkCloseSessions();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All sessions closed successfully')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('All sessions closed successfully'),
+                ),
+              );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.critical),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.critical,
+            ),
             child: const Text('YES, CLOSE ALL'),
           ),
         ],
@@ -766,7 +1152,9 @@ class _BillsScreenState extends State<BillsScreen> {
     final today = DateTime.now();
     final bills = provider.allBills.where((b) {
       final date = (b['createdAt'] as Timestamp).toDate();
-      return date.day == today.day && date.month == today.month && date.year == today.year;
+      return date.day == today.day &&
+          date.month == today.month &&
+          date.year == today.year;
     }).toList();
 
     pdf.addPage(
@@ -776,14 +1164,22 @@ class _BillsScreenState extends State<BillsScreen> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('Daily Revenue Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Daily Revenue Report',
+                style: pw.TextStyle(
+                  fontSize: 24,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.Text('Date: ${DateFormat('dd MMMM yyyy').format(today)}'),
               pw.SizedBox(height: 20),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Total Bills: ${bills.length}'),
-                  pw.Text('Total Volume: Rs. ${NumberFormat('#,##,###.00').format(provider.completedTodayVolume)}'),
+                  pw.Text(
+                    'Total Volume: Rs. ${NumberFormat('#,##,###.00').format(provider.completedTodayVolume)}',
+                  ),
                 ],
               ),
               pw.SizedBox(height: 20),
@@ -791,12 +1187,16 @@ class _BillsScreenState extends State<BillsScreen> {
                 context: context,
                 data: <List<String>>[
                   <String>['Bill ID', 'Table', 'Time', 'Amount'],
-                  ...bills.map((b) => [
-                    b['billId'].toString().substring(0, 8),
-                    b['tableId'].toString(),
-                    DateFormat('h:mm a').format((b['createdAt'] as Timestamp).toDate()),
-                    'Rs. ${b['finalTotal']}'
-                  ]),
+                  ...bills.map(
+                    (b) => [
+                      b['billId'].toString().substring(0, 8),
+                      b['tableId'].toString(),
+                      DateFormat(
+                        'h:mm a',
+                      ).format((b['createdAt'] as Timestamp).toDate()),
+                      'Rs. ${b['finalTotal']}',
+                    ],
+                  ),
                 ],
               ),
             ],
@@ -805,13 +1205,23 @@ class _BillsScreenState extends State<BillsScreen> {
       ),
     );
 
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
   }
 
-  void _handleMarkAsPaid(BuildContext context, BillsProvider provider, dynamic session) async {
+  void _handleMarkAsPaid(
+    BuildContext context,
+    BillsProvider provider,
+    dynamic session,
+  ) async {
+    // P0-2: Guard against double-tap — if already processing this table, ignore
+    if (_processingTableId != null) return;
+
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => _MarkAsPaidDialog(tableName: session.tableName ?? 'Table'),
+      builder: (context) =>
+          _MarkAsPaidDialog(tableName: session.tableName ?? 'Table'),
     );
 
     if (result == null) return;
@@ -819,7 +1229,7 @@ class _BillsScreenState extends State<BillsScreen> {
     setState(() => _processingTableId = session.tableId);
     try {
       final billId = await provider.markAsPaid(
-        session.tableId, 
+        session.tableId,
         session.orderIds,
         paymentMethod: result['method'],
         note: result['note'],
@@ -829,7 +1239,19 @@ class _BillsScreenState extends State<BillsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AdminTheme.critical));
+        // P0-2: Show error with retry option
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment failed: $e'),
+            backgroundColor: AdminTheme.critical,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'RETRY',
+              textColor: Colors.white,
+              onPressed: () => _handleMarkAsPaid(context, provider, session),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _processingTableId = null);
@@ -848,7 +1270,9 @@ class _BillsScreenState extends State<BillsScreen> {
             Text('Payment Successful'),
           ],
         ),
-        content: const Text('The session has been settled. Table is now available. Would you like to print the receipt?'),
+        content: const Text(
+          'The session has been settled. Table is now available. Would you like to print the receipt?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -861,7 +1285,9 @@ class _BillsScreenState extends State<BillsScreen> {
             },
             icon: const Icon(Ionicons.print_outline),
             label: const Text('Print Receipt'),
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.primaryColor),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.primaryColor,
+            ),
           ),
         ],
       ),
@@ -874,19 +1300,32 @@ class _BillsScreenState extends State<BillsScreen> {
     if (bill == null) return;
 
     String taxLabel = 'GST';
+    String receiptTitle = 'GUEST RECEIPT';
+    Map<String, dynamic> templateSettings = const <String, dynamic>{};
     try {
       final settings = context.read<OrdersProvider>().tenantSettings;
       final label = settings['taxLabel'];
       if (label is String && label.trim().isNotEmpty) taxLabel = label;
+      final template = settings['billTemplate'];
+      if (template is Map) {
+        templateSettings = Map<String, dynamic>.from(template);
+        final title = templateSettings['receiptTitle'];
+        if (title is String && title.trim().isNotEmpty) {
+          receiptTitle = title.trim();
+        }
+      }
     } catch (_) {}
 
     final pdf = await BillPrintBuilder.build(
       bill: bill,
       taxLabel: taxLabel,
-      receiptTitle: 'GUEST RECEIPT',
+      receiptTitle: receiptTitle,
+      templateSettings: templateSettings,
     );
 
-    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
   }
 }
 
@@ -920,9 +1359,18 @@ class _MarkAsPaidDialogState extends State<_MarkAsPaidDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Settle ${widget.tableName}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                'Settle ${widget.tableName}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 16),
-              const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Select Payment Method',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -934,19 +1382,29 @@ class _MarkAsPaidDialogState extends State<_MarkAsPaidDialog> {
                     selected: isSelected,
                     onSelected: (val) => setState(() => _selectedMethod = m),
                     selectedColor: AdminTheme.primaryColor.withOpacity(0.2),
-                    labelStyle: TextStyle(color: isSelected ? AdminTheme.primaryColor : AdminTheme.secondaryText),
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? AdminTheme.primaryColor
+                          : AdminTheme.secondaryText,
+                    ),
                   );
                 }).toList(),
               ),
               const SizedBox(height: 16),
-              const Text('Settlement Note (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Settlement Note (Optional)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _noteController,
                 decoration: const InputDecoration(
                   hintText: 'Add internal note...',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
                 maxLines: 2,
               ),
@@ -955,14 +1413,20 @@ class _MarkAsPaidDialogState extends State<_MarkAsPaidDialog> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context, {
                         'method': _selectedMethod,
                         'note': _noteController.text,
                       }),
-                      style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AdminTheme.success,
+                        foregroundColor: Colors.white,
+                      ),
                       child: const Text('Mark as Paid'),
                     ),
                   ],
@@ -971,14 +1435,20 @@ class _MarkAsPaidDialogState extends State<_MarkAsPaidDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
                     const SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context, {
                         'method': _selectedMethod,
                         'note': _noteController.text,
                       }),
-                      style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AdminTheme.success,
+                        foregroundColor: Colors.white,
+                      ),
                       child: const Text('Mark as Paid'),
                     ),
                   ],

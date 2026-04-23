@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:scan_serve/models/order_model.dart';
 import '../controllers/cart_controller.dart';
 import '../controllers/order_controller.dart';
 import '../models/order_details.dart';
 import '../services/order_service.dart';
 import '../services/guest_session_service.dart';
 import 'previous_orders_list.dart';
-import '../utils/snackbar_helper.dart';
 import '../theme/app_theme.dart';
 import '../utils/haptic_helper.dart';
+import '../utils/order_confirmation_tracker.dart';
 import 'payment_page.dart';
 import '../controllers/recommendation_controller.dart';
 import '../models/tenant_model.dart' as tenant_model;
@@ -1151,7 +1150,7 @@ class _BillDetails extends StatelessWidget {
         }
 
         final settings = snapshot.data ?? {};
-        final taxRate = (settings['taxRate'] as num?)?.toDouble() ?? 0.05;
+        final taxRate = (settings['taxRate'] as num?)?.toDouble() ?? 0.18;
         final tax = subtotal * taxRate;
         final total = subtotal + tax;
 
@@ -1318,7 +1317,7 @@ class _CartActionFooter extends StatelessWidget {
       future: orderService.getTenantSettings(tenantId),
       builder: (context, snapshot) {
         final settings = snapshot.data ?? {};
-        final taxRate = (settings['taxRate'] as num?)?.toDouble() ?? 0.05;
+        final taxRate = (settings['taxRate'] as num?)?.toDouble() ?? 0.18;
         final total = subtotal * (1 + taxRate);
 
         return Container(
@@ -1374,7 +1373,7 @@ class _CartActionFooter extends StatelessWidget {
                         onPressed: () async {
                           HapticHelper.medium();
                           final guestId = await guestSession.getGuestId();
-                          await orderService.createOrder(
+                          final orderId = await orderService.createOrder(
                             tenantId: tenantId,
                             guestId: guestId,
                             orderType: OrderType.dineIn,
@@ -1384,7 +1383,12 @@ class _CartActionFooter extends StatelessWidget {
                             sessionId:
                                 orderController.currentSession?.sessionId,
                           );
-                          cartController.clear();
+                          await OrderConfirmationTracker.markOrderConfirmed(
+                            tenantId: tenantId,
+                            tableId: orderController.currentSession?.tableId,
+                            orderId: orderId,
+                          );
+                          await cartController.clear();
                           if (onOrderPlaced != null) {
                             onOrderPlaced!();
                           } else if (context.mounted) {

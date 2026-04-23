@@ -122,10 +122,20 @@ class StaffService {
     String staffId,
     bool isActive,
   ) async {
+    // Update staff profile
     await _staffCollection(tenantId).doc(staffId).update({
       'isActive': isActive,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    // P0-4: Also update the users collection so auth middleware blocks deactivated accounts
+    final staffDoc = await _staffCollection(tenantId).doc(staffId).get();
+    final userId = staffDoc.data()?['userId'] as String?;
+    if (userId != null && userId.isNotEmpty) {
+      await _firestore.collection('users').doc(userId).update({
+        'isActive': isActive,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   Stream<List<StaffAttendance>> watchAttendance(String tenantId) {

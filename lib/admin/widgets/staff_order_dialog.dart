@@ -17,7 +17,7 @@ class StaffOrderDialog extends StatefulWidget {
   final bool autoStart;
 
   const StaffOrderDialog({
-    super.key, 
+    super.key,
     required this.tenantId,
     this.preselectedTableId,
     this.preselectedTableName,
@@ -64,7 +64,9 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
     _selectedTableId = widget.preselectedTableId;
     _selectedTableName = widget.preselectedTableName;
     if (widget.autoStart) {
-      _selectedOrderType = widget.preselectedTableId != null ? OrderType.dineIn : OrderType.parcel;
+      _selectedOrderType = widget.preselectedTableId != null
+          ? OrderType.dineIn
+          : OrderType.parcel;
     }
     if (widget.autoStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _autoStart());
@@ -101,12 +103,21 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Create New Staff Order', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                  const Text(
+                    'Create New Staff Order',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
-              const Text('Order Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Order Type',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -115,7 +126,8 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                       'Dine-in',
                       Icons.restaurant,
                       _selectedOrderType == OrderType.dineIn,
-                      () => setState(() => _selectedOrderType = OrderType.dineIn),
+                      () =>
+                          setState(() => _selectedOrderType = OrderType.dineIn),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -124,14 +136,19 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                       'Parcel',
                       Icons.shopping_bag,
                       _selectedOrderType == OrderType.parcel,
-                      () => setState(() => _selectedOrderType = OrderType.parcel),
+                      () =>
+                          setState(() => _selectedOrderType = OrderType.parcel),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 32),
-              if (_selectedOrderType == OrderType.dineIn && widget.preselectedTableId == null) ...[
-                const Text('1. Select Table', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              if (_selectedOrderType == OrderType.dineIn &&
+                  widget.preselectedTableId == null) ...[
+                const Text(
+                  '1. Select Table',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 const SizedBox(height: 12),
                 Consumer<TablesProvider>(
                   builder: (context, tablesProvider, _) {
@@ -151,10 +168,24 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                           final table = tables[index];
                           final isSelected = _selectedTableId == table.id;
                           return ListTile(
-                            leading: Icon(Icons.table_restaurant, color: table.isOccupied ? Colors.orange : Colors.green),
+                            leading: Icon(
+                              Icons.table_restaurant,
+                              color: table.isOccupied
+                                  ? Colors.orange
+                                  : Colors.green,
+                            ),
                             title: Text(table.name),
-                            subtitle: Text(table.isOccupied ? 'Currently Occupied' : 'Available'),
-                            trailing: isSelected ? const Icon(Icons.check_circle, color: AdminTheme.success) : null,
+                            subtitle: Text(
+                              table.isOccupied
+                                  ? 'Currently Occupied'
+                                  : 'Available',
+                            ),
+                            trailing: isSelected
+                                ? const Icon(
+                                    Icons.check_circle,
+                                    color: AdminTheme.success,
+                                  )
+                                : null,
                             onTap: () {
                               setState(() {
                                 _selectedTableId = table.id;
@@ -168,21 +199,30 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                   },
                 ),
                 const SizedBox(height: 32),
-              ] else if (_selectedOrderType == OrderType.dineIn && widget.preselectedTableId != null) ...[
+              ] else if (_selectedOrderType == OrderType.dineIn &&
+                  widget.preselectedTableId != null) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AdminTheme.success.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AdminTheme.success.withOpacity(0.2)),
+                    border: Border.all(
+                      color: AdminTheme.success.withOpacity(0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.table_restaurant, color: AdminTheme.success),
+                      const Icon(
+                        Icons.table_restaurant,
+                        color: AdminTheme.success,
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         'Ordering for ${widget.preselectedTableName}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryText,
+                        ),
                       ),
                     ],
                   ),
@@ -194,7 +234,9 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                   decoration: BoxDecoration(
                     color: AdminTheme.primaryColor.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AdminTheme.primaryColor.withOpacity(0.2)),
+                    border: Border.all(
+                      color: AdminTheme.primaryColor.withOpacity(0.2),
+                    ),
                   ),
                   child: const Row(
                     children: [
@@ -202,7 +244,10 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                       SizedBox(width: 12),
                       Text(
                         'Creating Parcel / Takeaway Order',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primaryText),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.primaryText,
+                        ),
                       ),
                     ],
                   ),
@@ -213,16 +258,28 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: ((_selectedOrderType == OrderType.dineIn && _selectedTableId == null) || _isCreating) ? null : _selectMenu,
+                  onPressed:
+                      ((_selectedOrderType == OrderType.dineIn &&
+                              _selectedTableId == null) ||
+                          _isCreating)
+                      ? null
+                      : _selectMenu,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AdminTheme.primaryColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: _isCreating
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
-                          widget.preselectedTableId != null ? 'Start Ordering' : 'Next: Select Menu Items',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          widget.preselectedTableId != null
+                              ? 'Start Ordering'
+                              : 'Next: Select Menu Items',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ),
@@ -257,7 +314,12 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
     }
   }
 
-  Widget _buildTypeOption(String label, IconData icon, bool isSelected, VoidCallback onTap) {
+  Widget _buildTypeOption(
+    String label,
+    IconData icon,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -299,36 +361,47 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
         context,
         items: items,
         tenantId: widget.tenantId,
-        tableId: _selectedOrderType == OrderType.parcel ? null : _selectedTableId,
-        tableName: _selectedOrderType == OrderType.parcel ? null : _selectedTableName,
+        tableId: _selectedOrderType == OrderType.parcel
+            ? null
+            : _selectedTableId,
+        tableName: _selectedOrderType == OrderType.parcel
+            ? null
+            : _selectedTableName,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Order created successfully'), backgroundColor: AdminTheme.success),
+          SnackBar(
+            content: const Text('Order created successfully'),
+            backgroundColor: AdminTheme.success,
+          ),
         );
       }
       return true;
     } catch (e) {
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-       }
-       return false;
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+      return false;
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
   }
 
   double _resolveTaxRate(OrdersProvider ordersProvider) {
-    final settingsRate = (ordersProvider.tenantSettings['taxRate'] as num?)?.toDouble();
+    final settingsRate = (ordersProvider.tenantSettings['taxRate'] as num?)
+        ?.toDouble();
     if (settingsRate != null && settingsRate >= 0) return settingsRate;
-    return 0.05;
+    return 0.18;
   }
 
   static double _resolveTaxRateStatic(OrdersProvider ordersProvider) {
-    final settingsRate = (ordersProvider.tenantSettings['taxRate'] as num?)?.toDouble();
+    final settingsRate = (ordersProvider.tenantSettings['taxRate'] as num?)
+        ?.toDouble();
     if (settingsRate != null && settingsRate >= 0) return settingsRate;
-    return 0.05;
+    return 0.18;
   }
 
   static Future<void> _createOrderStatic(
@@ -342,7 +415,10 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
     final ordersProvider = context.read<OrdersProvider>();
     final tablesProvider = context.read<TablesProvider>();
 
-    final subtotal = items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final subtotal = items.fold(
+      0.0,
+      (sum, item) => sum + (item.price * item.quantity),
+    );
     final taxRate = _resolveTaxRateStatic(ordersProvider);
     final tax = subtotal * taxRate;
     final total = subtotal + tax;
@@ -368,17 +444,22 @@ class _StaffOrderDialogState extends State<StaffOrderDialog> {
 
     if (!isParcel && tableId != null) {
       final table = tablesProvider.tables.firstWhere((t) => t.id == tableId);
-      await tablesProvider.updateTable(table.copyWith(
-        status: TableStatus.occupied,
-        isAvailable: false,
-        isOccupied: true,
-        occupiedAt: DateTime.now(),
-      ));
+      await tablesProvider.updateTable(
+        table.copyWith(
+          status: TableStatus.occupied,
+          isAvailable: false,
+          isOccupied: true,
+          occupiedAt: DateTime.now(),
+        ),
+      );
     }
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Order created successfully'), backgroundColor: AdminTheme.success),
+        SnackBar(
+          content: const Text('Order created successfully'),
+          backgroundColor: AdminTheme.success,
+        ),
       );
     }
   }

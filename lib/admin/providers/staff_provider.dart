@@ -148,8 +148,16 @@ class StaffProvider with ChangeNotifier {
     final uid = _auth!.user?.uid;
     if (uid == null) return;
 
-    final existing = _staff.where((s) => s.userId == uid).toList();
-    if (existing.isNotEmpty) return;
+    // P0-5: Check by both userId AND email to prevent duplicate records
+    final userEmail = _auth!.user?.email?.toLowerCase().trim();
+    final existingByUid = _staff.where((s) => s.userId == uid).toList();
+    if (existingByUid.isNotEmpty) return;
+    if (userEmail != null && userEmail.isNotEmpty) {
+      final existingByEmail = _staff
+          .where((s) => (s.email ?? '').toLowerCase().trim() == userEmail)
+          .toList();
+      if (existingByEmail.isNotEmpty) return;
+    }
 
     final name = _auth!.displayName ?? 'Captain';
     final email = _auth!.user?.email;
@@ -174,10 +182,11 @@ class StaffProvider with ChangeNotifier {
 
   Future<void> addOrUpdateStaff(StaffProfile staff) async {
     if (_tenantId == null) return;
-    if (staff.id.isEmpty) {
-      await _service.addStaff(_tenantId!, staff);
-    } else {
+    // P0-5: Always UPDATE if staff has an ID — never INSERT for existing records
+    if (staff.id.isNotEmpty) {
       await _service.updateStaff(_tenantId!, staff);
+    } else {
+      await _service.addStaff(_tenantId!, staff);
     }
   }
 

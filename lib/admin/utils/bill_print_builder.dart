@@ -9,12 +9,14 @@ class BillPrintBuilder {
     required Map<String, dynamic> bill,
     String taxLabel = 'GST',
     String receiptTitle = 'GUEST RECEIPT',
+    Map<String, dynamic>? templateSettings,
   }) async {
     final font = await PdfGoogleFonts.notoSansDevanagariRegular();
     final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
 
     final billId = (bill['billId'] ?? 'Unknown').toString();
-    final createdAt = (bill['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+    final createdAt =
+        (bill['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     final tableId = (bill['tableId'] ?? 'Unknown').toString();
     final paymentMethod = (bill['paymentMethod'] ?? 'Cash').toString();
     final customerName = (bill['customerName'] ?? '').toString();
@@ -25,6 +27,32 @@ class BillPrintBuilder {
     final discountAmount = _toDouble(bill['discountAmount']);
     final finalTotal = _toDouble(bill['finalTotal']);
     final taxRate = _resolveTaxRate(bill, subtotal);
+    final template = templateSettings ?? const <String, dynamic>{};
+    final restaurantName = _readString(
+      template,
+      'restaurantName',
+      fallback: 'SCAN SERVE',
+    );
+    final restaurantAddress = _readString(template, 'address');
+    final restaurantPhone = _readString(template, 'phone');
+    final restaurantGstin = _readString(template, 'gstin');
+    final restaurantFssai = _readString(template, 'fssai');
+    final footerMessage = _readString(
+      template,
+      'footerMessage',
+      fallback: 'THANK YOU. VISIT AGAIN.',
+    );
+    final showTable = _readBool(template, 'showTable', fallback: true);
+    final showPaymentMethod = _readBool(
+      template,
+      'showPaymentMethod',
+      fallback: true,
+    );
+    final showCustomerDetails = _readBool(
+      template,
+      'showCustomerDetails',
+      fallback: true,
+    );
 
     final items = _extractItems(bill['orderDetails']);
 
@@ -40,8 +68,12 @@ class BillPrintBuilder {
             children: [
               pw.Center(
                 child: pw.Text(
-                  'SCAN SERVE',
-                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, letterSpacing: 1),
+                  restaurantName.toUpperCase(),
+                  style: pw.TextStyle(
+                    fontSize: 13,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
               pw.Center(
@@ -50,16 +82,47 @@ class BillPrintBuilder {
                   style: const pw.TextStyle(fontSize: 9),
                 ),
               ),
+              if (restaurantAddress.isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    restaurantAddress,
+                    textAlign: pw.TextAlign.center,
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ),
+              if (restaurantPhone.isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    'Phone: $restaurantPhone',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ),
+              if (restaurantGstin.isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    'GSTIN: $restaurantGstin',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ),
+              if (restaurantFssai.isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    'FSSAI: $restaurantFssai',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ),
               pw.SizedBox(height: 6),
               _dashedDivider(),
               pw.SizedBox(height: 4),
               _keyValue('Bill', '#${_shortId(billId)}'),
-              _keyValue('Table', tableId),
+              if (showTable) _keyValue('Table', tableId),
               _keyValue('Date', DateFormat('dd MMM yyyy').format(createdAt)),
               _keyValue('Time', DateFormat('h:mm a').format(createdAt)),
-              _keyValue('Payment', paymentMethod),
-              if (customerName.isNotEmpty) _keyValue('Guest', customerName),
-              if (customerPhone.isNotEmpty) _keyValue('Phone', customerPhone),
+              if (showPaymentMethod) _keyValue('Payment', paymentMethod),
+              if (showCustomerDetails && customerName.isNotEmpty)
+                _keyValue('Guest', customerName),
+              if (showCustomerDetails && customerPhone.isNotEmpty)
+                _keyValue('Phone', customerPhone),
               pw.SizedBox(height: 6),
               _dashedDivider(),
               pw.SizedBox(height: 6),
@@ -70,8 +133,12 @@ class BillPrintBuilder {
               _dashedDivider(),
               pw.SizedBox(height: 6),
               _amountRow('Subtotal', subtotal),
-              _amountRow('${_cleanLabel(taxLabel)} ${_formatPercent(taxRate)}', tax),
-              if (discountAmount > 0) _amountRow('Discount', -discountAmount, isDiscount: true),
+              _amountRow(
+                '${_cleanLabel(taxLabel)} ${_formatPercent(taxRate)}',
+                tax,
+              ),
+              if (discountAmount > 0)
+                _amountRow('Discount', -discountAmount, isDiscount: true),
               pw.SizedBox(height: 4),
               _dashedDivider(),
               pw.SizedBox(height: 6),
@@ -79,7 +146,7 @@ class BillPrintBuilder {
               pw.SizedBox(height: 8),
               pw.Center(
                 child: pw.Text(
-                  'THANK YOU. VISIT AGAIN.',
+                  footerMessage.toUpperCase(),
                   style: const pw.TextStyle(fontSize: 8),
                 ),
               ),
@@ -133,6 +200,27 @@ class BillPrintBuilder {
     return trimmed.isEmpty ? 'GST' : trimmed.toUpperCase();
   }
 
+  static String _readString(
+    Map<String, dynamic> source,
+    String key, {
+    String fallback = '',
+  }) {
+    final value = source[key];
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  static bool _readBool(
+    Map<String, dynamic> source,
+    String key, {
+    required bool fallback,
+  }) {
+    final value = source[key];
+    if (value is bool) return value;
+    return fallback;
+  }
+
   static String _formatPercent(double value) {
     final pct = value * 100;
     final isInt = pct % 1 == 0;
@@ -171,20 +259,29 @@ class BillPrintBuilder {
       children: [
         pw.Expanded(
           flex: 7,
-          child: pw.Text('Item', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+          child: pw.Text(
+            'Item',
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+          ),
         ),
         pw.Expanded(
           flex: 2,
           child: pw.Align(
             alignment: pw.Alignment.centerRight,
-            child: pw.Text('Qty', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+            child: pw.Text(
+              'Qty',
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            ),
           ),
         ),
         pw.Expanded(
           flex: 3,
           child: pw.Align(
             alignment: pw.Alignment.centerRight,
-            child: pw.Text('Amt', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+            child: pw.Text(
+              'Amt',
+              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            ),
           ),
         ),
       ],
@@ -205,14 +302,20 @@ class BillPrintBuilder {
               flex: 2,
               child: pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(item.quantity.toString(), style: const pw.TextStyle(fontSize: 9)),
+                child: pw.Text(
+                  item.quantity.toString(),
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
               ),
             ),
             pw.Expanded(
               flex: 3,
               child: pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_money(item.total), style: const pw.TextStyle(fontSize: 9)),
+                child: pw.Text(
+                  _money(item.total),
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
               ),
             ),
           ],
@@ -222,7 +325,13 @@ class BillPrintBuilder {
             children: [
               pw.Expanded(
                 flex: 7,
-                child: pw.Text('₹${item.price.toStringAsFixed(2)} each', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                child: pw.Text(
+                  '₹${item.price.toStringAsFixed(2)} each',
+                  style: const pw.TextStyle(
+                    fontSize: 8,
+                    color: PdfColors.grey700,
+                  ),
+                ),
               ),
               pw.Expanded(flex: 5, child: pw.SizedBox()),
             ],
@@ -232,7 +341,11 @@ class BillPrintBuilder {
     );
   }
 
-  static pw.Widget _amountRow(String label, double value, {bool isDiscount = false}) {
+  static pw.Widget _amountRow(
+    String label,
+    double value, {
+    bool isDiscount = false,
+  }) {
     final color = isDiscount ? PdfColors.green700 : PdfColors.black;
     final display = value < 0 ? '-${_money(value.abs())}' : _money(value);
     return pw.Row(
@@ -248,8 +361,14 @@ class BillPrintBuilder {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text(label, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-        pw.Text(_money(value), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        pw.Text(
+          label,
+          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.Text(
+          _money(value),
+          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+        ),
       ],
     );
   }

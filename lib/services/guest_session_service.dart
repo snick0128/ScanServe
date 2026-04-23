@@ -3,14 +3,13 @@ import 'package:uuid/uuid.dart';
 import '../models/guest_profile_model.dart';
 import '../models/customer_session.dart';
 
-
 /// Guest Session Service
-/// 
+///
 /// Manages persistent guest identification across browser tabs and sessions.
 /// Uses SharedPreferences to store a single UUID per device/browser.
 /// This ensures that one device always has the same guestId, even when
 /// opening multiple tabs or refreshing the page.
-/// 
+///
 /// Also manages guest profile (name + phone) to prevent duplicate customer
 /// records and enable prefilling of customer details.
 class GuestSessionService {
@@ -19,10 +18,10 @@ class GuestSessionService {
   static const String _currentTableKey = 'current_table';
   static const String _guestProfileKey = 'guest_profile';
   static const String _customerSessionKey = 'customer_session';
+  static const String _qrMenuGuideSeenKey = 'qr_menu_guide_seen';
 
   final _prefs = SharedPreferences.getInstance();
   final _uuid = const Uuid();
-
 
   /// Get or create a persistent guest ID
   /// This ID is stored in SharedPreferences and persists across:
@@ -83,7 +82,9 @@ class GuestSessionService {
     await prefs.remove(_currentTableKey);
     await prefs.remove(_guestProfileKey);
     await prefs.remove(_customerSessionKey);
-    print('🗑️ Cleared guest session - new guestId will be created on next load');
+    print(
+      '🗑️ Cleared guest session - new guestId will be created on next load',
+    );
   }
 
   // ============================================================
@@ -114,7 +115,6 @@ class GuestSessionService {
     print('🗑️ Cleared local customer session');
   }
 
-
   // ============================================================
   // GUEST PROFILE MANAGEMENT
   // ============================================================
@@ -133,7 +133,7 @@ class GuestSessionService {
   Future<GuestProfile?> getGuestProfile() async {
     final prefs = await _prefs;
     final profileJson = prefs.getString(_guestProfileKey);
-    
+
     if (profileJson == null) {
       print('📭 No guest profile found');
       return null;
@@ -151,21 +151,13 @@ class GuestSessionService {
 
   /// Update guest profile with new name and/or phone
   /// Creates a new profile if none exists
-  Future<void> updateGuestProfile({
-    required String name,
-    String? phone,
-  }) async {
+  Future<void> updateGuestProfile({required String name, String? phone}) async {
     final guestId = await getGuestId();
     final existingProfile = await getGuestProfile();
 
-    final updatedProfile = existingProfile?.copyWith(
-      name: name,
-      phone: phone,
-    ) ?? GuestProfile.create(
-      guestId: guestId,
-      name: name,
-      phone: phone,
-    );
+    final updatedProfile =
+        existingProfile?.copyWith(name: name, phone: phone) ??
+        GuestProfile.create(guestId: guestId, name: name, phone: phone);
 
     await saveGuestProfile(updatedProfile);
   }
@@ -181,5 +173,15 @@ class GuestSessionService {
     final prefs = await _prefs;
     await prefs.remove(_guestProfileKey);
     print('🗑️ Cleared guest profile');
+  }
+
+  Future<bool> hasSeenQrMenuGuide() async {
+    final prefs = await _prefs;
+    return prefs.getBool(_qrMenuGuideSeenKey) ?? false;
+  }
+
+  Future<void> markQrMenuGuideSeen() async {
+    final prefs = await _prefs;
+    await prefs.setBool(_qrMenuGuideSeenKey, true);
   }
 }

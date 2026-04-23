@@ -13,6 +13,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:scan_serve/services/order_notification_orchestrator.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:scan_serve/utils/screen_scale.dart';
 
@@ -21,13 +22,33 @@ class StationConfig {
   final String name;
   final List<String> categories;
 
-  StationConfig({required this.id, required this.name, required this.categories});
+  StationConfig({
+    required this.id,
+    required this.name,
+    required this.categories,
+  });
 
   static List<StationConfig> get defaultStations => [
-    StationConfig(id: 'hot_kitchen', name: 'HOT KITCHEN', categories: ['Main Course', 'Starters', 'Grill', 'Tandoor', 'Meals']),
-    StationConfig(id: 'cold_kitchen', name: 'COLD KITCHEN', categories: ['Salads', 'Desserts', 'Cold Starters']),
-    StationConfig(id: 'bar', name: 'BAR STATION', categories: ['Beverages', 'Drinks', 'Mocktails', 'Cocktails']),
-    StationConfig(id: 'pass_expo', name: 'PASS / EXPO', categories: []), // Special case for all
+    StationConfig(
+      id: 'hot_kitchen',
+      name: 'HOT KITCHEN',
+      categories: ['Main Course', 'Starters', 'Grill', 'Tandoor', 'Meals'],
+    ),
+    StationConfig(
+      id: 'cold_kitchen',
+      name: 'COLD KITCHEN',
+      categories: ['Salads', 'Desserts', 'Cold Starters'],
+    ),
+    StationConfig(
+      id: 'bar',
+      name: 'BAR STATION',
+      categories: ['Beverages', 'Drinks', 'Mocktails', 'Cocktails'],
+    ),
+    StationConfig(
+      id: 'pass_expo',
+      name: 'PASS / EXPO',
+      categories: [],
+    ), // Special case for all
   ];
 }
 
@@ -59,12 +80,17 @@ class _KDSScreenState extends State<KDSScreen> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
     });
-    
+
     // Enable Wakelock to keep KDS screen on
     WakelockPlus.enable();
 
+    // P1-10: Initialize orchestrator for KDS kitchen alert sounds
+    OrderNotificationOrchestrator.instance.initialize(role: 'kitchen');
+
     // Setup connectivity monitoring
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       setState(() {
         _connectionStatus = results.first;
         if (_connectionStatus == ConnectivityResult.none) {
@@ -102,9 +128,11 @@ class _KDSScreenState extends State<KDSScreen> {
   void _resolveStation() {
     final auth = context.read<AdminAuthProvider>();
     final stationId = auth.kitchenStationId;
-    
-    print('🔥 KDS: Resolving station for role: ${auth.role}, stationId: $stationId');
-    
+
+    print(
+      '🔥 KDS: Resolving station for role: ${auth.role}, stationId: $stationId',
+    );
+
     if (stationId != null && stationId.isNotEmpty) {
       _currentStation = StationConfig.defaultStations.firstWhere(
         (s) => s.id == stationId,
@@ -113,13 +141,19 @@ class _KDSScreenState extends State<KDSScreen> {
     } else {
       // Fallback based on role names
       final role = auth.role?.toLowerCase() ?? '';
-      if (role.contains('hot')) _currentStation = StationConfig.defaultStations[0];
-      else if (role.contains('cold')) _currentStation = StationConfig.defaultStations[1];
-      else if (role.contains('bar')) _currentStation = StationConfig.defaultStations[2];
-      else if (role.contains('kitchen')) _currentStation = StationConfig.defaultStations[0];
-      else _currentStation = StationConfig.defaultStations[3]; // Default to PASS / EXPO (shows all)
+      if (role.contains('hot'))
+        _currentStation = StationConfig.defaultStations[0];
+      else if (role.contains('cold'))
+        _currentStation = StationConfig.defaultStations[1];
+      else if (role.contains('bar'))
+        _currentStation = StationConfig.defaultStations[2];
+      else if (role.contains('kitchen'))
+        _currentStation = StationConfig.defaultStations[0];
+      else
+        _currentStation = StationConfig
+            .defaultStations[3]; // Default to PASS / EXPO (shows all)
     }
-    
+
     print('🔥 KDS: Active Station is ${_currentStation?.name}');
     setState(() {});
   }
@@ -142,22 +176,33 @@ class _KDSScreenState extends State<KDSScreen> {
           Consumer2<OrdersProvider, MenuProvider>(
             builder: (context, ordersProvider, menuProvider, _) {
               // Track last update time from provider
-              if (ordersProvider.orders.isNotEmpty || !ordersProvider.isLoading) {
+              if (ordersProvider.orders.isNotEmpty ||
+                  !ordersProvider.isLoading) {
                 _lastUpdate = DateTime.now();
               }
 
               // Final station filtering
-              final stationOrders = _filterOrdersForStation(ordersProvider.kdsOrders, menuProvider.allItems);
-              
+              final stationOrders = _filterOrdersForStation(
+                ordersProvider.kdsOrders,
+                menuProvider.allItems,
+              );
+
               return Column(
                 children: [
                   _buildTopStatusBar(stationOrders.length, ordersProvider),
                   Expanded(
-                    child: (menuProvider.isLoading && menuProvider.allItems.isEmpty)
-                      ? const Center(child: CircularProgressIndicator())
-                      : (stationOrders.isEmpty 
-                        ? _buildEmptyState()
-                        : ClipRect(child: _buildOrderGrid(stationOrders, menuProvider.allItems))),
+                    child:
+                        (menuProvider.isLoading &&
+                            menuProvider.allItems.isEmpty)
+                        ? const Center(child: CircularProgressIndicator())
+                        : (stationOrders.isEmpty
+                              ? _buildEmptyState()
+                              : ClipRect(
+                                  child: _buildOrderGrid(
+                                    stationOrders,
+                                    menuProvider.allItems,
+                                  ),
+                                )),
                   ),
                   if (ordersProvider.latestNewOrder != null)
                     _buildNewOrderBanner(ordersProvider),
@@ -165,10 +210,9 @@ class _KDSScreenState extends State<KDSScreen> {
               );
             },
           ),
-          
+
           // Bug #8: Offline Overlay
-          if (_isOffline)
-            _buildOfflineOverlay(),
+          if (_isOffline) _buildOfflineOverlay(),
         ],
       ),
     );
@@ -198,18 +242,29 @@ class _KDSScreenState extends State<KDSScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Ionicons.cloud_offline_outline, size: isCompact ? 64 : 80, color: AdminTheme.critical),
+                      Icon(
+                        Ionicons.cloud_offline_outline,
+                        size: isCompact ? 64 : 80,
+                        color: AdminTheme.critical,
+                      ),
                       SizedBox(height: isCompact ? 16 : 24),
                       Text(
                         'CONNECTION LOST',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: isCompact ? 24 : 32, fontWeight: FontWeight.w900, color: AdminTheme.critical),
+                        style: TextStyle(
+                          fontSize: isCompact ? 24 : 32,
+                          fontWeight: FontWeight.w900,
+                          color: AdminTheme.critical,
+                        ),
                       ),
                       SizedBox(height: isCompact ? 12 : 16),
                       Text(
                         'The KDS has stopped receiving orders. This may be due to a network failure or session expiry.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: isCompact ? 14 : 18, color: AdminTheme.primaryText),
+                        style: TextStyle(
+                          fontSize: isCompact ? 14 : 18,
+                          color: AdminTheme.primaryText,
+                        ),
                       ),
                       SizedBox(height: isCompact ? 20 : 32),
                       ElevatedButton(
@@ -218,15 +273,26 @@ class _KDSScreenState extends State<KDSScreen> {
                           backgroundColor: AdminTheme.critical,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 56),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
-                        child: Text('RETRY & ACKNOWLEDGE', style: TextStyle(fontSize: isCompact ? 16 : 20, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          'RETRY & ACKNOWLEDGE',
+                          style: TextStyle(
+                            fontSize: isCompact ? 16 : 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                       SizedBox(height: isCompact ? 12 : 16),
                       Text(
                         'Manual acknowledgement is required to resume kitchen operations.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: isCompact ? 11 : 12, color: AdminTheme.secondaryText),
+                        style: TextStyle(
+                          fontSize: isCompact ? 11 : 12,
+                          color: AdminTheme.secondaryText,
+                        ),
                       ),
                     ],
                   ),
@@ -255,14 +321,26 @@ class _KDSScreenState extends State<KDSScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Ionicons.restaurant_outline, size: 16, color: AdminTheme.primaryColor),
+                Icon(
+                  Ionicons.restaurant_outline,
+                  size: 16,
+                  color: AdminTheme.primaryColor,
+                ),
                 SizedBox(width: 8.w),
                 Text(
                   _currentStation?.name ?? 'SELECT STATION',
-                  style: TextStyle(color: AdminTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 13.sp),
+                  style: TextStyle(
+                    color: AdminTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.sp,
+                  ),
                 ),
                 SizedBox(width: 4.w),
-                Icon(Ionicons.chevron_down, size: 14, color: AdminTheme.primaryColor),
+                Icon(
+                  Ionicons.chevron_down,
+                  size: 14,
+                  color: AdminTheme.primaryColor,
+                ),
               ],
             ),
           ),
@@ -281,14 +359,23 @@ class _KDSScreenState extends State<KDSScreen> {
                     Row(
                       children: [
                         Container(
-                          width: 10, height: 10,
-                          decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                         SizedBox(width: 8.w),
                         Expanded(
                           child: Text(
                             'KITCHEN DISPLAY',
-                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w900,
+                              color: AdminTheme.primaryText,
+                              letterSpacing: 1,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -298,7 +385,10 @@ class _KDSScreenState extends State<KDSScreen> {
                       ],
                     ),
                     SizedBox(height: 8.h),
-                    Align(alignment: Alignment.centerLeft, child: stationSelector),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: stationSelector,
+                    ),
                   ],
                 )
               : Row(
@@ -307,14 +397,23 @@ class _KDSScreenState extends State<KDSScreen> {
                       child: Row(
                         children: [
                           Container(
-                            width: 10, height: 10,
-                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                           SizedBox(width: 8.w),
                           Flexible(
                             child: Text(
                               'KITCHEN DISPLAY',
-                              style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AdminTheme.primaryText, letterSpacing: 1),
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                fontWeight: FontWeight.w900,
+                                color: AdminTheme.primaryText,
+                                letterSpacing: 1,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -339,7 +438,10 @@ class _KDSScreenState extends State<KDSScreen> {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(border: Border.all(color: AdminTheme.dividerColor), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(
+          border: Border.all(color: AdminTheme.dividerColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Icon(icon, size: 20, color: AdminTheme.secondaryText),
       ),
     );
@@ -352,13 +454,31 @@ class _KDSScreenState extends State<KDSScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: AdminTheme.dividerColor, width: 2)),
-            child: const Icon(Ionicons.restaurant_outline, size: 64, color: AdminTheme.secondaryText),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AdminTheme.dividerColor, width: 2),
+            ),
+            child: const Icon(
+              Ionicons.restaurant_outline,
+              size: 64,
+              color: AdminTheme.secondaryText,
+            ),
           ),
           const SizedBox(height: 24),
-          const Text('Awaiting orders...', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText)),
+          const Text(
+            'Awaiting orders...',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AdminTheme.secondaryText,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('New orders for this station will appear here automatically.', style: TextStyle(color: AdminTheme.secondaryText)),
+          const Text(
+            'New orders for this station will appear here automatically.',
+            style: TextStyle(color: AdminTheme.secondaryText),
+          ),
         ],
       ),
     );
@@ -417,12 +537,16 @@ class _KDSScreenState extends State<KDSScreen> {
     final age = DateTime.now().difference(order.createdAt);
     final isUrgent = age.inMinutes >= 10;
     final isMedium = age.inMinutes >= 5 && age.inMinutes < 10;
-    
-    final statusColor = isUrgent ? AdminTheme.critical : (isMedium ? Colors.orange : Colors.green);
+
+    final statusColor = isUrgent
+        ? AdminTheme.critical
+        : (isMedium ? Colors.orange : Colors.green);
     final statusLabel = isUrgent ? 'URGENT' : (isMedium ? 'COOKING' : 'NEW');
 
     final hasCheckedItems = _checkedItems[order.id]?.isNotEmpty ?? false;
-    final allCheckedReady = stationItems.every((item) => item.status == model.OrderItemStatus.ready);
+    final allCheckedReady = stationItems.every(
+      (item) => item.status == model.OrderItemStatus.ready,
+    );
 
     return Container(
       width: cardWidth,
@@ -430,7 +554,13 @@ class _KDSScreenState extends State<KDSScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -439,22 +569,34 @@ class _KDSScreenState extends State<KDSScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.05),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              border: Border(bottom: BorderSide(color: statusColor.withOpacity(0.2))),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              border: Border(
+                bottom: BorderSide(color: statusColor.withOpacity(0.2)),
+              ),
             ),
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                  Text(
-                    order.tableName ?? 'TAB 0',
-                    style: TextStyle(fontSize: isCompact ? 20.sp : 24, fontWeight: FontWeight.w900, color: AdminTheme.primaryText),
-                  ),
+                    Text(
+                      order.tableName ?? 'TAB 0',
+                      style: TextStyle(
+                        fontSize: isCompact ? 20.sp : 24,
+                        fontWeight: FontWeight.w900,
+                        color: AdminTheme.primaryText,
+                      ),
+                    ),
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Ionicons.information_circle_outline, size: 20, color: AdminTheme.secondaryText),
+                          icon: const Icon(
+                            Ionicons.information_circle_outline,
+                            size: 20,
+                            color: AdminTheme.secondaryText,
+                          ),
                           onPressed: () => _showOrderDetails(order, menuItems),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -462,7 +604,11 @@ class _KDSScreenState extends State<KDSScreen> {
                         const SizedBox(width: 8),
                         Text(
                           _formatDuration(age),
-                          style: TextStyle(fontSize: isCompact ? 16.sp : 18, fontWeight: FontWeight.bold, color: statusColor),
+                          style: TextStyle(
+                            fontSize: isCompact ? 16.sp : 18,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
                         ),
                       ],
                     ),
@@ -473,12 +619,29 @@ class _KDSScreenState extends State<KDSScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(4)),
-                      child: Text(statusLabel, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Ionicons.print_outline, size: 20, color: AdminTheme.secondaryText),
+                      icon: const Icon(
+                        Ionicons.print_outline,
+                        size: 20,
+                        color: AdminTheme.secondaryText,
+                      ),
                       onPressed: () => _printKOT(order),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -489,7 +652,7 @@ class _KDSScreenState extends State<KDSScreen> {
               ],
             ),
           ),
-          
+
           // Items List
           Expanded(
             child: ListView.builder(
@@ -498,18 +661,26 @@ class _KDSScreenState extends State<KDSScreen> {
               itemBuilder: (context, idx) {
                 final item = stationItems[idx];
                 final isReady = item.status == model.OrderItemStatus.ready;
-                final isChecked = (_checkedItems[order.id]?.contains(item.id) ?? false) || isReady;
-                
+                final isChecked =
+                    (_checkedItems[order.id]?.contains(item.id) ?? false) ||
+                    isReady;
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: InkWell(
-                    onTap: isReady ? null : () => _toggleItemCheck(order.id, item.id),
+                    onTap: isReady
+                        ? null
+                        : () => _toggleItemCheck(order.id, item.id),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                          color: isChecked ? AdminTheme.success : AdminTheme.secondaryText,
+                          isChecked
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          color: isChecked
+                              ? AdminTheme.success
+                              : AdminTheme.secondaryText,
                           size: 28,
                         ),
                         const SizedBox(width: 12),
@@ -520,10 +691,14 @@ class _KDSScreenState extends State<KDSScreen> {
                               Text(
                                 '${item.quantity}× ${item.name}',
                                 style: TextStyle(
-                                  fontSize: isCompact ? 14 : 16, 
-                                  fontWeight: FontWeight.bold, 
-                                  color: isChecked ? AdminTheme.secondaryText : AdminTheme.primaryText,
-                                  decoration: isReady ? TextDecoration.lineThrough : null,
+                                  fontSize: isCompact ? 14 : 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: isChecked
+                                      ? AdminTheme.secondaryText
+                                      : AdminTheme.primaryText,
+                                  decoration: isReady
+                                      ? TextDecoration.lineThrough
+                                      : null,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -531,17 +706,27 @@ class _KDSScreenState extends State<KDSScreen> {
                               if (item.notes != null && item.notes!.isNotEmpty)
                                 Text(
                                   item.notes!,
-                                  style: TextStyle(fontSize: isCompact ? 12 : 13, color: Colors.orange, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontSize: isCompact ? 12 : 13,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              if (item.addons != null && item.addons!.isNotEmpty)
-                                ...item.addons!.map((addon) => Text(
-                                  '• $addon',
-                                  style: TextStyle(fontSize: isCompact ? 11 : 12, color: AdminTheme.secondaryText),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )),
+                              if (item.addons != null &&
+                                  item.addons!.isNotEmpty)
+                                ...item.addons!.map(
+                                  (addon) => Text(
+                                    '• $addon',
+                                    style: TextStyle(
+                                      fontSize: isCompact ? 11 : 12,
+                                      color: AdminTheme.secondaryText,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -552,7 +737,7 @@ class _KDSScreenState extends State<KDSScreen> {
               },
             ),
           ),
-          
+
           // Action Button
           Padding(
             padding: EdgeInsets.all(16.w),
@@ -560,22 +745,31 @@ class _KDSScreenState extends State<KDSScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ElevatedButton(
-                  onPressed: (hasCheckedItems && !allCheckedReady) ? () => _markCheckedItemsReady(order.id, stationItems) : null,
+                  onPressed: (hasCheckedItems && !allCheckedReady)
+                      ? () => _markCheckedItemsReady(order.id, stationItems)
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AdminTheme.success,
                     foregroundColor: Colors.white,
                     minimumSize: Size(double.infinity, 48.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 0,
                     disabledBackgroundColor: Colors.grey[200],
                   ),
                   child: Text(
-                    allCheckedReady ? 'ALL READY' : 'MARK SELECTED READY', 
-                    style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3, fontSize: isCompact ? 11.sp : 13.sp)
+                    allCheckedReady ? 'ALL READY' : 'MARK SELECTED READY',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.3,
+                      fontSize: isCompact ? 11.sp : 13.sp,
+                    ),
                   ),
                 ),
                 if (_currentStation?.id == 'pass_expo' &&
-                    (context.read<AdminAuthProvider>().isAdmin || context.read<AdminAuthProvider>().isCaptain)) ...[
+                    (context.read<AdminAuthProvider>().isAdmin ||
+                        context.read<AdminAuthProvider>().isCaptain)) ...[
                   SizedBox(height: 8.h),
                   ElevatedButton(
                     onPressed: order.status == model.OrderStatus.ready
@@ -585,8 +779,13 @@ class _KDSScreenState extends State<KDSScreen> {
                       backgroundColor: Colors.white,
                       foregroundColor: AdminTheme.primaryColor,
                       minimumSize: Size(double.infinity, 48.h),
-                      side: const BorderSide(color: AdminTheme.primaryColor, width: 2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(
+                        color: AdminTheme.primaryColor,
+                        width: 2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: EdgeInsets.symmetric(vertical: 8.h),
                       elevation: 0,
                     ),
@@ -596,8 +795,12 @@ class _KDSScreenState extends State<KDSScreen> {
                         const Icon(Ionicons.checkmark_done_outline, size: 20),
                         const SizedBox(width: 8),
                         Text(
-                          'SERVE ENTIRE ORDER', 
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: isCompact ? 11.sp : 13.sp, letterSpacing: 0.3)
+                          'SERVE ENTIRE ORDER',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: isCompact ? 11.sp : 13.sp,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ],
                     ),
@@ -629,15 +832,20 @@ class _KDSScreenState extends State<KDSScreen> {
     });
   }
 
-
-  Future<void> _markCheckedItemsReady(String orderId, List<model.OrderItem> allItems) async {
+  Future<void> _markCheckedItemsReady(
+    String orderId,
+    List<model.OrderItem> allItems,
+  ) async {
     final provider = context.read<OrdersProvider>();
     final checkedItemIds = _checkedItems[orderId] ?? {};
-    
+
     if (checkedItemIds.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No items selected'), backgroundColor: AdminTheme.warning),
+          const SnackBar(
+            content: Text('No items selected'),
+            backgroundColor: AdminTheme.warning,
+          ),
         );
       }
       return;
@@ -649,7 +857,14 @@ class _KDSScreenState extends State<KDSScreen> {
         const SnackBar(
           content: Row(
             children: [
-              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
               SizedBox(width: 16),
               Text('Updating items...'),
             ],
@@ -664,9 +879,14 @@ class _KDSScreenState extends State<KDSScreen> {
       List<String> errors = [];
 
       for (var item in allItems) {
-        if (checkedItemIds.contains(item.id) && item.status != model.OrderItemStatus.ready) {
+        if (checkedItemIds.contains(item.id) &&
+            item.status != model.OrderItemStatus.ready) {
           try {
-            await provider.updateOrderItemStatus(orderId, item.id, model.OrderItemStatus.ready);
+            await provider.updateOrderItemStatus(
+              orderId,
+              item.id,
+              model.OrderItemStatus.ready,
+            );
             updatedCount++;
             debugPrint('✅ KDS: Marked item ${item.name} as READY');
           } catch (itemError) {
@@ -675,7 +895,7 @@ class _KDSScreenState extends State<KDSScreen> {
           }
         }
       }
-      
+
       // Clear checked items for this order
       setState(() {
         _checkedItems.remove(orderId);
@@ -683,11 +903,13 @@ class _KDSScreenState extends State<KDSScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
-        
+
         if (errors.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✓ $updatedCount item${updatedCount > 1 ? 's' : ''} marked as READY'),
+              content: Text(
+                '✓ $updatedCount item${updatedCount > 1 ? 's' : ''} marked as READY',
+              ),
               backgroundColor: AdminTheme.success,
               duration: const Duration(seconds: 2),
             ),
@@ -695,7 +917,9 @@ class _KDSScreenState extends State<KDSScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Updated $updatedCount item(s). ${errors.length} item(s) could not be updated.'),
+              content: Text(
+                'Updated $updatedCount item(s). ${errors.length} item(s) could not be updated.',
+              ),
               backgroundColor: AdminTheme.warning,
               duration: const Duration(seconds: 4),
             ),
@@ -704,12 +928,14 @@ class _KDSScreenState extends State<KDSScreen> {
       }
     } catch (e) {
       debugPrint('❌ KDS: Critical error in _markCheckedItemsReady: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Unable to update selected items. Please try again.'),
+            content: const Text(
+              'Unable to update selected items. Please try again.',
+            ),
             backgroundColor: AdminTheme.critical,
             duration: const Duration(seconds: 4),
             action: SnackBarAction(
@@ -725,11 +951,16 @@ class _KDSScreenState extends State<KDSScreen> {
 
   Future<void> _serveEntireOrder(model.Order order) async {
     try {
-      await context.read<OrdersProvider>().updateOrderStatus(order.id, model.OrderStatus.served);
+      await context.read<OrdersProvider>().updateOrderStatus(
+        order.id,
+        model.OrderStatus.served,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Order for ${order.tableName ?? "table"} marked as served'),
+          content: Text(
+            'Order for ${order.tableName ?? "table"} marked as served',
+          ),
           backgroundColor: AdminTheme.success,
         ),
       );
@@ -737,7 +968,9 @@ class _KDSScreenState extends State<KDSScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Unable to serve this order right now. Please try again.'),
+          content: const Text(
+            'Unable to serve this order right now. Please try again.',
+          ),
           backgroundColor: AdminTheme.critical,
         ),
       );
@@ -760,7 +993,10 @@ class _KDSScreenState extends State<KDSScreen> {
             final maxHeight = size.height * 0.9;
 
             return ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+              constraints: BoxConstraints(
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+              ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -770,15 +1006,38 @@ class _KDSScreenState extends State<KDSScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Table ${order.tableName}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                        IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Ionicons.close)),
+                        Text(
+                          'Table ${order.tableName}',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Ionicons.close),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text('Order ID: #${order.id.substring(0, 8)}', style: const TextStyle(color: AdminTheme.secondaryText)),
-                    Text('Order Age: ${_formatDuration(age)}', style: const TextStyle(color: AdminTheme.secondaryText)),
+                    Text(
+                      'Order ID: #${order.id.substring(0, 8)}',
+                      style: const TextStyle(color: AdminTheme.secondaryText),
+                    ),
+                    Text(
+                      'Order Age: ${_formatDuration(age)}',
+                      style: const TextStyle(color: AdminTheme.secondaryText),
+                    ),
                     const SizedBox(height: 24),
-                    const Text('STATION ITEMS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1, color: AdminTheme.secondaryText)),
+                    const Text(
+                      'STATION ITEMS',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                        color: AdminTheme.secondaryText,
+                      ),
+                    ),
                     const Divider(),
                     ConstrainedBox(
                       constraints: BoxConstraints(maxHeight: maxHeight * 0.45),
@@ -789,17 +1048,44 @@ class _KDSScreenState extends State<KDSScreen> {
                           final item = stationItems[idx];
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: Text('${item.quantity}× ${item.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: (item.notes != null || (item.addons != null && item.addons!.isNotEmpty)) 
-                              ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (item.notes != null) Text(item.notes!, style: const TextStyle(color: Colors.orange)),
-                                    if (item.addons != null) ...item.addons!.map((a) => Text('• $a')),
-                                  ],
-                                ) 
-                              : null,
-                            trailing: Text(item.status.displayName, style: TextStyle(color: item.status == model.OrderItemStatus.ready ? AdminTheme.success : AdminTheme.secondaryText, fontWeight: FontWeight.bold)),
+                            title: Text(
+                              '${item.quantity}× ${item.name}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle:
+                                (item.notes != null ||
+                                    (item.addons != null &&
+                                        item.addons!.isNotEmpty))
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (item.notes != null)
+                                        Text(
+                                          item.notes!,
+                                          style: const TextStyle(
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                      if (item.addons != null)
+                                        ...item.addons!.map(
+                                          (a) => Text('• $a'),
+                                        ),
+                                    ],
+                                  )
+                                : null,
+                            trailing: Text(
+                              item.status.displayName,
+                              style: TextStyle(
+                                color:
+                                    item.status == model.OrderItemStatus.ready
+                                    ? AdminTheme.success
+                                    : AdminTheme.secondaryText,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -812,7 +1098,9 @@ class _KDSScreenState extends State<KDSScreen> {
                             onPressed: () => _printKOT(order),
                             icon: const Icon(Ionicons.print_outline, size: 18),
                             label: const Text('PRINT KOT'),
-                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
                           ),
                         ),
                       ],
@@ -834,36 +1122,53 @@ class _KDSScreenState extends State<KDSScreen> {
         title: const Text('Select Kitchen Station'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: StationConfig.defaultStations.map((station) => ListTile(
-            title: Text(station.name),
-            selected: _currentStation?.id == station.id,
-            onTap: () {
-              setState(() => _currentStation = station);
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: StationConfig.defaultStations
+              .map(
+                (station) => ListTile(
+                  title: Text(station.name),
+                  selected: _currentStation?.id == station.id,
+                  onTap: () {
+                    setState(() => _currentStation = station);
+                    Navigator.pop(context);
+                  },
+                ),
+              )
+              .toList(),
         ),
       ),
     );
   }
 
-  List<model.Order> _filterOrdersForStation(List<model.Order> orders, List<MenuItem> menuItems) {
+  List<model.Order> _filterOrdersForStation(
+    List<model.Order> orders,
+    List<MenuItem> menuItems,
+  ) {
     var filtered = orders.toList();
-    
+
     if (_currentStation?.id != 'pass_expo') {
       filtered = filtered.where((order) {
         return order.items.any((item) {
           final menuItem = menuItems.firstWhere(
-            (mi) => mi.id == item.id || mi.name == item.name, 
-            orElse: () => MenuItem(id: '', name: '', category: '', price: 0, description: '', imageUrl: '', isManualAvailable: true, itemType: 'veg')
+            (mi) => mi.id == item.id || mi.name == item.name,
+            orElse: () => MenuItem(
+              id: '',
+              name: '',
+              category: '',
+              price: 0,
+              description: '',
+              imageUrl: '',
+              isManualAvailable: true,
+              itemType: 'veg',
+            ),
           );
           if (menuItem.id.isEmpty) return true; // Show in all if unknown
-          return _currentStation?.categories.contains(menuItem.category) ?? true;
+          return _currentStation?.categories.contains(menuItem.category) ??
+              true;
         });
       }).toList();
     }
 
-    // Robust Sorting logic: 
+    // Robust Sorting logic:
     // 1. Urgency Score (System score)
     // 2. Age (Oldest first)
     filtered.sort((a, b) {
@@ -875,13 +1180,25 @@ class _KDSScreenState extends State<KDSScreen> {
     return filtered;
   }
 
-  List<model.OrderItem> _filterItemsForStation(List<model.OrderItem> items, List<MenuItem> menuItems) {
+  List<model.OrderItem> _filterItemsForStation(
+    List<model.OrderItem> items,
+    List<MenuItem> menuItems,
+  ) {
     if (_currentStation?.id == 'pass_expo') return items;
-    
+
     return items.where((item) {
       final menuItem = menuItems.firstWhere(
-        (mi) => mi.id == item.id || mi.name == item.name, 
-        orElse: () => MenuItem(id: '', name: '', category: '', price: 0, description: '', imageUrl: '', isManualAvailable: true, itemType: 'veg')
+        (mi) => mi.id == item.id || mi.name == item.name,
+        orElse: () => MenuItem(
+          id: '',
+          name: '',
+          category: '',
+          price: 0,
+          description: '',
+          imageUrl: '',
+          isManualAvailable: true,
+          itemType: 'veg',
+        ),
       );
       if (menuItem.id.isEmpty) return true; // Keep if unknown to be safe
       return _currentStation?.categories.contains(menuItem.category) ?? true;
@@ -904,19 +1221,40 @@ class _KDSScreenState extends State<KDSScreen> {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Center(
-                  child: pw.Text('KOT Ticket', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  child: pw.Text(
+                    'KOT Ticket',
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
                 ),
                 pw.Divider(),
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('Table: ${order.tableName ?? "N/A"}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                    pw.Text(DateFormat('h:mm a').format(order.createdAt), style: const pw.TextStyle(fontSize: 12)),
+                    pw.Text(
+                      'Table: ${order.tableName ?? "N/A"}',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    pw.Text(
+                      DateFormat('h:mm a').format(order.createdAt),
+                      style: const pw.TextStyle(fontSize: 12),
+                    ),
                   ],
                 ),
-                pw.Text('Order: #${order.id.substring(0, 8)}', style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  'Order: #${order.id.substring(0, 8)}',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
                 if (order.customerName != null)
-                   pw.Text('Cust: ${order.customerName}', style: const pw.TextStyle(fontSize: 10)),
+                  pw.Text(
+                    'Cust: ${order.customerName}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
                 pw.Divider(borderStyle: pw.BorderStyle.dashed),
                 pw.SizedBox(height: 5),
                 ...order.items.map((item) {
@@ -927,20 +1265,50 @@ class _KDSScreenState extends State<KDSScreen> {
                       children: [
                         pw.Container(
                           width: 20,
-                          child: pw.Text('${item.quantity}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                          child: pw.Text(
+                            '${item.quantity}',
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                         pw.Expanded(
                           child: pw.Column(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
                             children: [
-                              pw.Text(item.name, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
-                               /* Variants display in KOT */
-                              if (item.variantName != null) 
-                                pw.Text('(${item.variantName})', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                              pw.Text(
+                                item.name,
+                                style: pw.TextStyle(
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              /* Variants display in KOT */
+                              if (item.variantName != null)
+                                pw.Text(
+                                  '(${item.variantName})',
+                                  style: pw.TextStyle(
+                                    fontSize: 10,
+                                    fontStyle: pw.FontStyle.italic,
+                                  ),
+                                ),
                               if (item.notes != null && item.notes!.isNotEmpty)
-                                pw.Text('Note: ${item.notes}', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
-                              if (item.addons != null && item.addons!.isNotEmpty)
-                                ...item.addons!.map((a) => pw.Text('+ $a', style: const pw.TextStyle(fontSize: 10))),
+                                pw.Text(
+                                  'Note: ${item.notes}',
+                                  style: pw.TextStyle(
+                                    fontSize: 10,
+                                    fontStyle: pw.FontStyle.italic,
+                                  ),
+                                ),
+                              if (item.addons != null &&
+                                  item.addons!.isNotEmpty)
+                                ...item.addons!.map(
+                                  (a) => pw.Text(
+                                    '+ $a',
+                                    style: const pw.TextStyle(fontSize: 10),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -950,7 +1318,10 @@ class _KDSScreenState extends State<KDSScreen> {
                 }).toList(),
                 pw.Divider(),
                 pw.Center(
-                  child: pw.Text('Printed at ${DateFormat('h:mm a').format(DateTime.now())}', style: const pw.TextStyle(fontSize: 8)),
+                  child: pw.Text(
+                    'Printed at ${DateFormat('h:mm a').format(DateTime.now())}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
                 ),
               ],
             );
@@ -965,7 +1336,9 @@ class _KDSScreenState extends State<KDSScreen> {
     } catch (e) {
       debugPrint('Error printing KOT: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Print Error: $e')));
       }
     }
   }
@@ -984,12 +1357,20 @@ class _KDSScreenState extends State<KDSScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Ionicons.alert_circle, color: Colors.white, size: 22.w),
+                        Icon(
+                          Ionicons.alert_circle,
+                          color: Colors.white,
+                          size: 22.w,
+                        ),
                         SizedBox(width: 10.w),
                         Expanded(
                           child: Text(
                             'NEW ORDER: ${order.tableName} • #${order.id.substring(0, 8)}',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.sp),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.sp,
+                            ),
                           ),
                         ),
                       ],
@@ -1001,7 +1382,12 @@ class _KDSScreenState extends State<KDSScreen> {
                         onPressed: () => provider.clearLatestNewOrder(),
                         child: Text(
                           'ACKNOWLEDGE',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, decoration: TextDecoration.underline, fontSize: 12.sp),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            decoration: TextDecoration.underline,
+                            fontSize: 12.sp,
+                          ),
                         ),
                       ),
                     ),
@@ -1009,17 +1395,33 @@ class _KDSScreenState extends State<KDSScreen> {
                 )
               : Row(
                   children: [
-                    Icon(Ionicons.alert_circle, color: Colors.white, size: 24.w),
+                    Icon(
+                      Ionicons.alert_circle,
+                      color: Colors.white,
+                      size: 24.w,
+                    ),
                     SizedBox(width: 16.w),
                     Expanded(
                       child: Text(
                         'NEW ORDER RECEIVED: Table ${order.tableName} - #${order.id.substring(0, 8)}',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14.sp),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14.sp,
+                        ),
                       ),
                     ),
                     TextButton(
                       onPressed: () => provider.clearLatestNewOrder(),
-                      child: Text('ACKNOWLEDGE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, decoration: TextDecoration.underline, fontSize: 13.sp)),
+                      child: Text(
+                        'ACKNOWLEDGE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          decoration: TextDecoration.underline,
+                          fontSize: 13.sp,
+                        ),
+                      ),
                     ),
                   ],
                 ),

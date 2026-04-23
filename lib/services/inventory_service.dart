@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_log.dart';
 import '../models/tenant_model.dart';
@@ -180,7 +181,8 @@ class InventoryService {
     });
   }
 
-  /// Deduct stock based on a completed order and its recipe linkage
+  /// Deduct stock based on a completed order and its recipe linkage.
+  /// Accepts both List<CartItem> and List<OrderItem> via dynamic dispatch.
   Future<void> deductStockForOrder({
     required String tenantId,
     required String orderId,
@@ -189,25 +191,45 @@ class InventoryService {
     required String performedBy,
   }) async {
     for (var orderItem in orderItems) {
+      // P0-3: Resolve item ID and quantity regardless of CartItem vs OrderItem type
+      String itemId;
+      int qty;
+      try {
+        // OrderItem has .id directly; CartItem has .item.id
+        final dynamic raw = orderItem;
+        if (raw.item != null) {
+          // CartItem
+          itemId = (raw.item.id as String?) ?? '';
+          qty = (raw.quantity as int?) ?? 0;
+        } else {
+          itemId = (raw.id as String?) ?? '';
+          qty = (raw.quantity as int?) ?? 0;
+        }
+      } catch (_) {
+        continue;
+      }
+      if (itemId.isEmpty || qty <= 0) continue;
+
       // 1. Find the menu item definition
       final definition = menuDefinitions.firstWhere(
-        (m) => m.id == (orderItem as dynamic).id,
+        (m) => m.id == itemId,
         orElse: () => MenuItem(id: '', name: '', description: '', price: 0),
       );
 
-      if (definition.inventoryTrackingType == InventoryTrackingType.none)
+      if (definition.inventoryTrackingType == InventoryTrackingType.none) {
         continue;
+      }
 
       // 2. Process each ingredient
       for (var entry in definition.inventoryIngredients.entries) {
-        final itemId = entry.key;
+        final ingredientId = entry.key;
         final qtyPerSale = entry.value;
-        final totalDeduction = -(qtyPerSale * (orderItem as dynamic).quantity);
+        final totalDeduction = -(qtyPerSale * qty);
 
         try {
           await updateStock(
             tenantId: tenantId,
-            itemId: itemId,
+            itemId: ingredientId,
             quantityChange: totalDeduction,
             type: InventoryChangeType.stockOut,
             reason: InventoryChangeReason.sale,
@@ -215,13 +237,17 @@ class InventoryService {
             sourceId: 'Order: ${orderId.substring(0, 8)}',
           );
 
-          // Check if stock is now zero and update menu availability
-          final updatedItem = await getItem(tenantId, itemId);
+          // P0-3: Check if stock is now zero and flag menu item as out-of-stock
+          final updatedItem = await getItem(tenantId, ingredientId);
           if (updatedItem != null && updatedItem.currentStock <= 0) {
-            _markLinkedMenuItemsUnavailable(tenantId, itemId, menuDefinitions);
+            _markLinkedMenuItemsUnavailable(
+              tenantId,
+              ingredientId,
+              menuDefinitions,
+            );
           }
         } catch (e) {
-          print('Failed to deduct stock for $itemId: $e');
+          debugPrint('Failed to deduct stock for $ingredientId: $e');
         }
       }
     }

@@ -30,6 +30,8 @@ class OrderNotificationOrchestrator {
   final NotificationPreferencesService _preferencesService =
       NotificationPreferencesService();
   final Queue<String> _speechQueue = Queue<String>();
+  DateTime? _lastSpeechTime;
+  String? _lastSpeechText;
 
   NotificationPreferences _preferences = const NotificationPreferences();
   Timer? _repeatTimer;
@@ -76,6 +78,7 @@ class OrderNotificationOrchestrator {
   Future<void> handleForegroundOrderEvent({
     required OrderAlertType type,
     required model.Order order,
+    String? speechOverride,
   }) async {
     final summary = _buildSummary(order);
     await _showHeadsUp(order, summary, type);
@@ -83,7 +86,7 @@ class OrderNotificationOrchestrator {
     switch (type) {
       case OrderAlertType.newOrder:
         await _runAlarmLoop();
-        await _speakIfNeeded(_buildSpeech(order));
+        await _speakIfNeeded(speechOverride ?? _buildSpeech(order));
         break;
       case OrderAlertType.orderReady:
         await _playTone(repeats: 3);
@@ -111,12 +114,15 @@ class OrderNotificationOrchestrator {
   }
 
   Future<void> _runAlarmLoop() async {
+    // Always clear any existing loop before deciding single vs repeat playback.
+    _repeatTimer?.cancel();
+    _repeatTimer = null;
+
     if (!_shouldPlaySound || !_preferences.repeatAlarm) {
       await _playTone(repeats: 1);
       return;
     }
 
-    _repeatTimer?.cancel();
     await _playTone(repeats: 1);
     _repeatTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
       await _playTone(repeats: 1);
@@ -184,16 +190,48 @@ class OrderNotificationOrchestrator {
           final spice = item.selectedSpiceLevel == null
               ? ''
               : ' ${item.selectedSpiceLevel}';
-          return '${item.quantity} ${item.name}$spice';
+          return '${item.quantity} ${_normalizeForSpeech(item.name)}$spice';
         })
         .join(', ');
     return '$items for ${order.tableName ?? "pickup"}';
   }
 
+  String _normalizeForSpeech(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return raw;
+
+    final looksAllCaps =
+        trimmed == trimmed.toUpperCase() &&
+        RegExp(r'[A-Z]').hasMatch(trimmed) &&
+        !RegExp(r'[a-z]').hasMatch(trimmed);
+
+    if (!looksAllCaps) return trimmed;
+
+    // Avoid TTS spelling letter-by-letter for uppercase menu names like "LASSI".
+    return trimmed
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
   Future<void> _speakIfNeeded(String text) async {
     if (!_shouldSpeak || text.trim().isEmpty) return;
+
+    // P1-6: Deduplicate — ignore same text queued within 500ms
+    final now = DateTime.now();
+    if (_lastSpeechText == text &&
+        _lastSpeechTime != null &&
+        now.difference(_lastSpeechTime!).inMilliseconds < 500) {
+      return;
+    }
+    _lastSpeechText = text;
+    _lastSpeechTime = now;
+
     _speechQueue.add(text);
-    if (_isSpeaking) return;
+    if (_isSpeaking)
+      return; // P1-6: Single queue — don't start a second speaker
 
     _isSpeaking = true;
     try {

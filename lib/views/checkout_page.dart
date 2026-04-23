@@ -38,7 +38,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   model.PaymentStatus _paymentStatus = model.PaymentStatus.pending;
   bool _isProcessing = false;
   String? _orderId;
-  double _taxRate = 0.05; // Default 5%
+  double _taxRate = 0.18; // Default 18% GST
   String _taxLabel = 'GST';
   double _discount = 0;
 
@@ -52,17 +52,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
   Future<void> _loadGuestProfile() async {
     final profile = await _guestSession.getGuestProfile();
     final settings = await _orderService.getTenantSettings(widget.tenantId);
-    
+
     if (mounted) {
       setState(() {
         if (profile != null) {
           _nameController.text = profile.name;
           _phoneController.text = profile.phone ?? '';
         }
-        
+
         // Load tax settings
         final s = settings['settings'] ?? {};
-        _taxRate = (s['taxRate'] as num?)?.toDouble() ?? 0.05;
+        _taxRate = (s['taxRate'] as num?)?.toDouble() ?? 0.18;
         _taxLabel = s['taxLabel'] ?? 'Tax';
       });
       print('✅ Prefilled customer details and settings');
@@ -76,11 +76,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
     super.dispose();
   }
 
-  Future<void> _processCheckout(CartController cart, OrderController orderController) async {
+  Future<void> _processCheckout(
+    CartController cart,
+    OrderController orderController,
+  ) async {
     if (_isProcessing) return; // Immediate duplicate prevention
 
     if (!_formKey.currentState!.validate()) {
-      SnackbarHelper.showTopSnackBar(context, 'Please fill in all required fields');
+      SnackbarHelper.showTopSnackBar(
+        context,
+        'Please fill in all required fields',
+      );
       return;
     }
 
@@ -96,12 +102,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
       _orderId = await _orderService.createOrder(
         tenantId: widget.tenantId,
         guestId: guestId,
-        orderType: widget.orderType == 'dineIn' ? orm.OrderType.dineIn : orm.OrderType.parcel,
+        orderType: widget.orderType == 'dineIn'
+            ? orm.OrderType.dineIn
+            : orm.OrderType.parcel,
         tableId: widget.tableId,
         cartItems: cart.items,
         notes: 'Order placed via checkout',
         customerName: _nameController.text.trim(),
-        customerPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        customerPhone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
         paymentStatus: model.PaymentStatus.pending,
         requestId: requestId,
         sessionId: orderController.currentSession?.sessionId, // Pass session ID
@@ -115,7 +125,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
       // Save guest profile for CRM
       await _guestSession.updateGuestProfile(
         name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
       );
 
       // CRITICAL: Mark order as confirmed BEFORE clearing cart
@@ -126,13 +138,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
 
       // Clear cart after successful order
-      cart.clear();
+      await cart.clear();
 
       if (mounted) {
-        final successMsg = widget.orderType == 'dineIn' 
+        final successMsg = widget.orderType == 'dineIn'
             ? 'Order received by kitchen! Preparing your meal...'
             : 'Order received! We\'ll notify you when it\'s ready.';
-            
+
         SnackbarHelper.showTopSnackBar(context, successMsg);
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
@@ -143,11 +155,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
-  Future<void> _sendToKitchen(CartController cart, OrderController orderController) async {
+  Future<void> _sendToKitchen(
+    CartController cart,
+    OrderController orderController,
+  ) async {
     if (_isProcessing) return;
 
     if (!_formKey.currentState!.validate()) {
-      SnackbarHelper.showTopSnackBar(context, 'Please fill in all required fields');
+      SnackbarHelper.showTopSnackBar(
+        context,
+        'Please fill in all required fields',
+      );
       return;
     }
 
@@ -165,14 +183,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
         cartItems: cart.items,
         notes: 'Dine-in order sent to kitchen',
         customerName: _nameController.text.trim(),
-        customerPhone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        customerPhone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
         requestId: requestId,
         sessionId: orderController.currentSession?.sessionId, // Pass session ID
       );
 
       await _guestSession.updateGuestProfile(
         name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
       );
 
       // CRITICAL: Mark order as confirmed BEFORE clearing cart
@@ -183,10 +205,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
 
       // Clear cart after successful order
-      cart.clear();
+      await cart.clear();
 
       if (mounted) {
-        SnackbarHelper.showTopSnackBar(context, 'Order received! Cooking started.');
+        SnackbarHelper.showTopSnackBar(
+          context,
+          'Order received! Cooking started.',
+        );
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
@@ -219,8 +244,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                        onPressed: cart.items.isEmpty ? null : () => _sendToKitchen(cart, orderController),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: cart.items.isEmpty
+                            ? null
+                            : () => _sendToKitchen(cart, orderController),
                         child: const Text('Send to Kitchen (Add-on)'),
                       ),
                     ),
@@ -228,7 +258,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: cart.items.isEmpty ? null : () => _processCheckout(cart, orderController),
+                        onPressed: cart.items.isEmpty
+                            ? null
+                            : () => _processCheckout(cart, orderController),
                         child: const Text('Proceed to Payment'),
                       ),
                     ),
@@ -238,7 +270,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: cart.items.isEmpty ? null : () => _processCheckout(cart, orderController),
+                    onPressed: cart.items.isEmpty
+                        ? null
+                        : () => _processCheckout(cart, orderController),
                     child: const Text('Complete Order'),
                   ),
                 ),
@@ -255,10 +289,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            ...cart.items.map((i) => Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [Text('${i.quantity}x ${i.item.name}'), Text('₹${i.item.price * i.quantity}')],
-            )),
+            ...cart.items.map(
+              (i) => Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('${i.quantity}x ${i.item.name}'),
+                  Text('₹${i.item.price * i.quantity}'),
+                ],
+              ),
+            ),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -272,7 +311,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('$_taxLabel (${(_taxRate * 100).toInt()}%)'),
-                Text('₹${((cart.totalAmount - _discount) * _taxRate).toStringAsFixed(2)}'),
+                Text(
+                  '₹${((cart.totalAmount - _discount) * _taxRate).toStringAsFixed(2)}',
+                ),
               ],
             ),
             if (_discount > 0) ...[
@@ -281,7 +322,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Discount', style: TextStyle(color: Colors.green)),
-                  Text('-₹${_discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
+                  Text(
+                    '-₹${_discount.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.green),
+                  ),
                 ],
               ),
             ],
@@ -289,10 +333,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total (incl. 18% GST)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Text(
+                  'Total (incl. 18% GST)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
                 Text(
-                  '₹${((cart.totalAmount - _discount) * (1 + _taxRate)).toStringAsFixed(2)}', 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)
+                  '₹${((cart.totalAmount - _discount) * (1 + _taxRate)).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.black,
+                  ),
                 ),
               ],
             ),

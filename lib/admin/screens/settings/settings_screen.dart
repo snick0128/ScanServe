@@ -26,9 +26,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _descriptionController;
   late TextEditingController _taxRateController;
   late TextEditingController _avgPrepTimeController;
+  late TextEditingController _billHeaderNameController;
+  late TextEditingController _billTitleController;
+  late TextEditingController _billAddressController;
+  late TextEditingController _billPhoneController;
+  late TextEditingController _billGstinController;
+  late TextEditingController _billFssaiController;
+  late TextEditingController _billTaxLabelController;
+  late TextEditingController _billFooterController;
   bool _isVegOnly = false;
   bool _captainCanDeleteItems = true;
   bool _captainRequiresApproval = false;
+  bool _billShowTable = true;
+  bool _billShowPaymentMethod = true;
+  bool _billShowCustomerDetails = true;
   NotificationPreferences _notificationPreferences =
       const NotificationPreferences();
   final NotificationPreferencesService _notificationPreferencesService =
@@ -46,6 +57,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _descriptionController = TextEditingController();
     _taxRateController = TextEditingController();
     _avgPrepTimeController = TextEditingController();
+    _billHeaderNameController = TextEditingController();
+    _billTitleController = TextEditingController(text: 'GUEST RECEIPT');
+    _billAddressController = TextEditingController();
+    _billPhoneController = TextEditingController();
+    _billGstinController = TextEditingController();
+    _billFssaiController = TextEditingController();
+    _billTaxLabelController = TextEditingController(text: 'GST');
+    _billFooterController = TextEditingController(
+      text: 'THANK YOU. VISIT AGAIN.',
+    );
     _loadSettings();
   }
 
@@ -55,6 +76,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _descriptionController.dispose();
     _taxRateController.dispose();
     _avgPrepTimeController.dispose();
+    _billHeaderNameController.dispose();
+    _billTitleController.dispose();
+    _billAddressController.dispose();
+    _billPhoneController.dispose();
+    _billGstinController.dispose();
+    _billFssaiController.dispose();
+    _billTaxLabelController.dispose();
+    _billFooterController.dispose();
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     super.dispose();
@@ -70,6 +99,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (doc.exists) {
         final data = doc.data()!;
+        final settings = (data['settings'] as Map<String, dynamic>?) ?? {};
+        final billTemplate =
+            (settings['billTemplate'] as Map<String, dynamic>?) ?? {};
         final notificationPreferences = await _notificationPreferencesService
             .load();
         setState(() {
@@ -79,10 +111,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               .toString();
           _avgPrepTimeController.text = (data['avgPrepTime'] ?? 25).toString();
           _isVegOnly = data['isVegOnly'] ?? false;
-          final captainSettings = data['settings']?['captainPermissions'] ?? {};
+          final captainSettings = settings['captainPermissions'] ?? {};
           _captainCanDeleteItems = captainSettings['canDeleteItems'] ?? true;
           _captainRequiresApproval =
               captainSettings['requiresApproval'] ?? false;
+          _billHeaderNameController.text =
+              (billTemplate['restaurantName'] ?? data['name'] ?? '').toString();
+          _billTitleController.text =
+              (billTemplate['receiptTitle'] ?? 'GUEST RECEIPT').toString();
+          _billAddressController.text = (billTemplate['address'] ?? '')
+              .toString();
+          _billPhoneController.text = (billTemplate['phone'] ?? '').toString();
+          _billGstinController.text = (billTemplate['gstin'] ?? '').toString();
+          _billFssaiController.text = (billTemplate['fssai'] ?? '').toString();
+          _billTaxLabelController.text = (settings['taxLabel'] ?? 'GST')
+              .toString();
+          _billFooterController.text =
+              (billTemplate['footerMessage'] ?? 'THANK YOU. VISIT AGAIN.')
+                  .toString();
+          _billShowTable = billTemplate['showTable'] != false;
+          _billShowPaymentMethod = billTemplate['showPaymentMethod'] != false;
+          _billShowCustomerDetails =
+              billTemplate['showCustomerDetails'] != false;
           _notificationPreferences = notificationPreferences;
           _isLoading = false;
         });
@@ -111,10 +161,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'canDeleteItems': _captainCanDeleteItems,
           'requiresApproval': _captainRequiresApproval,
         },
+        'settings.taxLabel': _billTaxLabelController.text.trim().isEmpty
+            ? 'GST'
+            : _billTaxLabelController.text.trim(),
+        'settings.billTemplate': {
+          'restaurantName': _billHeaderNameController.text.trim().isEmpty
+              ? _nameController.text.trim()
+              : _billHeaderNameController.text.trim(),
+          'receiptTitle': _billTitleController.text.trim().isEmpty
+              ? 'GUEST RECEIPT'
+              : _billTitleController.text.trim(),
+          'address': _billAddressController.text.trim(),
+          'phone': _billPhoneController.text.trim(),
+          'gstin': _billGstinController.text.trim(),
+          'fssai': _billFssaiController.text.trim(),
+          'footerMessage': _billFooterController.text.trim().isEmpty
+              ? 'THANK YOU. VISIT AGAIN.'
+              : _billFooterController.text.trim(),
+          'showTable': _billShowTable,
+          'showPaymentMethod': _billShowPaymentMethod,
+          'showCustomerDetails': _billShowCustomerDetails,
+        },
       });
       await OrderNotificationOrchestrator.instance.updatePreferences(
         _notificationPreferences,
       );
+      try {
+        await context.read<OrdersProvider>().refreshTenantSettings();
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -434,6 +508,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 );
               },
+            ),
+            const Divider(height: 32),
+            const Text(
+              'Bill Template Settings',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Customize receipt branding and bill fields shown to guests.',
+              style: TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _billHeaderNameController,
+              decoration: const InputDecoration(
+                labelText: 'Bill Header Name',
+                hintText: 'Restaurant name on printed bill',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _billTitleController,
+              decoration: const InputDecoration(
+                labelText: 'Receipt Title',
+                hintText: 'Example: GUEST RECEIPT',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _billTaxLabelController,
+              decoration: const InputDecoration(
+                labelText: 'Tax Label',
+                hintText: 'GST / VAT / TAX',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _billAddressController,
+              decoration: const InputDecoration(
+                labelText: 'Address',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _billPhoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'Support Phone',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _billGstinController,
+                    decoration: const InputDecoration(
+                      labelText: 'GSTIN',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _billFssaiController,
+              decoration: const InputDecoration(
+                labelText: 'FSSAI No. (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _billFooterController,
+              decoration: const InputDecoration(
+                labelText: 'Footer Message',
+                hintText: 'Message shown at bottom of bill',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              title: const Text('Show Table on Bill'),
+              value: _billShowTable,
+              onChanged: (value) => setState(() => _billShowTable = value),
+              contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              title: const Text('Show Payment Method'),
+              value: _billShowPaymentMethod,
+              onChanged: (value) =>
+                  setState(() => _billShowPaymentMethod = value),
+              contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              title: const Text('Show Customer Details'),
+              value: _billShowCustomerDetails,
+              onChanged: (value) =>
+                  setState(() => _billShowCustomerDetails = value),
+              contentPadding: EdgeInsets.zero,
             ),
             const Divider(height: 32),
             const Text(

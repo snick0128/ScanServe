@@ -80,9 +80,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       bottomNavigationBar:
           (isMobile && !context.read<AdminAuthProvider>().isKitchen)
           ? BottomNavigationBar(
+              // P3-14: Dashboard(0) → Table(2) → Order(3) → Bill(4) → More
               currentIndex: _selectedIndex == 0
                   ? 0
-                  : (_selectedIndex == 2 ? 1 : (_selectedIndex == 3 ? 2 : 0)),
+                  : (_selectedIndex == 2
+                        ? 1
+                        : (_selectedIndex == 3
+                              ? 2
+                              : (_selectedIndex == 4 ? 3 : 0))),
               onTap: (index) {
                 if (index == 0)
                   _onItemTapped(0);
@@ -90,6 +95,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _onItemTapped(2);
                 else if (index == 2)
                   _onItemTapped(3);
+                else if (index == 3)
+                  _onItemTapped(4);
                 else {
                   _scaffoldKey.currentState?.openDrawer();
                 }
@@ -103,12 +110,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Home',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Ionicons.restaurant_outline),
+                  icon: Icon(Ionicons.tablet_landscape_outline),
                   label: 'Tables',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Ionicons.list_outline),
                   label: 'Orders',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Ionicons.receipt_outline),
+                  label: 'Bill',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Ionicons.menu_outline),
@@ -467,16 +478,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final now = DateTime.now();
         final todayStart = DateTime(now.year, now.month, now.day);
-        final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+        final todayEnd = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          23,
+          59,
+          59,
+          999,
+        );
 
         DateTime _effectivePaidAt(model.Order o) {
           return o.paidAt ?? o.updatedAt ?? o.createdAt;
         }
 
         final revenue = ordersProvider.pastOrders
-            .where((o) =>
-                o.status == model.OrderStatus.completed &&
-                o.paymentStatus == model.PaymentStatus.paid)
+            .where(
+              (o) =>
+                  o.status == model.OrderStatus.completed &&
+                  o.paymentStatus == model.PaymentStatus.paid,
+            )
             .where((o) {
               final paidAt = _effectivePaidAt(o);
               return !paidAt.isBefore(todayStart) && !paidAt.isAfter(todayEnd);
@@ -1179,11 +1200,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   String tableName = isBill
                       ? (call as BillRequest).tableName ?? 'Table'
                       : (call as WaiterCall).tableName ?? 'Table';
-                  final waiterNotes = isBill ? null : (call as WaiterCall).notes?.toString().trim();
-                  final waiterLabel = (waiterNotes == null || waiterNotes.isEmpty)
+                  final waiterNotes = isBill
+                      ? null
+                      : (call as WaiterCall).notes?.toString().trim();
+                  final waiterLabel =
+                      (waiterNotes == null || waiterNotes.isEmpty)
                       ? 'Waiter Service'
                       : waiterNotes;
-                  final waiterIcon = (waiterNotes != null && waiterNotes.toLowerCase().contains('water'))
+                  final waiterIcon =
+                      (waiterNotes != null &&
+                          waiterNotes.toLowerCase().contains('water'))
                       ? Icons.local_drink_outlined
                       : Ionicons.person;
 

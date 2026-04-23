@@ -159,9 +159,11 @@ class OrderController extends ChangeNotifier {
         .listen((doc) {
           if (!doc.exists) return;
 
-          final updatedOrder = OrderDetails.fromMap(
-            doc.data()!..['id'] = doc.id,
-          );
+          final data = doc.data() ?? <String, dynamic>{};
+          final updatedOrder = OrderDetails.fromMap({
+            ...data,
+            'orderId': data['orderId'] ?? doc.id,
+          });
           final index = _activeOrders.indexWhere((o) => o.orderId == orderId);
 
           if (index != -1) {
@@ -245,7 +247,10 @@ class OrderController extends ChangeNotifier {
             final orderData = doc.data();
 
             try {
-              final orderDetails = OrderDetails.fromMap(orderData);
+              final orderDetails = OrderDetails.fromMap({
+                ...orderData,
+                'orderId': orderData['orderId'] ?? doc.id,
+              });
 
               final isPast =
                   orderDetails.status == OrderStatus.cancelled ||
@@ -254,8 +259,12 @@ class OrderController extends ChangeNotifier {
               // If we have a tableId filter, only show orders for this table AND session (dine-in)
               // Otherwise show all orders for this guest
               if (tableId != null && orderDetails.type == OrderType.dineIn) {
-                if (orderDetails.tableId == tableId &&
-                    orderDetails.sessionId == _currentSession?.sessionId) {
+                final matchesTable = orderDetails.tableId == tableId;
+                final matchesCurrentSession =
+                    _currentSession?.sessionId == null ||
+                    orderDetails.sessionId == _currentSession?.sessionId;
+
+                if (matchesTable && (isPast || matchesCurrentSession)) {
                   if (isPast) {
                     _pastOrders.add(orderDetails);
                   } else {

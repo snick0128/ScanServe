@@ -1057,7 +1057,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                   ),
                   _textField('Photo URL (optional)', photoController),
                   _textField('User UID (optional)', userIdController),
-                  _textField('Login Email (optional)', emailController),
+                  _textField('Login Email (required)', emailController),
                   _textField('Base Salary', salaryController, isNumber: true),
                   _textField('Rating (0-5)', ratingController, isNumber: true),
                   SizedBox(height: 10.h),
@@ -1171,6 +1171,22 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                 final rating =
                     double.tryParse(ratingController.text.trim()) ?? 0;
                 final now = DateTime.now();
+
+                // P2-13: Email is mandatory
+                final emailText = emailController.text.trim();
+                if (emailText.isEmpty) {
+                  _showSnack(context, 'Email is required', isError: true);
+                  return;
+                }
+                if (!emailText.contains('@') || !emailText.contains('.')) {
+                  _showSnack(
+                    context,
+                    'Enter a valid email address',
+                    isError: true,
+                  );
+                  return;
+                }
+
                 final updated = StaffProfile(
                   id: staff?.id ?? '',
                   name: nameController.text.trim(),

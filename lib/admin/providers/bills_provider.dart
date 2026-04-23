@@ -27,7 +27,7 @@ class ActiveSession {
 
 class BillsProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const double _fallbackTaxRate = 0.05;
+  static const double _fallbackTaxRate = 0.18;
 
   List<Map<String, dynamic>> _allBills = [];
   bool _isLoading = false;
@@ -55,12 +55,16 @@ class BillsProvider with ChangeNotifier {
 
     final Query query;
     if (_tenantId == 'global') {
-      query = _firestore.collectionGroup('bills').limit(100);
+      query = _firestore
+          .collectionGroup('bills')
+          .orderBy('createdAt', descending: true)
+          .limit(100);
     } else {
       query = _firestore
           .collection('tenants')
           .doc(_tenantId)
-          .collection('bills');
+          .collection('bills')
+          .orderBy('createdAt', descending: true); // P1-8: newest first
     }
 
     _billsSubscription = query.snapshots().listen(
@@ -193,52 +197,38 @@ class BillsProvider with ChangeNotifier {
   }) async {
     if (_tenantId == null || _ordersProvider == null) return null;
 
-    try {
-      // 1. Get current orders for this session
-      final orders = _ordersProvider!.allOrders
-          .where((o) => orderIds.contains(o.id))
-          .toList();
+    // P0-2: Get current orders for this session
+    final orders = _ordersProvider!.allOrders
+        .where((o) => orderIds.contains(o.id))
+        .toList();
 
-      if (orders.isEmpty) return null;
+    if (orders.isEmpty) return null;
 
-      final taxRate = _resolveTaxRate(orders);
+    final taxRate = _resolveTaxRate(orders);
 
-      // 2. Generate the bill record (Atomic transactional creation)
-      final billService = BillService();
-      final billId =
-          await Future<String>.sync(() {
-            return billService.generateBill(
-              tenantId: _tenantId!,
-              tableId: tableId,
-              orders: orders,
-              discount: discount,
-              isPercentage: isPercentage,
-              taxRate: taxRate,
-              paymentMethod: paymentMethod,
-              note: note,
-            );
-          }).catchError((error) {
-            throw Exception('Bill generation failed: $error');
-          });
+    // P0-2: Generate bill — let errors propagate so UI can show them
+    final billService = BillService();
+    final billId = await billService.generateBill(
+      tenantId: _tenantId!,
+      tableId: tableId,
+      orders: orders,
+      discount: discount,
+      isPercentage: isPercentage,
+      taxRate: taxRate,
+      paymentMethod: paymentMethod,
+      note: note,
+    );
 
-      // 3. Finalize settlement and release table
-      await Future<void>.sync(() {
-        return _ordersProvider!.markTableAsPaid(
-          tableId,
-          finalAmount: finalAmount,
-          correctionAmount: correctionAmount,
-          correctionReason: correctionReason,
-          paymentMethod: paymentMethod,
-        );
-      }).catchError((error) {
-        throw Exception('Settlement failed: $error');
-      });
+    // P0-2: Finalize settlement — let errors propagate
+    await _ordersProvider!.markTableAsPaid(
+      tableId,
+      finalAmount: finalAmount,
+      correctionAmount: correctionAmount,
+      correctionReason: correctionReason,
+      paymentMethod: paymentMethod,
+    );
 
-      return billId;
-    } catch (e) {
-      print('❌ Error in markAsPaid flow: $e');
-      rethrow;
-    }
+    return billId;
   }
 
   double _resolveTaxRate(List<model.Order> orders) {

@@ -70,6 +70,7 @@ class _HomeContentState extends State<HomeContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final menuController = context.read<app_controller.MenuController>();
       menuController.loadMenuItems(widget.tenantId);
+      _maybeShowFirstTimeQrGuide();
     });
   }
 
@@ -239,6 +240,71 @@ class _HomeContentState extends State<HomeContent> {
     } catch (e) {
       print('Error initializing session: $e');
     }
+  }
+
+  Future<void> _maybeShowFirstTimeQrGuide() async {
+    final guestSession = GuestSessionService();
+    final hasSeenGuide = await guestSession.hasSeenQrMenuGuide();
+    if (hasSeenGuide || !mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.qr_code_scanner_rounded,
+              color: AppTheme.primaryColor,
+              size: 28,
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'How To Use QR Menu',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            _GuideStep(
+              icon: Icons.restaurant_menu_rounded,
+              text: 'Browse menu items and open any dish to see details.',
+            ),
+            SizedBox(height: 12),
+            _GuideStep(
+              icon: Icons.add_shopping_cart_rounded,
+              text: 'Add your items to cart and adjust quantity if needed.',
+            ),
+            SizedBox(height: 12),
+            _GuideStep(
+              icon: Icons.receipt_long_rounded,
+              text:
+                  'Place the order from cart and track it live on this screen.',
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+
+    await guestSession.markQrMenuGuideSeen();
   }
 
   Future<void> _loadTenantInfo() async {
@@ -1093,6 +1159,35 @@ class _HomeContentState extends State<HomeContent> {
               label: 'Cart',
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _GuideStep extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _GuideStep({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: AppTheme.primaryColor),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(text, style: const TextStyle(fontSize: 14, height: 1.4)),
         ),
       ],
     );

@@ -223,9 +223,9 @@ class CartController extends ChangeNotifier {
     return _generateKey(itemId, variant, selectedSpiceLevel);
   }
 
-  void clear() {
+  Future<void> clear() async {
     _items.clear();
-    _saveCart();
+    await _saveCart();
     notifyListeners();
   }
 }

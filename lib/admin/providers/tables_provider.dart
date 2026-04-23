@@ -11,7 +11,7 @@ import '../../models/order.dart' as order_model;
 class TablesProvider with ChangeNotifier {
   final TablesService _tablesService = TablesService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   List<RestaurantTable> _tables = [];
   bool _isLoading = false;
   String? _tenantId;
@@ -23,88 +23,104 @@ class TablesProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   int get totalTablesCount => _tables.length;
-  
-  int get activeSessionsCount => _tables.where((t) => t.status.hasActiveSession).length;
-  
-  int get billRequestsCount => _tables.where((t) => t.status == TableStatus.billRequested).length;
-  
-  int get vacantTablesCount => _tables.where((t) => t.status.canAcceptCustomers).length;
+
+  int get activeSessionsCount =>
+      _tables.where((t) => t.status.hasActiveSession).length;
+
+  int get billRequestsCount =>
+      _tables.where((t) => t.status == TableStatus.billRequested).length;
+
+  int get vacantTablesCount =>
+      _tables.where((t) => t.status.canAcceptCustomers).length;
 
   void initialize(String tenantId, {OrdersProvider? ordersProvider}) {
     print('🔥 TablesProvider: Initialize called for tenant: $tenantId');
     _ordersProvider = ordersProvider;
     if (_tenantId == tenantId && (_tables.isNotEmpty || _isLoading)) {
-      print('🔥 TablesProvider: Already healthy for $tenantId, tables count: ${_tables.length}');
+      print(
+        '🔥 TablesProvider: Already healthy for $tenantId, tables count: ${_tables.length}',
+      );
       _ordersProvider = ordersProvider; // Update the reference anyway
       return;
     }
-    
+
     print('🔥 TablesProvider: Setting up new subscription for $tenantId');
     _tablesSubscription?.cancel();
     _tenantId = tenantId;
     _isLoading = true;
     notifyListeners();
 
-    _tablesSubscription = _tablesService.getTablesStream(tenantId).listen(
-      (tables) {
-        print('🔥 TablesProvider: Received ${tables.length} tables from stream');
-        _tables = tables;
-        _isLoading = false;
-        if (_ordersProvider != null) {
-          _syncTablesWithOrders();
-        }
-        notifyListeners();
-      },
-      onError: (error) {
-        print('❌ TablesProvider: Stream error: $error');
-        _isLoading = false;
-        _tables = [];
-        notifyListeners();
-      },
-      onDone: () {
-        print('🔥 TablesProvider: Stream closed');
-      },
-    );
+    _tablesSubscription = _tablesService
+        .getTablesStream(tenantId)
+        .listen(
+          (tables) {
+            print(
+              '🔥 TablesProvider: Received ${tables.length} tables from stream',
+            );
+            _tables = tables;
+            _isLoading = false;
+            if (_ordersProvider != null) {
+              _syncTablesWithOrders();
+            }
+            notifyListeners();
+          },
+          onError: (error) {
+            print('❌ TablesProvider: Stream error: $error');
+            _isLoading = false;
+            _tables = [];
+            notifyListeners();
+          },
+          onDone: () {
+            print('🔥 TablesProvider: Stream closed');
+          },
+        );
   }
 
   /// Automatically heals the state by syncing table physical status with order data
   void _syncTablesWithOrders() {
     if (_ordersProvider == null || _tables.isEmpty || _tenantId == null) return;
 
-    final activeOrders = _ordersProvider!.orders.where((o) => 
-      o.status != order_model.OrderStatus.completed && 
-      o.status != order_model.OrderStatus.cancelled
-    ).toList();
+    final activeOrders = _ordersProvider!.orders
+        .where(
+          (o) =>
+              o.status != order_model.OrderStatus.completed &&
+              o.status != order_model.OrderStatus.cancelled,
+        )
+        .toList();
 
     // Mapping of tableId -> activeOrder count
     final Map<String, int> tableActiveOrders = {};
     for (var o in activeOrders) {
       if (o.tableId != null) {
-        tableActiveOrders[o.tableId!] = (tableActiveOrders[o.tableId!] ?? 0) + 1;
+        tableActiveOrders[o.tableId!] =
+            (tableActiveOrders[o.tableId!] ?? 0) + 1;
       }
     }
 
     for (final table in _tables) {
-       final hasActiveOrders = tableActiveOrders.containsKey(table.id);
-       
-       if (hasActiveOrders && table.status == TableStatus.available) {
-          print('🛠️ Auto-Sync: Marking table ${table.name} as occupied due to active order');
-          final order = activeOrders.firstWhere((o) => o.tableId == table.id);
-          updateTable(table.copyWith(
+      final hasActiveOrders = tableActiveOrders.containsKey(table.id);
+
+      if (hasActiveOrders && table.status == TableStatus.available) {
+        print(
+          '🛠️ Auto-Sync: Marking table ${table.name} as occupied due to active order',
+        );
+        final order = activeOrders.firstWhere((o) => o.tableId == table.id);
+        updateTable(
+          table.copyWith(
             isOccupied: true,
             isAvailable: false,
             status: TableStatus.occupied,
             occupiedAt: order.createdAt,
             currentSessionId: order.id, // Link to one of the active orders
-          ));
-       } else if (!hasActiveOrders && table.status == TableStatus.occupied) {
-          // If a table is marked occupied but has NO orders, and it's been like that for a while
-          final now = DateTime.now();
-          if (table.occupiedAt != null && now.difference(table.occupiedAt!).inMinutes > 5) {
-             print('🛠️ Auto-Sync: Releasing GHOST table ${table.name} (Occupied with no orders for 5+ min)');
-             releaseTable(table.id);
-          }
-       }
+          ),
+        );
+      } else if (!hasActiveOrders && table.status == TableStatus.occupied) {
+        // P1-7: Release ghost tables immediately — no active order = table should be available
+        debugPrint(
+          '🛠️ Auto-Sync: Releasing GHOST table ${table.name} (Occupied with no active orders)',
+        );
+        releaseTable(table.id);
+      }
     }
   }
 
@@ -125,25 +141,30 @@ class TablesProvider with ChangeNotifier {
 
   Future<void> releaseTable(String tableId) async {
     if (_tenantId == null) return;
-    
+
     try {
       // 1. Force release (cancel active orders) via OrdersProvider
       if (_ordersProvider != null) {
-        await _ordersProvider!.forceReleaseTable(tableId, reason: 'Manual table release');
+        await _ordersProvider!.forceReleaseTable(
+          tableId,
+          reason: 'Manual table release',
+        );
         print('🔓 Released table $tableId via OrdersProvider');
         return;
       }
-      
+
       // 2. Update table status to available and track last released timestamp
       final table = _tables.firstWhere((t) => t.id == tableId);
-      await updateTable(table.copyWith(
-        status: TableStatus.available,
-        isAvailable: true,
-        isOccupied: false,
-        currentSessionId: null,
-        occupiedAt: null,
-        lastReleasedAt: DateTime.now(), // Tracking for Bug #6
-      ));
+      await updateTable(
+        table.copyWith(
+          status: TableStatus.available,
+          isAvailable: true,
+          isOccupied: false,
+          currentSessionId: null,
+          occupiedAt: null,
+          lastReleasedAt: DateTime.now(), // Tracking for Bug #6
+        ),
+      );
 
       // Clear pending waiter calls if we couldn't route through OrdersProvider
       if (tableId != 'PARCEL') {

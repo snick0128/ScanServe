@@ -14,7 +14,7 @@ class NotificationPreferences {
     this.voiceSpeed = 0.5,
     this.languageCode = 'en-IN',
     this.readItems = true,
-    this.repeatAlarm = true,
+    this.repeatAlarm = false,
     this.alarmVolume = 1,
     this.snoozeSeconds = 10,
   });
@@ -40,7 +40,7 @@ class NotificationPreferences {
       voiceSpeed: (map['voiceSpeed'] as num?)?.toDouble() ?? 0.5,
       languageCode: map['languageCode']?.toString() ?? 'en-IN',
       readItems: map['readItems'] != false,
-      repeatAlarm: map['repeatAlarm'] != false,
+      repeatAlarm: map['repeatAlarm'] == true,
       alarmVolume: (map['alarmVolume'] as num?)?.toDouble() ?? 1,
       snoozeSeconds: (map['snoozeSeconds'] as num?)?.toInt() ?? 10,
     );
