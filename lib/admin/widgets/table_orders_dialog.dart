@@ -95,22 +95,6 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
     return 'GST';
   }
 
-  void _rebuildPreservingScroll(VoidCallback update) {
-    final offset = _scrollController.hasClients
-        ? _scrollController.offset
-        : null;
-    setState(update);
-    if (offset == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      final max = _scrollController.position.maxScrollExtent;
-      final clamped = offset.clamp(0.0, max);
-      if (clamped != _scrollController.offset) {
-        _scrollController.jumpTo(clamped);
-      }
-    });
-  }
-
   Future<void> _startNewOrder() async {
     final auth = context.read<AdminAuthProvider>();
     if (auth.isKitchen) {
@@ -697,7 +681,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'FINAL TOTALAMOUNT',
+            'FINAL TOTAL AMOUNT',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -1287,7 +1271,7 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                     borderRadius: BorderRadius.circular(8),
                     isSelected: [_isPercentageDiscount, !_isPercentageDiscount],
                     onPressed: (index) {
-                      _rebuildPreservingScroll(() {
+                      setState(() {
                         _isPercentageDiscount = index == 0;
                       });
                     },
@@ -1317,7 +1301,12 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
                     ),
                   ),
                   onChanged: (val) {
-                    _rebuildPreservingScroll(() {});
+                    // Use setState directly — _rebuildPreservingScroll causes
+                    // the ListView to jump because it fights the keyboard/layout
+                    // shift. A plain setState is sufficient here since the
+                    // discount field is inside the scrollable list and the
+                    // scroll position is preserved naturally by the framework.
+                    setState(() {});
                   },
                 ),
               ),

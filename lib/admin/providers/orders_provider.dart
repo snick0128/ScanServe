@@ -1312,7 +1312,7 @@ class OrdersProvider with ChangeNotifier {
         final currentTax = (data['tax'] ?? 0).toDouble();
         final taxRate = currentSubtotal > 0
             ? (currentTax / currentSubtotal)
-            : 0.05;
+            : 0.18; // default 18% GST
 
         final tax = subtotal * taxRate;
         final total = subtotal + tax;
@@ -1363,8 +1363,12 @@ class OrdersProvider with ChangeNotifier {
 
     for (final other in otherOrders) {
       for (final newItem in other.items) {
+        // Match by name + variant, NOT by id — items from different orders
+        // always have different UUIDs so id-matching never consolidates them.
         final existingItemIndex = mergedItems.indexWhere(
-          (i) => i.id == newItem.id,
+          (i) =>
+              i.name == newItem.name &&
+              i.variantName == newItem.variantName,
         );
         if (existingItemIndex != -1) {
           final oldItem = mergedItems[existingItemIndex];
@@ -1387,7 +1391,7 @@ class OrdersProvider with ChangeNotifier {
     );
     final taxRate = baseOrder.subtotal > 0
         ? (baseOrder.tax / baseOrder.subtotal)
-        : 0.05;
+        : 0.18; // default 18% GST
     final tax = subtotal * taxRate;
     final total = subtotal + tax;
 
@@ -1430,11 +1434,13 @@ class OrdersProvider with ChangeNotifier {
             '🔄 OrdersProvider: Appending to existing order: ${existingOrder.id} for table ${order.tableId}',
           );
 
-          // Merge items
+          // Merge items — match by name + variant, not by id
           List<model.OrderItem> mergedItems = List.from(existingOrder.items);
           for (var newItem in order.items) {
             final existingItemIndex = mergedItems.indexWhere(
-              (i) => i.id == newItem.id,
+              (i) =>
+                  i.name == newItem.name &&
+                  i.variantName == newItem.variantName,
             );
             if (existingItemIndex != -1) {
               final oldItem = mergedItems[existingItemIndex];
@@ -1456,7 +1462,7 @@ class OrdersProvider with ChangeNotifier {
           );
           final taxRate = existingOrder.subtotal > 0
               ? (existingOrder.tax / existingOrder.subtotal)
-              : 0.05;
+              : 0.18; // default 18% GST
           final tax = subtotal * taxRate;
           final total = subtotal + tax;
 
