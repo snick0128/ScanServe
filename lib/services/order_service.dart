@@ -8,6 +8,7 @@ import '../utils/session_validator.dart';
 import '../utils/request_debouncer.dart';
 import 'inventory_service.dart';
 import 'menu_service.dart';
+import 'display_order_id_service.dart';
 
 class OrderService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -15,6 +16,7 @@ class OrderService {
   final RequestDebouncer _debouncer = RequestDebouncer();
   final InventoryService _inventoryService = InventoryService();
   final MenuService _menuService = MenuService();
+  final DisplayOrderIdService _displayIdService = DisplayOrderIdService();
 
   int _estimateWaitTime(List<CartItem> cartItems) {
     if (cartItems.isEmpty) return 25;
@@ -41,6 +43,7 @@ class OrderService {
     String? paymentMethod,
     String? requestId, // UUID for deduplication
     String? sessionId, // session ID for Bug #6
+    int guestCount = 0,
   }) async {
     try {
       // CRITICAL: Validate session identifiers
@@ -200,8 +203,9 @@ class OrderService {
       // 2. Create New Order
       final orderId = _uuid.v4();
 
-      // Get table name
+      // Get table name + section
       String? tableName;
+      String? sectionName;
       if (orderType == orm.OrderType.dineIn && tableId != null) {
         final tableDoc = await _firestore
             .collection('tenants')
@@ -210,7 +214,15 @@ class OrderService {
             .doc(tableId)
             .get();
         tableName = tableDoc.data()?['name'] as String?;
+        sectionName = tableDoc.data()?['section'] as String?;
       }
+
+      // Generate concurrency-safe display order ID
+      final displayOrderId = await _displayIdService.generate(
+        tenantId: tenantId,
+        tableName: tableName,
+        isParcel: orderType == orm.OrderType.parcel,
+      );
 
       final List<model.OrderItem> items = cartItems.map((c) {
         final price = c.selectedVariant?.price ?? c.item.price;
@@ -254,6 +266,9 @@ class OrderService {
         chefNote: chefNote,
         estimatedWaitTime: _estimateWaitTime(cartItems),
         sessionId: sessionId,
+        displayOrderId: displayOrderId,
+        guestCount: guestCount,
+        sectionName: sectionName,
       );
 
       await _firestore

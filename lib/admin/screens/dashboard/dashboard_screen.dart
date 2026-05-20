@@ -44,11 +44,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Kitchen staff only gets KDS
     final auth = context.read<AdminAuthProvider>();
     if (auth.isKitchen) {
+      // Kitchen staff lands directly on KDS
       _selectedIndex = 9;
+    } else if (auth.isCaptain) {
+      // Waiters/captains land directly on Tables for faster service
+      _selectedIndex = 2;
     }
+    // Admin/owner stays on Dashboard (index 0)
   }
 
   void _onItemTapped(int index) {

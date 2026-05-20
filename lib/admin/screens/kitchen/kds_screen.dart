@@ -548,6 +548,10 @@ class _KDSScreenState extends State<KDSScreen> {
       (item) => item.status == model.OrderItemStatus.ready,
     );
 
+    // Display order ID — fall back to first 8 chars of internal ID
+    final displayId = order.displayOrderId ??
+        '#${order.id.length >= 8 ? order.id.substring(0, 8) : order.id}';
+
     return Container(
       width: cardWidth,
       margin: EdgeInsets.only(bottom: 8.h),
@@ -564,9 +568,9 @@ class _KDSScreenState extends State<KDSScreen> {
       ),
       child: Column(
         children: [
-          // Column Header
+          // Card Header
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.05),
               borderRadius: const BorderRadius.vertical(
@@ -577,16 +581,35 @@ class _KDSScreenState extends State<KDSScreen> {
               ),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Row 1: Table name + timer
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      order.tableName ?? 'TAB 0',
-                      style: TextStyle(
-                        fontSize: isCompact ? 20.sp : 24,
-                        fontWeight: FontWeight.w900,
-                        color: AdminTheme.primaryText,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.tableName ?? 'TABLE',
+                            style: TextStyle(
+                              fontSize: isCompact ? 20.sp : 24,
+                              fontWeight: FontWeight.w900,
+                              color: AdminTheme.primaryText,
+                            ),
+                          ),
+                          if (order.sectionName != null &&
+                              order.sectionName!.isNotEmpty)
+                            Text(
+                              order.sectionName!,
+                              style: TextStyle(
+                                fontSize: isCompact ? 11.sp : 12,
+                                fontWeight: FontWeight.w600,
+                                color: AdminTheme.secondaryText,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Row(
@@ -615,13 +638,13 @@ class _KDSScreenState extends State<KDSScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                // Row 2: Status badge + order ID + guest count + print
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 4,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
                         color: statusColor,
@@ -636,10 +659,45 @@ class _KDSScreenState extends State<KDSScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayId,
+                        style: TextStyle(
+                          fontSize: isCompact ? 11.sp : 12,
+                          fontWeight: FontWeight.bold,
+                          color: AdminTheme.secondaryText,
+                          letterSpacing: 0.5,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (order.guestCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Ionicons.people_outline,
+                            size: 14,
+                            color: AdminTheme.secondaryText,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${order.guestCount}',
+                            style: TextStyle(
+                              fontSize: isCompact ? 12.sp : 13,
+                              fontWeight: FontWeight.bold,
+                              color: AdminTheme.primaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     IconButton(
                       icon: const Icon(
                         Ionicons.print_outline,
-                        size: 20,
+                        size: 18,
                         color: AdminTheme.secondaryText,
                       ),
                       onPressed: () => _printKOT(order),
@@ -1021,9 +1079,23 @@ class _KDSScreenState extends State<KDSScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Order ID: #${order.id.substring(0, 8)}',
+                      order.displayOrderId != null
+                          ? 'Order: ${order.displayOrderId}'
+                          : 'Order ID: #${order.id.substring(0, 8)}',
                       style: const TextStyle(color: AdminTheme.secondaryText),
                     ),
+                    if (order.sectionName != null)
+                      Text(
+                        'Section: ${order.sectionName}',
+                        style:
+                            const TextStyle(color: AdminTheme.secondaryText),
+                      ),
+                    if (order.guestCount > 0)
+                      Text(
+                        'Guests: ${order.guestCount}',
+                        style:
+                            const TextStyle(color: AdminTheme.secondaryText),
+                      ),
                     Text(
                       'Order Age: ${_formatDuration(age)}',
                       style: const TextStyle(color: AdminTheme.secondaryText),
@@ -1205,11 +1277,14 @@ class _KDSScreenState extends State<KDSScreen> {
     }).toList();
   }
 
-  Future<void> _printKOT(model.Order order) async {
+  Future<void> _printKOT(model.Order order, {bool isReprint = false}) async {
     try {
       final pdf = pw.Document();
       final font = await PdfGoogleFonts.notoSansDevanagariRegular();
       final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
+
+      final displayId = order.displayOrderId ??
+          '#${order.id.length >= 8 ? order.id.substring(0, 8) : order.id}';
 
       pdf.addPage(
         pw.Page(
@@ -1222,14 +1297,41 @@ class _KDSScreenState extends State<KDSScreen> {
               children: [
                 pw.Center(
                   child: pw.Text(
-                    'KOT Ticket',
+                    'KOT',
                     style: pw.TextStyle(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                 ),
+                if (isReprint)
+                  pw.Center(
+                    child: pw.Container(
+                      margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(width: 1),
+                      ),
+                      child: pw.Text(
+                        '** DUPLICATE COPY **',
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
                 pw.Divider(),
+                // Order ID (display format)
+                pw.Text(
+                  'Order: $displayId',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                // Table + Section
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -1237,39 +1339,51 @@ class _KDSScreenState extends State<KDSScreen> {
                       'Table: ${order.tableName ?? "N/A"}',
                       style: pw.TextStyle(
                         fontWeight: pw.FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 12,
                       ),
                     ),
                     pw.Text(
                       DateFormat('h:mm a').format(order.createdAt),
-                      style: const pw.TextStyle(fontSize: 12),
+                      style: const pw.TextStyle(fontSize: 11),
                     ),
                   ],
                 ),
-                pw.Text(
-                  'Order: #${order.id.substring(0, 8)}',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-                if (order.customerName != null)
+                if (order.sectionName != null && order.sectionName!.isNotEmpty)
                   pw.Text(
-                    'Cust: ${order.customerName}',
+                    'Section: ${order.sectionName}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                if (order.guestCount > 0)
+                  pw.Text(
+                    'Guests: ${order.guestCount}',
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                if (order.customerName != null &&
+                    order.customerName!.isNotEmpty &&
+                    order.customerName != 'Walk-in' &&
+                    order.customerName != 'Staff Created')
+                  pw.Text(
+                    'Customer: ${order.customerName}',
                     style: const pw.TextStyle(fontSize: 10),
                   ),
                 pw.Divider(borderStyle: pw.BorderStyle.dashed),
-                pw.SizedBox(height: 5),
+                pw.SizedBox(height: 4),
                 ...order.items.map((item) {
                   return pw.Container(
                     margin: const pw.EdgeInsets.only(bottom: 8),
                     child: pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Container(
-                          width: 20,
+                        pw.SizedBox(
+                          width: 22,
                           child: pw.Text(
-                            '${item.quantity}',
+                            '${item.quantity}x',
                             style: pw.TextStyle(
                               fontWeight: pw.FontWeight.bold,
-                              fontSize: 14,
+                              fontSize: 13,
                             ),
                           ),
                         ),
@@ -1284,7 +1398,6 @@ class _KDSScreenState extends State<KDSScreen> {
                                   fontSize: 12,
                                 ),
                               ),
-                              /* Variants display in KOT */
                               if (item.variantName != null)
                                 pw.Text(
                                   '(${item.variantName})',
@@ -1319,7 +1432,7 @@ class _KDSScreenState extends State<KDSScreen> {
                 pw.Divider(),
                 pw.Center(
                   child: pw.Text(
-                    'Printed at ${DateFormat('h:mm a').format(DateTime.now())}',
+                    'Printed: ${DateFormat('dd MMM h:mm a').format(DateTime.now())}',
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                 ),
@@ -1331,20 +1444,24 @@ class _KDSScreenState extends State<KDSScreen> {
 
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'KOT_${order.id.substring(0, 8)}',
+        name: 'KOT_$displayId',
       );
     } catch (e) {
       debugPrint('Error printing KOT: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Print Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Print Error: $e')));
       }
     }
   }
 
   Widget _buildNewOrderBanner(OrdersProvider provider) {
     final order = provider.latestNewOrder!;
+    final displayId = order.displayOrderId ??
+        '#${order.id.length >= 8 ? order.id.substring(0, 8) : order.id}';
+    final guestLabel =
+        order.guestCount > 0 ? ' • ${order.guestCount} guests' : '';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 720;
@@ -1357,15 +1474,11 @@ class _KDSScreenState extends State<KDSScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Ionicons.alert_circle,
-                          color: Colors.white,
-                          size: 22.w,
-                        ),
+                        Icon(Ionicons.alert_circle, color: Colors.white, size: 22.w),
                         SizedBox(width: 10.w),
                         Expanded(
                           child: Text(
-                            'NEW ORDER: ${order.tableName} • #${order.id.substring(0, 8)}',
+                            'NEW: ${order.tableName}$guestLabel • $displayId',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -1395,15 +1508,11 @@ class _KDSScreenState extends State<KDSScreen> {
                 )
               : Row(
                   children: [
-                    Icon(
-                      Ionicons.alert_circle,
-                      color: Colors.white,
-                      size: 24.w,
-                    ),
+                    Icon(Ionicons.alert_circle, color: Colors.white, size: 24.w),
                     SizedBox(width: 16.w),
                     Expanded(
                       child: Text(
-                        'NEW ORDER RECEIVED: Table ${order.tableName} - #${order.id.substring(0, 8)}',
+                        'NEW ORDER: ${order.tableName}$guestLabel — $displayId',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

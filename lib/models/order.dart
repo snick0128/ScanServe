@@ -198,6 +198,14 @@ class Order {
   final String? paidBy;
   final String? paymentNote;
 
+  // Human-readable display ID — never shown internally, only to staff/kitchen
+  final String? displayOrderId; // e.g. "19MAY-T12-042"
+  final int? dailySequence;     // e.g. 42 (for indexing)
+
+  // Operational metadata
+  final int guestCount;         // Number of guests at the table
+  final String? sectionName;    // Section the table belongs to (e.g. "AC Hall")
+
   Order({
     required this.id,
     required this.tenantId,
@@ -232,6 +240,10 @@ class Order {
     this.paidAt,
     this.paidBy,
     this.paymentNote,
+    this.displayOrderId,
+    this.dailySequence,
+    this.guestCount = 0,
+    this.sectionName,
   });
 
   factory Order.fromFirestore(DocumentSnapshot doc) {
@@ -295,6 +307,10 @@ class Order {
       paidAt: data['paidAt'] != null ? parseDateTime(data['paidAt']) : null,
       paidBy: data['paidBy'],
       paymentNote: data['paymentNote'],
+      displayOrderId: data['displayOrderId'],
+      dailySequence: (data['dailySequence'] as num?)?.toInt(),
+      guestCount: (data['guestCount'] as num?)?.toInt() ?? 0,
+      sectionName: data['sectionName'],
     );
   }
 
@@ -333,6 +349,10 @@ class Order {
       if (paidAt != null) 'paidAt': Timestamp.fromDate(paidAt!),
       if (paidBy != null) 'paidBy': paidBy,
       'paymentNote': paymentNote,
+      if (displayOrderId != null) 'displayOrderId': displayOrderId,
+      if (dailySequence != null) 'dailySequence': dailySequence,
+      'guestCount': guestCount,
+      if (sectionName != null) 'sectionName': sectionName,
     };
   }
 
@@ -370,6 +390,10 @@ class Order {
     DateTime? paidAt,
     String? paidBy,
     String? paymentNote,
+    String? displayOrderId,
+    int? dailySequence,
+    int? guestCount,
+    String? sectionName,
   }) {
     return Order(
       id: id ?? this.id,
@@ -405,6 +429,10 @@ class Order {
       paidAt: paidAt ?? this.paidAt,
       paidBy: paidBy ?? this.paidBy,
       paymentNote: paymentNote ?? this.paymentNote,
+      displayOrderId: displayOrderId ?? this.displayOrderId,
+      dailySequence: dailySequence ?? this.dailySequence,
+      guestCount: guestCount ?? this.guestCount,
+      sectionName: sectionName ?? this.sectionName,
     );
   }
 

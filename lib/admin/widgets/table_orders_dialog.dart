@@ -703,6 +703,8 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
   }
 
   Widget _buildOrderCard(model.Order order) {
+    final displayId = order.displayOrderId ??
+        'Order #${order.id.length >= 8 ? order.id.substring(0, 8) : order.id}';
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -715,27 +717,55 @@ class _TableOrdersDialogState extends State<TableOrdersDialog> {
               children: [
                 Expanded(
                   child: Text(
-                    'Order #${order.id.substring(0, 8)}',
+                    displayId,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                /* Removed FIRE button as per Requirement 3: Transition is automatic */
+                if (order.guestCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.people_alt_outlined,
+                            size: 14, color: Colors.grey),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${order.guestCount}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
                 _buildStatusChip(order.status),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               DateFormat('MMM d, y • h:mm a').format(order.createdAt),
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
-            if (order.customerName != null && order.customerName!.isNotEmpty)
+            if (order.customerName != null &&
+                order.customerName!.isNotEmpty &&
+                order.customerName != 'Walk-in' &&
+                order.customerName != 'Staff Created')
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: 3),
                 child: Text(
                   'Customer: ${order.customerName}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            if (order.customerPhone != null &&
+                order.customerPhone!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'Phone: ${order.customerPhone}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ),

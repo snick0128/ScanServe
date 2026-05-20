@@ -179,43 +179,63 @@ class _TablesScreenState extends State<TablesScreen> {
 
   Widget _buildKPIBar(TablesProvider provider) {
     final isMobile = MediaQuery.of(context).size.width < 900;
-    
     return Padding(
-      padding: EdgeInsets.all(isMobile ? 16 : 32),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.fromLTRB(
+          isMobile ? 16 : 32, 12, isMobile ? 16 : 32, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey[100]!),
+        ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildKPICard('TOTAL', provider.totalTablesCount.toString()),
-            const SizedBox(width: 12),
-            _buildKPICard('ACTIVE', provider.activeSessionsCount.toString()),
-            const SizedBox(width: 12),
-            _buildKPICard('BILLS', provider.billRequestsCount.toString()),
+            _buildKPIStat('TOTAL', provider.totalTablesCount.toString()),
+            _buildKPIDivider(),
+            _buildKPIStat('ACTIVE', provider.activeSessionsCount.toString(),
+                color: AdminTheme.success),
+            _buildKPIDivider(),
+            _buildKPIStat('BILLS', provider.billRequestsCount.toString(),
+                color: AdminTheme.primaryColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildKPICard(String label, String value) {
-    final isMobile = MediaQuery.of(context).size.width < 900;
-    return Container(
-      width: isMobile ? 120 : 200,
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[100]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildKPIStat(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AdminTheme.secondaryText, letterSpacing: 1)),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: isMobile ? 24 : 36, fontWeight: FontWeight.bold, color: AdminTheme.primaryText)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color ?? AdminTheme.primaryText,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: AdminTheme.secondaryText,
+              letterSpacing: 0.5,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildKPIDivider() {
+    return Container(width: 1, height: 24, color: Colors.grey[200]);
   }
 
   Widget _buildFiltersBar() {
